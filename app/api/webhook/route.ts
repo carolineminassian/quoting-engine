@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16'
+  apiVersion: '2026-04-22.dahlia'
 });
 
 // Le Service Role Key permet au backend d'écrire dans la base de données sans session active
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   try {
     event = stripe.webhooks.constructEvent(
       body,
-      sig,
+      sig,A
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
