@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
-// 1. Updated Interfaces to include specific tax rates
 interface EstimateItem {
   materialId: string;
   qty: number;
@@ -26,7 +25,7 @@ export default function NewEstimatePage() {
     <Suspense
       fallback={
         <div className="p-10 text-center font-sans uppercase font-black text-gray-300 tracking-widest italic">
-          Synchronizing Engine...
+          Chargement / Loading...
         </div>
       }
     >
@@ -47,6 +46,14 @@ function NewEstimateContent() {
   const [loading, setLoading] = useState(true);
   const [limitReached, setLimitReached] = useState(false);
 
+  // NEW: Custom In-App Dialog State
+  const [dialog, setDialog] = useState<{
+    type: 'alert' | 'confirm';
+    title?: string;
+    message: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
   const [client, setClient] = useState({
     name: '',
     email: '',
@@ -55,7 +62,6 @@ function NewEstimateContent() {
   });
   const [customRef, setCustomRef] = useState('');
 
-  // 2. Applied the Interface to the state
   const [sections, setSections] = useState<EstimateSection[]>([
     { title: '', laborHours: 0, hourlyRate: 50, laborTaxRate: 0, items: [] }
   ]);
@@ -69,7 +75,11 @@ function NewEstimateContent() {
 
       const [prof, mats, ests] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user?.id).single(),
-        supabase.from('materials').select('*').order('name'),
+        supabase
+          .from('materials')
+          .select('*')
+          .eq('user_id', user?.id)
+          .order('name'),
         supabase
           .from('estimates')
           .select(
@@ -126,7 +136,6 @@ function NewEstimateContent() {
             address: est.client_address || ''
           });
           setCustomRef(est.custom_id || '');
-          // Ensure older estimates without tax rates don't break
           const loadedSections = (est.sections || []).map((sec: any) => ({
             ...sec,
             laborTaxRate:
@@ -187,7 +196,6 @@ function NewEstimateContent() {
     setSections(n);
   };
 
-  // 3. Updated granular calculation logic
   const calculateTotals = () => {
     let subtotalCents = 0;
     let totalTaxCents = 0;
@@ -227,11 +235,11 @@ function NewEstimateContent() {
     const phoneRegex = /^[\d\+\-\s\(\)]{7,20}$/;
 
     if (client.email && !emailRegex.test(client.email)) {
-      alert(lang.invalidEmail);
+      setDialog({ type: 'alert', message: lang.invalidEmail });
       return;
     }
     if (client.phone && !phoneRegex.test(client.phone)) {
-      alert(lang.invalidPhone);
+      setDialog({ type: 'alert', message: lang.invalidPhone });
       return;
     }
 
@@ -239,11 +247,13 @@ function NewEstimateContent() {
       sec.items.some((item) => item.qty <= 0)
     );
     if (hasZeroQty) {
-      alert(
-        profile?.country === 'FR'
-          ? "La quantité de chaque matériau doit être supérieure à 0. Supprimez la ligne si l'article n'est pas nécessaire."
-          : 'The quantity of each material must be greater than 0. Remove the row if the item is not needed.'
-      );
+      setDialog({
+        type: 'alert',
+        message:
+          profile?.country === 'FR'
+            ? "La quantité de chaque matériau doit être supérieure à 0. Supprimez la ligne si l'article n'est pas nécessaire."
+            : 'The quantity of each material must be greater than 0. Remove the row if the item is not needed.'
+      });
       return;
     }
 
@@ -289,14 +299,14 @@ function NewEstimateContent() {
       }
       router.push(`/estimates/${res.data[0].id}`);
     } else {
-      alert(res.error.message);
+      setDialog({ type: 'alert', message: res.error.message });
     }
   };
 
   if (loading || !lang)
     return (
       <div className="p-10 text-center font-sans text-black italic">
-        Synchronizing Planner...
+        Chargement / Loading...
       </div>
     );
 
@@ -329,7 +339,7 @@ function NewEstimateContent() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black pb-40 font-sans">
+    <main className="min-h-screen bg-gray-50 p-8 text-black pb-40 font-sans relative">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
@@ -501,9 +511,9 @@ function NewEstimateContent() {
             </p>
             <div className="space-y-3">
               {sec.items.map((item, iIdx) => (
-                <div key={iIdx} className="flex gap-4 items-center">
+                <div key={iIdx} className="flex gap-2 sm:gap-4 items-center">
                   <select
-                    className="flex-1 p-2 border border-gray-100 rounded bg-gray-50 font-bold text-xs"
+                    className="flex-1 p-2 border border-gray-100 rounded bg-gray-50 font-bold text-xs outline-none focus:border-blue-500"
                     value={item.materialId}
                     onChange={(e) =>
                       updateItem(sIdx, iIdx, 'materialId', e.target.value)
@@ -514,31 +524,43 @@ function NewEstimateContent() {
                     </option>
                     {materials.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name} ({lang.units[m.unit]}) (
+                        {m.name} ({lang.units?.[m.unit] || m.unit}) (
                         {profile?.currency === 'EUR' ? '€' : '$'}
                         {(m.cost_per_unit_cents / 100).toFixed(2)})
                       </option>
                     ))}
                   </select>
-                  <input
-                    type="number"
-                    className="w-24 p-2 border border-gray-100 rounded text-center font-bold"
-                    placeholder="Qty"
-                    value={item.qty === 0 ? '' : item.qty}
-                    onChange={(e) =>
-                      updateItem(
-                        sIdx,
-                        iIdx,
-                        'qty',
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                  />
+
+                  {/* Qty Input with Permanent Prefix */}
                   <div className="relative">
+                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
+                      {profile?.country === 'FR' ? 'Qté' : 'Qty'}
+                    </span>
                     <input
                       type="number"
-                      className="w-20 p-2 border border-gray-100 rounded text-center font-bold pr-6"
-                      placeholder="Tax"
+                      className="w-24 p-2 pl-9 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
+                      placeholder="0"
+                      value={item.qty === 0 ? '' : item.qty}
+                      onChange={(e) =>
+                        updateItem(
+                          sIdx,
+                          iIdx,
+                          'qty',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                    />
+                  </div>
+
+                  {/* Tax Input with Permanent Prefix & Suffix */}
+                  <div className="relative">
+                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
+                      {profile?.country === 'FR' ? 'TVA' : 'Tax'}
+                    </span>
+                    <input
+                      type="number"
+                      className="w-28 p-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
+                      placeholder="0"
                       value={item.taxRate}
                       onChange={(e) =>
                         updateItem(
@@ -549,10 +571,11 @@ function NewEstimateContent() {
                         )
                       }
                     />
-                    <span className="absolute right-2 top-2 text-gray-400 text-xs font-bold">
+                    <span className="absolute right-2 top-2 text-gray-400 text-xs font-bold pointer-events-none">
                       %
                     </span>
                   </div>
+
                   <button
                     onClick={() => {
                       const n = [...sections];
@@ -561,7 +584,7 @@ function NewEstimateContent() {
                       );
                       setSections(n);
                     }}
-                    className="text-gray-200 hover:text-red-400 text-xl font-bold transition-colors"
+                    className="text-gray-200 hover:text-red-400 text-xl font-bold transition-colors pl-2"
                   >
                     ×
                   </button>
@@ -649,6 +672,40 @@ function NewEstimateContent() {
           </div>
         </div>
       </div>
+
+      {/* GLOBAL DIALOG UI */}
+      {dialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
+            <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900">
+              {dialog.title ||
+                (profile?.country === 'FR' ? 'Notification' : 'Notice')}
+            </h3>
+            <p className="text-sm text-gray-500 font-medium mb-8">
+              {dialog.message}
+            </p>
+            <div className="flex gap-3 justify-end">
+              {dialog.type === 'confirm' && (
+                <button
+                  onClick={() => setDialog(null)}
+                  className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (dialog.onConfirm) dialog.onConfirm();
+                  else setDialog(null);
+                }}
+                className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
+              >
+                {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

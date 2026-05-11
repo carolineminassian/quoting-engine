@@ -12,9 +12,19 @@ export default function ProfilePage() {
   const [lang, setLang] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
+  const [dialog, setDialog] = useState<{
+    type: 'alert' | 'confirm';
+    title?: string;
+    message: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
   const [businessName, setBusinessName] = useState('');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [country, setCountry] = useState('US');
+
+  // NEW: State for actual file upload
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
 
   useEffect(() => {
@@ -36,6 +46,9 @@ export default function ProfilePage() {
         setBusinessName(prof.business_name || '');
         setTaxRate(prof.default_tax_rate || 0);
         setCountry(prof.country || 'US');
+        if (prof.logo_url) {
+          setSelectedFileName('Uploaded Logo');
+        }
       }
     }
     fetchData();
@@ -43,9 +56,8 @@ export default function ProfilePage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
       setSelectedFileName(e.target.files[0].name);
-    } else {
-      setSelectedFileName('');
     }
   };
 
@@ -53,7 +65,28 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
 
-    // Auto-assign currency based on market selection
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    let finalLogoUrl = profile.logo_url;
+
+    // Execute actual Supabase Storage Upload if a new file is chosen
+    if (selectedFile && user) {
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${user.id}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, selectedFile, { upsert: true });
+
+      if (!uploadError) {
+        const { data: publicUrlData } = supabase.storage
+          .from('logos')
+          .getPublicUrl(fileName);
+        finalLogoUrl = publicUrlData.publicUrl;
+      }
+    }
+
     const currency = country === 'FR' ? 'EUR' : 'USD';
 
     await supabase
@@ -62,44 +95,49 @@ export default function ProfilePage() {
         business_name: businessName,
         default_tax_rate: taxRate,
         country: country,
-        currency: currency
+        currency: currency,
+        logo_url: finalLogoUrl
       })
       .eq('id', profile.id);
 
-    // Update language instantly locally
     setLang(country === 'FR' ? translations.FR : translations.US);
 
     setSaving(false);
-    alert(country === 'FR' ? 'Paramètres mis à jour.' : 'Settings updated.');
+    setDialog({
+      type: 'alert',
+      message: country === 'FR' ? 'Paramètres mis à jour.' : 'Settings updated.'
+    });
   };
 
-  const handleCancelSub = async () => {
-    if (
-      !confirm(
+  const handleCancelSubClick = () => {
+    setDialog({
+      type: 'confirm',
+      message:
         profile?.country === 'FR'
           ? 'Annuler votre abonnement Pro ?'
-          : 'Cancel your Pro subscription?'
-      )
-    )
-      return;
-    await supabase
-      .from('profiles')
-      .update({ subscription_tier: 'free' })
-      .eq('id', profile.id);
-    location.reload();
+          : 'Cancel your Pro subscription?',
+      onConfirm: async () => {
+        setDialog(null);
+        await supabase
+          .from('profiles')
+          .update({ subscription_tier: 'free' })
+          .eq('id', profile.id);
+        location.reload();
+      }
+    });
   };
 
   if (!lang)
     return (
       <div className="p-10 text-center font-sans text-black italic">
-        Loading...
+        Chargement / Loading...
       </div>
     );
 
   const isFreePlan = profile.subscription_tier === 'free';
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans">
+    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans relative">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-between items-end mb-12">
           <h1 className="text-4xl font-black tracking-tighter uppercase">
@@ -175,6 +213,7 @@ export default function ProfilePage() {
               <div className="relative flex items-center">
                 <input
                   type="file"
+                  accept="image/png, image/jpeg"
                   disabled={isFreePlan}
                   onChange={handleFileChange}
                   className={`absolute inset-0 w-full h-full opacity-0 z-10 ${isFreePlan ? 'cursor-not-allowed' : 'cursor-pointer'}`}
@@ -188,6 +227,13 @@ export default function ProfilePage() {
                   <span className="text-xs text-gray-500 font-medium truncate flex-1">
                     {selectedFileName || lang.noFileChosen || 'No file chosen'}
                   </span>
+                  {profile?.logo_url && !selectedFile && (
+                    <img
+                      src={profile.logo_url}
+                      alt="Current Logo"
+                      className="h-6 w-6 object-contain"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -209,11 +255,11 @@ export default function ProfilePage() {
           <div className="flex justify-between items-center">
             <div>
               <p className="font-bold text-lg text-gray-800">
-                {profile.subscription_tier === 'pro'
+                {profile?.subscription_tier === 'pro'
                   ? lang.proPlan || 'Pro Plan'
                   : lang.freePlan || 'Free Plan'}
               </p>
-              {isFreePlan && profile.estimate_credits > 0 && (
+              {isFreePlan && profile?.estimate_credits > 0 && (
                 <p className="text-sm font-mono text-blue-600 mt-1">
                   {profile.estimate_credits} Credits remaining
                 </p>
@@ -229,7 +275,7 @@ export default function ProfilePage() {
                 </Link>
               ) : (
                 <button
-                  onClick={handleCancelSub}
+                  onClick={handleCancelSubClick}
                   className="text-red-500 text-[10px] font-black uppercase tracking-widest hover:text-red-700 transition-colors"
                 >
                   {lang.cancelSub || 'Cancel Subscription'}
@@ -239,6 +285,40 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* GLOBAL DIALOG UI */}
+      {dialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
+            <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900">
+              {dialog.title ||
+                (profile?.country === 'FR' ? 'Notification' : 'Notice')}
+            </h3>
+            <p className="text-sm text-gray-500 font-medium mb-8">
+              {dialog.message}
+            </p>
+            <div className="flex gap-3 justify-end">
+              {dialog.type === 'confirm' && (
+                <button
+                  onClick={() => setDialog(null)}
+                  className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (dialog.onConfirm) dialog.onConfirm();
+                  else setDialog(null);
+                }}
+                className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
+              >
+                {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
