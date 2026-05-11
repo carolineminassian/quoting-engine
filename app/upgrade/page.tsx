@@ -95,7 +95,7 @@ export default function UpgradePage() {
               {lang.proPlanName}
             </h2>
             <p className="text-4xl font-mono font-black mb-8">
-              {profile.currency === 'EUR' ? '7€' : '$10'}
+              {profile.currency === 'EUR' ? '7€' : '$9'}
               <span className="text-sm text-gray-400">{lang.perMonth}</span>
             </p>
 
