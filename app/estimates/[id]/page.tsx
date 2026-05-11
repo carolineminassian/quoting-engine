@@ -16,6 +16,9 @@ export default function EstimateView() {
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
+  // NEW: State to determine if the viewer is the contractor or the client
+  const [isOwner, setIsOwner] = useState(false);
+
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
     title?: string;
@@ -25,6 +28,11 @@ export default function EstimateView() {
 
   useEffect(() => {
     async function fetchData() {
+      // Check who is viewing the page
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+
       const { data: est } = await supabase
         .from('estimates')
         .select('*')
@@ -36,9 +44,13 @@ export default function EstimateView() {
         return;
       }
 
+      // If the logged in user's ID matches the estimate's creator ID, they are the owner
+      setIsOwner(user?.id === est.user_id);
+
       const [prof, mats] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', est.user_id).single(),
-        supabase.from('materials').select('*')
+        // Security update: Only fetch materials belonging to the estimate owner
+        supabase.from('materials').select('*').eq('user_id', est.user_id)
       ]);
 
       import('@/lib/translations').then(({ translations }) => {
@@ -279,44 +291,51 @@ export default function EstimateView() {
   return (
     <main className="min-h-screen bg-gray-100 p-4 sm:p-8 text-black font-sans relative">
       <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-8 print:hidden">
-          <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center w-full sm:w-auto">
-            <Link
-              href="/dashboard"
-              className="text-center bg-white border border-gray-200 px-4 py-2 rounded font-bold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              ← Dashboard
-            </Link>
+        {/* TOP BAR: Conditionally aligns based on ownership */}
+        <div
+          className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-8 print:hidden ${isOwner ? 'justify-between' : 'justify-end'}`}
+        >
+          {isOwner && (
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center w-full sm:w-auto">
+              <Link
+                href="/dashboard"
+                className="text-center bg-white border border-gray-200 px-4 py-2 rounded font-bold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                ← Dashboard
+              </Link>
 
-            {!estimate.is_locked && (
-              <div className="flex justify-between sm:justify-start items-center gap-2 bg-white px-3 py-2 rounded border border-gray-200">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                  {profile.country === 'FR'
-                    ? 'Détails internes'
-                    : 'Internal Details'}
-                </span>
-                <button
-                  onClick={() => setShowDetails(!showDetails)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
-                  />
-                </button>
-              </div>
-            )}
-          </div>
+              {!estimate.is_locked && (
+                <div className="flex justify-between sm:justify-start items-center gap-2 bg-white px-3 py-2 rounded border border-gray-200">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                    {profile.country === 'FR'
+                      ? 'Détails internes'
+                      : 'Internal Details'}
+                  </span>
+                  <button
+                    onClick={() => setShowDetails(!showDetails)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
             {estimate.is_locked ? (
               <>
-                <button
-                  onClick={handleNativeShare}
-                  className="flex-1 sm:hidden bg-gray-100 text-gray-700 px-4 py-3 rounded font-bold text-sm border border-gray-200"
-                >
-                  {profile.country === 'FR' ? 'Partager' : 'Share'}
-                </button>
-                {estimate.client_email && (
+                {isOwner && (
+                  <button
+                    onClick={handleNativeShare}
+                    className="flex-1 sm:hidden bg-gray-100 text-gray-700 px-4 py-3 rounded font-bold text-sm border border-gray-200"
+                  >
+                    {profile.country === 'FR' ? 'Partager' : 'Share'}
+                  </button>
+                )}
+                {isOwner && estimate.client_email && (
                   <button
                     disabled={sending}
                     onClick={() => handleSend('email')}
@@ -331,34 +350,37 @@ export default function EstimateView() {
                         : 'Email'}
                   </button>
                 )}
+                {/* Print button is available to both Owner and Client */}
                 <button
                   onClick={() => window.print()}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded font-bold text-sm shadow-md"
+                  className="flex-1 sm:flex-none bg-blue-600 text-white px-6 py-3 rounded font-bold text-sm shadow-md"
                 >
                   {profile.country === 'FR' ? 'Imprimer / PDF' : 'Save / Print'}
                 </button>
               </>
             ) : (
-              <div className="flex w-full gap-2">
-                <Link
-                  href={`/new-estimate?edit=${id}`}
-                  className="flex-1 text-center bg-blue-50 text-blue-600 px-4 py-3 rounded font-bold text-sm"
-                >
-                  {profile.country === 'FR' ? 'Modifier' : 'Edit'}
-                </Link>
-                <button
-                  onClick={handleCancelDraft}
-                  className="flex-1 bg-red-50 text-red-600 font-bold text-sm px-4 py-3 rounded"
-                >
-                  {profile.country === 'FR' ? 'Annuler' : 'Cancel'}
-                </button>
-                <button
-                  onClick={handleFinalize}
-                  className="flex-1 bg-green-600 text-white px-4 py-3 rounded font-bold text-sm shadow-md"
-                >
-                  {profile.country === 'FR' ? 'Finaliser' : 'Finalize'}
-                </button>
-              </div>
+              isOwner && (
+                <div className="flex w-full gap-2">
+                  <Link
+                    href={`/new-estimate?edit=${id}`}
+                    className="flex-1 text-center bg-blue-50 text-blue-600 px-4 py-3 rounded font-bold text-sm"
+                  >
+                    {profile.country === 'FR' ? 'Modifier' : 'Edit'}
+                  </Link>
+                  <button
+                    onClick={handleCancelDraft}
+                    className="flex-1 bg-red-50 text-red-600 font-bold text-sm px-4 py-3 rounded"
+                  >
+                    {profile.country === 'FR' ? 'Annuler' : 'Cancel'}
+                  </button>
+                  <button
+                    onClick={handleFinalize}
+                    className="flex-1 bg-green-600 text-white px-4 py-3 rounded font-bold text-sm shadow-md"
+                  >
+                    {profile.country === 'FR' ? 'Finaliser' : 'Finalize'}
+                  </button>
+                </div>
+              )
             )}
           </div>
         </div>
