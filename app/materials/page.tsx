@@ -87,7 +87,7 @@ export default function MaterialsPage() {
         user_id: user?.id,
         name: newName,
         unit: newUnit,
-        cost_per_unit_cents: Math.round(parseFloat(newPrice) * 100)
+        cost_per_unit_cents: Math.max(0, Math.round(parseFloat(newPrice) * 100))
       }
     ]);
 
@@ -115,7 +115,10 @@ export default function MaterialsPage() {
       .update({
         name: editName,
         unit: editUnit,
-        cost_per_unit_cents: Math.round(parseFloat(editPrice) * 100)
+        cost_per_unit_cents: Math.max(
+          0,
+          Math.round(parseFloat(editPrice) * 100)
+        )
       })
       .eq('id', id);
 
@@ -215,6 +218,7 @@ export default function MaterialsPage() {
                 required
                 title={lang.costTooltip}
                 type="number"
+                min="0"
                 step="0.01"
                 className="w-full p-3 border rounded-lg outline-none focus:border-blue-500 font-mono font-bold"
                 value={newPrice}
@@ -285,6 +289,7 @@ export default function MaterialsPage() {
                             <input
                               title={lang.costTooltip}
                               type="number"
+                              min="0"
                               step="0.01"
                               value={editPrice}
                               onChange={(e) => setEditPrice(e.target.value)}

@@ -31,7 +31,6 @@ export default function EstimateView() {
         .eq('id', id)
         .single();
 
-      // Removed the early return to handle "not found" smoothly
       if (!est) {
         setLoading(false);
         return;
@@ -280,7 +279,6 @@ export default function EstimateView() {
   return (
     <main className="min-h-screen bg-gray-100 p-4 sm:p-8 text-black font-sans relative">
       <div className="max-w-4xl mx-auto">
-        {/* MOBILE UI FIXES: Using w-full flex-col on mobile, expanding to row on sm screens */}
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-8 print:hidden">
           <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center w-full sm:w-auto">
             <Link
@@ -290,7 +288,6 @@ export default function EstimateView() {
               ← Dashboard
             </Link>
 
-            {/* TOGGLE: Hides completely if the estimate is locked */}
             {!estimate.is_locked && (
               <div className="flex justify-between sm:justify-start items-center gap-2 bg-white px-3 py-2 rounded border border-gray-200">
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
@@ -310,7 +307,6 @@ export default function EstimateView() {
             )}
           </div>
 
-          {/* Action Buttons: Stretches cleanly on mobile */}
           <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
             {estimate.is_locked ? (
               <>
@@ -395,7 +391,6 @@ export default function EstimateView() {
               </div>
             </div>
             <div className="text-left sm:text-right flex flex-col sm:items-end">
-              {/* PRO LOGO RENDERING */}
               {profile.subscription_tier === 'pro' && profile.logo_url && (
                 <img
                   src={profile.logo_url}
@@ -447,7 +442,6 @@ export default function EstimateView() {
                       {generateDynamicDescription(sec)}
                     </p>
 
-                    {/* Only show details if toggle is ON and the estimate is NOT locked */}
                     {showDetails && !estimate.is_locked ? (
                       <div className="text-[10px] text-gray-500 font-mono space-y-1 bg-gray-50 p-3 rounded border border-gray-100">
                         {sec.laborHours > 0 && (
@@ -550,6 +544,36 @@ export default function EstimateView() {
                   {profile.currency === 'EUR' ? '€' : '$'}
                   {(estimate.total_amount_cents / 100).toFixed(2)}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* RESTORED LEGAL & COMPLIANCE FOOTER */}
+          <div className="mt-40 pt-12 border-t border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
+                  {profile.country === 'FR'
+                    ? 'Conformité & Mentions Légales'
+                    : 'Compliance & Legal'}
+                </p>
+                <p className="text-[10px] text-gray-400 leading-relaxed italic">
+                  {profile.country === 'FR'
+                    ? "Document généré conformément à l'article 286 du code général des impôts (Loi Anti-Fraude TVA). Ce document est inaltérable une fois finalisé."
+                    : 'Standard business estimate. Certified digital record. Valid for 30 days from issuance.'}
+                </p>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
+                  {profile.country === 'FR'
+                    ? 'Conditions de Paiement'
+                    : 'Terms'}
+                </p>
+                <p className="text-[10px] text-gray-400 leading-relaxed font-bold">
+                  {profile.country === 'FR'
+                    ? 'Règlement sous 30 jours.'
+                    : 'Payment due upon receipt.'}
+                </p>
               </div>
             </div>
           </div>

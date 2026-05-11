@@ -46,7 +46,6 @@ function NewEstimateContent() {
   const [loading, setLoading] = useState(true);
   const [limitReached, setLimitReached] = useState(false);
 
-  // NEW: Custom In-App Dialog State
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
     title?: string;
@@ -459,13 +458,14 @@ function NewEstimateContent() {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
                   value={sec.laborHours}
                   onChange={(e) =>
                     updateSection(
                       sIdx,
                       'laborHours',
-                      parseFloat(e.target.value) || 0
+                      Math.max(0, parseFloat(e.target.value) || 0)
                     )
                   }
                 />
@@ -476,13 +476,14 @@ function NewEstimateContent() {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
                   value={sec.hourlyRate}
                   onChange={(e) =>
                     updateSection(
                       sIdx,
                       'hourlyRate',
-                      parseFloat(e.target.value) || 0
+                      Math.max(0, parseFloat(e.target.value) || 0)
                     )
                   }
                 />
@@ -493,13 +494,14 @@ function NewEstimateContent() {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
                   value={sec.laborTaxRate}
                   onChange={(e) =>
                     updateSection(
                       sIdx,
                       'laborTaxRate',
-                      parseFloat(e.target.value) || 0
+                      Math.max(0, parseFloat(e.target.value) || 0)
                     )
                   }
                 />
@@ -531,13 +533,13 @@ function NewEstimateContent() {
                     ))}
                   </select>
 
-                  {/* Qty Input with Permanent Prefix */}
                   <div className="relative">
                     <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
                       {profile?.country === 'FR' ? 'Qté' : 'Qty'}
                     </span>
                     <input
                       type="number"
+                      min="0"
                       className="w-24 p-2 pl-9 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
                       placeholder="0"
                       value={item.qty === 0 ? '' : item.qty}
@@ -546,19 +548,19 @@ function NewEstimateContent() {
                           sIdx,
                           iIdx,
                           'qty',
-                          parseFloat(e.target.value) || 0
+                          Math.max(0, parseFloat(e.target.value) || 0)
                         )
                       }
                     />
                   </div>
 
-                  {/* Tax Input with Permanent Prefix & Suffix */}
                   <div className="relative">
                     <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
                       {profile?.country === 'FR' ? 'TVA' : 'Tax'}
                     </span>
                     <input
                       type="number"
+                      min="0"
                       className="w-28 p-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
                       placeholder="0"
                       value={item.taxRate}
@@ -567,7 +569,7 @@ function NewEstimateContent() {
                           sIdx,
                           iIdx,
                           'taxRate',
-                          parseFloat(e.target.value) || 0
+                          Math.max(0, parseFloat(e.target.value) || 0)
                         )
                       }
                     />
