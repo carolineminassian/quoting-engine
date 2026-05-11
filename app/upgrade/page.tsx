@@ -37,8 +37,8 @@ export default function UpgradePage() {
     // REPLACE THESE WITH YOUR EXACT STRIPE PRICE IDs
     const priceId =
       type === 'pro'
-        ? 'price_1TVZapQOMlHkT3tXcZKrOGJ5'
-        : 'price_1TVdm0QOMlHkT3tXCF2j94CR';
+        ? 'price_1TW2dOQOMlHkT3tX4YL6Pn2C'
+        : 'price_1TW2aHQOMlHkT3tXV1ITlTHt';
 
     try {
       const res = await fetch('/api/checkout', {
