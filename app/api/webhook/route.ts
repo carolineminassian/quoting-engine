@@ -25,10 +25,8 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
-    return NextResponse.json(
-      { error: `Webhook Error: ${err.message}` },
-      { status: 400 }
-    );
+    console.error('Webhook signature verification failed:', err.message);
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 
   // Traiter uniquement les paiements réussis
