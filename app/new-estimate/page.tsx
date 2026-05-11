@@ -6,6 +6,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+interface EstimateItem {
+  materialId: string;
+  qty: number;
+}
+
+interface EstimateSection {
+  title: string;
+  laborHours: number;
+  hourlyRate: number;
+  items: EstimateItem[];
+}
+
 export default function NewEstimatePage() {
   return (
     <Suspense
@@ -40,7 +52,7 @@ function NewEstimateContent() {
   });
   const [customRef, setCustomRef] = useState('');
 
-  const [sections, setSections] = useState([
+  const [sections, setSections] = useState<EstimateSection[]>([
     { title: '', laborHours: 0, hourlyRate: 50, items: [] }
   ]);
 
@@ -143,10 +155,14 @@ function NewEstimateContent() {
     setSections(n);
   };
 
-  const updateItem = (sIdx: number, iIdx: number, field: string, val: any) => {
+  const updateItem = (
+    sIdx: number,
+    iIdx: number,
+    field: keyof EstimateItem,
+    val: any
+  ) => {
     const n = [...sections];
-    // @ts-ignore
-    n[sIdx].items[iIdx][field] = val;
+    (n[sIdx].items[iIdx] as any)[field] = val;
     setSections(n);
   };
 
@@ -484,7 +500,7 @@ function NewEstimateContent() {
             <button
               onClick={() => {
                 const n = [...sections];
-                /* @ts-ignore */ n[sIdx].items.push({ materialId: '', qty: 0 });
+                n[sIdx].items.push({ materialId: '', qty: 0 });
                 setSections(n);
               }}
               className="text-blue-600 font-black text-[10px] uppercase tracking-widest mt-6 hover:text-blue-800 transition-colors"
