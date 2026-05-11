@@ -10,7 +10,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [lang, setLang] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingSecurity, setSavingSecurity] = useState(false);
 
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
@@ -19,13 +20,16 @@ export default function ProfilePage() {
     onConfirm?: () => void;
   } | null>(null);
 
+  // Business Profile State
   const [businessName, setBusinessName] = useState('');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [country, setCountry] = useState('US');
-
-  // NEW: State for actual file upload
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
+
+  // Security Profile State
+  const [authEmail, setAuthEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     async function fetchData() {
@@ -33,6 +37,8 @@ export default function ProfilePage() {
         data: { user }
       } = await supabase.auth.getUser();
       if (!user) return router.push('/');
+
+      setAuthEmail(user.email || '');
 
       const { data: prof } = await supabase
         .from('profiles')
@@ -61,16 +67,15 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
+    setSavingProfile(true);
 
     const {
       data: { user }
     } = await supabase.auth.getUser();
     let finalLogoUrl = profile.logo_url;
 
-    // Execute actual Supabase Storage Upload if a new file is chosen
     if (selectedFile && user) {
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${user.id}.${fileExt}`;
@@ -101,12 +106,40 @@ export default function ProfilePage() {
       .eq('id', profile.id);
 
     setLang(country === 'FR' ? translations.FR : translations.US);
-
-    setSaving(false);
+    setSavingProfile(false);
     setDialog({
       type: 'alert',
-      message: country === 'FR' ? 'Paramètres mis à jour.' : 'Settings updated.'
+      message:
+        country === 'FR'
+          ? 'Paramètres du profil mis à jour.'
+          : 'Profile settings updated.'
     });
+  };
+
+  const handleSaveSecurity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSecurity(true);
+
+    const updates: { email?: string; password?: string } = {};
+    if (authEmail) updates.email = authEmail;
+    if (newPassword) updates.password = newPassword;
+
+    const { error } = await supabase.auth.updateUser(updates);
+
+    setSavingSecurity(false);
+
+    if (error) {
+      setDialog({ type: 'alert', message: error.message });
+    } else {
+      setNewPassword(''); // Clear password field on success
+      setDialog({
+        type: 'alert',
+        message:
+          profile?.country === 'FR'
+            ? 'Sécurité mise à jour. Si vous avez modifié votre email, veuillez vérifier votre boîte de réception pour le lien de confirmation.'
+            : 'Security updated. If you changed your email, please check your inbox to verify the change.'
+      });
+    }
   };
 
   const handleCancelSubClick = () => {
@@ -151,15 +184,21 @@ export default function ProfilePage() {
           </Link>
         </div>
 
+        {/* BUSINESS PROFILE SECTION */}
         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
-          <form onSubmit={handleSave} className="space-y-6">
+          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-100 pb-2">
+            {profile?.country === 'FR'
+              ? "Profil de l'entreprise"
+              : 'Business Profile'}
+          </p>
+          <form onSubmit={handleSaveProfile} className="space-y-6">
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
                 {lang.businessName}
               </label>
               <input
                 required
-                className="w-full p-3 border rounded-lg outline-none focus:border-blue-500 font-bold"
+                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
               />
@@ -171,7 +210,7 @@ export default function ProfilePage() {
                   {country === 'FR' ? 'Marché Principal' : 'Primary Market'}
                 </label>
                 <select
-                  className="w-full p-3 border rounded-lg outline-none focus:border-blue-500 font-bold bg-white"
+                  className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold bg-white"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                 >
@@ -187,7 +226,8 @@ export default function ProfilePage() {
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full p-3 border rounded-lg outline-none focus:border-blue-500 font-mono font-bold pr-8"
+                    min="0"
+                    className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold pr-8"
                     value={taxRate}
                     onChange={(e) =>
                       setTaxRate(parseFloat(e.target.value) || 0)
@@ -240,16 +280,70 @@ export default function ProfilePage() {
 
             <button
               type="submit"
-              disabled={saving}
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-colors"
+              disabled={savingProfile}
+              className="bg-gray-800 text-white px-8 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-gray-900 transition-colors"
             >
-              {saving ? '...' : lang.save}
+              {savingProfile ? '...' : lang.save}
             </button>
           </form>
         </div>
 
+        {/* ACCOUNT SECURITY SECTION */}
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
+          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-100 pb-2">
+            {profile?.country === 'FR'
+              ? 'Sécurité du compte'
+              : 'Account Security'}
+          </p>
+          <form onSubmit={handleSaveSecurity} className="space-y-6">
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+                {profile?.country === 'FR' ? 'Adresse E-mail' : 'Email Address'}
+              </label>
+              <input
+                type="email"
+                required
+                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+                {profile?.country === 'FR'
+                  ? 'Nouveau Mot de Passe'
+                  : 'New Password'}
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                {profile?.country === 'FR'
+                  ? 'Laissez vide pour conserver votre mot de passe actuel.'
+                  : 'Leave blank to keep your current password.'}
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={savingSecurity}
+              className="bg-red-50 text-red-600 border border-red-100 px-8 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] hover:bg-red-100 transition-colors"
+            >
+              {savingSecurity
+                ? '...'
+                : profile?.country === 'FR'
+                  ? 'Mettre à jour la sécurité'
+                  : 'Update Security'}
+            </button>
+          </form>
+        </div>
+
+        {/* SUBSCRIPTION PLAN SECTION */}
         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-          <p className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest">
+          <p className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest border-b border-gray-100 pb-2">
             {lang.currentPlan || 'Current Plan'}
           </p>
           <div className="flex justify-between items-center">
@@ -269,14 +363,14 @@ export default function ProfilePage() {
               {isFreePlan ? (
                 <Link
                   href="/upgrade"
-                  className="bg-gray-800 text-white px-6 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg inline-block hover:bg-gray-900 transition-colors"
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg inline-block hover:bg-blue-700 transition-colors"
                 >
                   {lang.upgradeToPro || 'Upgrade to Pro'}
                 </Link>
               ) : (
                 <button
                   onClick={handleCancelSubClick}
-                  className="text-red-500 text-[10px] font-black uppercase tracking-widest hover:text-red-700 transition-colors"
+                  className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-gray-600 transition-colors"
                 >
                   {lang.cancelSub || 'Cancel Subscription'}
                 </button>
