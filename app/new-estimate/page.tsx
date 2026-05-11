@@ -6,15 +6,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+// 1. Updated Interfaces to include specific tax rates
 interface EstimateItem {
   materialId: string;
   qty: number;
+  taxRate: number;
 }
 
 interface EstimateSection {
   title: string;
   laborHours: number;
   hourlyRate: number;
+  laborTaxRate: number;
   items: EstimateItem[];
 }
 
@@ -52,8 +55,9 @@ function NewEstimateContent() {
   });
   const [customRef, setCustomRef] = useState('');
 
+  // 2. Applied the Interface to the state
   const [sections, setSections] = useState<EstimateSection[]>([
-    { title: '', laborHours: 0, hourlyRate: 50, items: [] }
+    { title: '', laborHours: 0, hourlyRate: 50, laborTaxRate: 0, items: [] }
   ]);
 
   useEffect(() => {
@@ -78,7 +82,6 @@ function NewEstimateContent() {
         setProfile(prof.data);
         setLang(prof.data.country === 'FR' ? translations.FR : translations.US);
 
-        // Usage Limit Check Logic (Only applies when creating a NEW estimate)
         if (!editId && prof.data.subscription_tier === 'free') {
           const currentMonth = new Date().getMonth();
           const currentYear = new Date().getFullYear();
@@ -99,7 +102,6 @@ function NewEstimateContent() {
 
       setMaterials(mats.data || []);
 
-      // Extract unique clients from past estimates for the dropdown
       if (ests.data) {
         const uniqueClientsMap = new Map();
         ests.data.forEach((e) => {
@@ -110,7 +112,6 @@ function NewEstimateContent() {
         setPastClients(Array.from(uniqueClientsMap.values()));
       }
 
-      // Load draft data if editing
       if (editId) {
         const { data: est } = await supabase
           .from('estimates')
@@ -125,11 +126,27 @@ function NewEstimateContent() {
             address: est.client_address || ''
           });
           setCustomRef(est.custom_id || '');
-          setSections(est.sections || []);
+          // Ensure older estimates without tax rates don't break
+          const loadedSections = (est.sections || []).map((sec: any) => ({
+            ...sec,
+            laborTaxRate:
+              sec.laborTaxRate !== undefined
+                ? sec.laborTaxRate
+                : prof.data?.default_tax_rate || 0,
+            items: (sec.items || []).map((item: any) => ({
+              ...item,
+              taxRate:
+                item.taxRate !== undefined
+                  ? item.taxRate
+                  : prof.data?.default_tax_rate || 0
+            }))
+          }));
+          setSections(loadedSections);
         }
       } else if (prof.data) {
         const n = [...sections];
         n[0].hourlyRate = prof.data.default_hourly_rate || 50;
+        n[0].laborTaxRate = prof.data.default_tax_rate || 0;
         setSections(n);
       }
       setLoading(false);
@@ -149,7 +166,11 @@ function NewEstimateContent() {
     }
   };
 
-  const updateSection = (sIdx: number, field: string, val: any) => {
+  const updateSection = (
+    sIdx: number,
+    field: keyof EstimateSection,
+    val: any
+  ) => {
     const n = [...sections];
     (n[sIdx] as any)[field] = val;
     setSections(n);
@@ -166,25 +187,42 @@ function NewEstimateContent() {
     setSections(n);
   };
 
+  // 3. Updated granular calculation logic
   const calculateTotals = () => {
     let subtotalCents = 0;
+    let totalTaxCents = 0;
+
     sections.forEach((sec) => {
-      const matCents = sec.items.reduce((acc, item: any) => {
-        const m = materials.find((mat) => mat.id === item.materialId);
-        return acc + (m ? m.cost_per_unit_cents * item.qty : 0);
-      }, 0);
       const laborCents = Math.round(sec.laborHours * sec.hourlyRate * 100);
-      subtotalCents += matCents + laborCents;
+      const laborTaxCents = Math.round(
+        laborCents * ((sec.laborTaxRate || 0) / 100)
+      );
+
+      subtotalCents += laborCents;
+      totalTaxCents += laborTaxCents;
+
+      sec.items.forEach((item) => {
+        const m = materials.find((mat) => mat.id === item.materialId);
+        if (m) {
+          const itemCost = m.cost_per_unit_cents * item.qty;
+          const itemTax = Math.round(itemCost * ((item.taxRate || 0) / 100));
+
+          subtotalCents += itemCost;
+          totalTaxCents += itemTax;
+        }
+      });
     });
-    const taxRate = profile?.default_tax_rate || 0;
-    const tax = Math.round(subtotalCents * (taxRate / 100));
-    return { subtotalCents, tax, totalCents: subtotalCents + tax, taxRate };
+
+    return {
+      subtotalCents,
+      tax: totalTaxCents,
+      totalCents: subtotalCents + totalTaxCents
+    };
   };
 
-  const { subtotalCents, tax, totalCents, taxRate } = calculateTotals();
+  const { subtotalCents, tax, totalCents } = calculateTotals();
 
   const handleSave = async () => {
-    // 1. Validate Formats
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[\d\+\-\s\(\)]{7,20}$/;
 
@@ -197,9 +235,8 @@ function NewEstimateContent() {
       return;
     }
 
-    // 2. Validate Material Quantities
     const hasZeroQty = sections.some((sec) =>
-      sec.items.some((item: any) => item.qty <= 0)
+      sec.items.some((item) => item.qty <= 0)
     );
     if (hasZeroQty) {
       alert(
@@ -228,8 +265,7 @@ function NewEstimateContent() {
       is_locked: false,
       business_name_snapshot: profile.business_name,
       country_snapshot: profile.country,
-      currency_snapshot: profile.currency,
-      tax_rate_snapshot: totals.taxRate // Store the rate used at time of creation
+      currency_snapshot: profile.currency
     };
 
     const res = editId
@@ -241,7 +277,6 @@ function NewEstimateContent() {
       : await supabase.from('estimates').insert([payload]).select();
 
     if (!res.error) {
-      // If free user and no editId, deduct a credit if they are relying on credits
       if (
         !editId &&
         profile.subscription_tier === 'free' &&
@@ -398,8 +433,8 @@ function NewEstimateContent() {
               onChange={(e) => updateSection(sIdx, 'title', e.target.value)}
             />
 
-            <div className="grid grid-cols-2 gap-4 mb-8 bg-slate-50 p-6 rounded-lg border border-slate-100">
-              <div className="col-span-2 mb-2">
+            <div className="grid grid-cols-3 gap-4 mb-8 bg-slate-50 p-6 rounded-lg border border-slate-100">
+              <div className="col-span-3 mb-2">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   {profile?.country === 'FR'
                     ? "Paramètres de Main-d'œuvre"
@@ -442,6 +477,23 @@ function NewEstimateContent() {
                   }
                 />
               </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  {profile?.country === 'FR' ? 'Taxe (%)' : 'Tax Rate (%)'}
+                </label>
+                <input
+                  type="number"
+                  className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
+                  value={sec.laborTaxRate}
+                  onChange={(e) =>
+                    updateSection(
+                      sIdx,
+                      'laborTaxRate',
+                      parseFloat(e.target.value) || 0
+                    )
+                  }
+                />
+              </div>
             </div>
 
             <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">
@@ -449,7 +501,7 @@ function NewEstimateContent() {
             </p>
             <div className="space-y-3">
               {sec.items.map((item, iIdx) => (
-                <div key={iIdx} className="flex gap-4">
+                <div key={iIdx} className="flex gap-4 items-center">
                   <select
                     className="flex-1 p-2 border border-gray-100 rounded bg-gray-50 font-bold text-xs"
                     value={item.materialId}
@@ -482,6 +534,25 @@ function NewEstimateContent() {
                       )
                     }
                   />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      className="w-20 p-2 border border-gray-100 rounded text-center font-bold pr-6"
+                      placeholder="Tax"
+                      value={item.taxRate}
+                      onChange={(e) =>
+                        updateItem(
+                          sIdx,
+                          iIdx,
+                          'taxRate',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                    />
+                    <span className="absolute right-2 top-2 text-gray-400 text-xs font-bold">
+                      %
+                    </span>
+                  </div>
                   <button
                     onClick={() => {
                       const n = [...sections];
@@ -500,7 +571,11 @@ function NewEstimateContent() {
             <button
               onClick={() => {
                 const n = [...sections];
-                n[sIdx].items.push({ materialId: '', qty: 0 });
+                n[sIdx].items.push({
+                  materialId: '',
+                  qty: 0,
+                  taxRate: profile?.default_tax_rate || 0
+                });
                 setSections(n);
               }}
               className="text-blue-600 font-black text-[10px] uppercase tracking-widest mt-6 hover:text-blue-800 transition-colors"
@@ -518,6 +593,7 @@ function NewEstimateContent() {
                 title: '',
                 laborHours: 0,
                 hourlyRate: profile?.default_hourly_rate || 50,
+                laborTaxRate: profile?.default_tax_rate || 0,
                 items: []
               }
             ])
@@ -541,7 +617,7 @@ function NewEstimateContent() {
               </div>
               <div>
                 <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">
-                  {lang.tax} ({taxRate}%)
+                  {profile?.country === 'FR' ? 'TVA Totale' : 'Total Tax'}
                 </p>
                 <p className="text-xl font-mono font-bold">
                   {profile?.currency === 'EUR' ? '€' : '$'}

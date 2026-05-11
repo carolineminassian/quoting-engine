@@ -27,6 +27,12 @@ export default function DashboardPage() {
         .single();
 
       if (prof) {
+        // Redirect to profile setup if business name is missing
+        if (!prof.business_name) {
+          router.push('/profile?firstTime=true');
+          return;
+        }
+
         setProfile(prof);
         setLang(prof.country === 'FR' ? translations.FR : translations.US);
       }
