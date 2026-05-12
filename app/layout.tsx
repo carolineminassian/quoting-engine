@@ -29,15 +29,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <PHProvider>
-        {/* Updated to use the Geist fonts you defined instead of Inter */}
         <body
           className={`${geistSans.variable} ${geistMono.variable} font-sans`}
         >
-          {/* If you want the Navbar on every page, you would place <Navbar /> here */}
+          <Navbar />
 
           {children}
 
-          {/* The Cookie Banner sits at the bottom of the body */}
           <CookieBanner />
         </body>
       </PHProvider>
