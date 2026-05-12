@@ -159,7 +159,25 @@ function LoginContent() {
               />
             </div>
           )}
-
+          {view === 'signup' && (
+            <div className="text-[10px] text-gray-400 text-center font-medium leading-relaxed px-4">
+              By creating an account, you agree to our{' '}
+              <Link
+                href="/terms"
+                className="text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link
+                href="/privacy"
+                className="text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </div>
+          )}
           <button
             type="submit"
             disabled={loading}

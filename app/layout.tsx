@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import Navbar from '../components/Navbar';
+import { PHProvider } from './providers';
+import CookieBanner from '@/components/CookieBanner';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -26,10 +28,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-gray-50">
-        <Navbar />
-        {children}
-      </body>
+      <PHProvider>
+        {/* Updated to use the Geist fonts you defined instead of Inter */}
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} font-sans`}
+        >
+          {/* If you want the Navbar on every page, you would place <Navbar /> here */}
+
+          {children}
+
+          {/* The Cookie Banner sits at the bottom of the body */}
+          <CookieBanner />
+        </body>
+      </PHProvider>
     </html>
   );
 }
