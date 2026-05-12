@@ -5,6 +5,14 @@ import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const LoadingDots = () => (
+  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+  </div>
+);
+
 export default function EstimateView() {
   const { id } = useParams();
   const router = useRouter();
@@ -16,7 +24,6 @@ export default function EstimateView() {
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  // NEW: State to determine if the viewer is the contractor or the client
   const [isOwner, setIsOwner] = useState(false);
 
   const [dialog, setDialog] = useState<{
@@ -28,7 +35,6 @@ export default function EstimateView() {
 
   useEffect(() => {
     async function fetchData() {
-      // Check who is viewing the page
       const {
         data: { user }
       } = await supabase.auth.getUser();
@@ -44,12 +50,10 @@ export default function EstimateView() {
         return;
       }
 
-      // If the logged in user's ID matches the estimate's creator ID, they are the owner
       setIsOwner(user?.id === est.user_id);
 
       const [prof, mats] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', est.user_id).single(),
-        // Security update: Only fetch materials belonging to the estimate owner
         supabase.from('materials').select('*').eq('user_id', est.user_id)
       ]);
 
@@ -250,7 +254,10 @@ export default function EstimateView() {
         setDialog(null);
         await supabase
           .from('estimates')
-          .update({ is_locked: true })
+          .update({
+            is_locked: true,
+            show_details_snapshot: showDetails
+          })
           .eq('id', id);
         location.reload();
       }
@@ -273,10 +280,7 @@ export default function EstimateView() {
     });
   };
 
-  if (loading)
-    return (
-      <div className="p-10 text-center font-sans">Chargement / Loading...</div>
-    );
+  if (loading) return <LoadingDots />;
 
   if (!estimate) {
     return (
@@ -287,11 +291,13 @@ export default function EstimateView() {
   }
 
   const { subtotal, groups } = getTaxSummary();
+  const isShowingDetails = estimate.is_locked
+    ? estimate.show_details_snapshot === true
+    : showDetails;
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 sm:p-8 text-black font-sans relative">
       <div className="max-w-4xl mx-auto">
-        {/* TOP BAR: Conditionally aligns based on ownership */}
         <div
           className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-8 print:hidden ${isOwner ? 'justify-between' : 'justify-end'}`}
         >
@@ -350,7 +356,6 @@ export default function EstimateView() {
                         : 'Email'}
                   </button>
                 )}
-                {/* Print button is available to both Owner and Client */}
                 <button
                   onClick={() => window.print()}
                   className="flex-1 sm:flex-none bg-blue-600 text-white px-6 py-3 rounded font-bold text-sm shadow-md"
@@ -464,7 +469,7 @@ export default function EstimateView() {
                       {generateDynamicDescription(sec)}
                     </p>
 
-                    {showDetails && !estimate.is_locked ? (
+                    {isShowingDetails ? (
                       <div className="text-[10px] text-gray-500 font-mono space-y-1 bg-gray-50 p-3 rounded border border-gray-100">
                         {sec.laborHours > 0 && (
                           <p>
@@ -570,7 +575,6 @@ export default function EstimateView() {
             </div>
           </div>
 
-          {/* RESTORED LEGAL & COMPLIANCE FOOTER */}
           <div className="mt-40 pt-12 border-t border-gray-100">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
               <div>
@@ -602,7 +606,6 @@ export default function EstimateView() {
         </div>
       </div>
 
-      {/* GLOBAL DIALOG UI */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">

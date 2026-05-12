@@ -6,6 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+const LoadingDots = () => (
+  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+  </div>
+);
+
 interface EstimateItem {
   materialId: string;
   qty: number;
@@ -22,13 +30,7 @@ interface EstimateSection {
 
 export default function NewEstimatePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="p-10 text-center font-sans uppercase font-black text-gray-300 tracking-widest italic">
-          Chargement / Loading...
-        </div>
-      }
-    >
+    <Suspense fallback={<LoadingDots />}>
       <NewEstimateContent />
     </Suspense>
   );
@@ -45,6 +47,7 @@ function NewEstimateContent() {
   const [lang, setLang] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [limitReached, setLimitReached] = useState(false);
+  const [monthlyCount, setMonthlyCount] = useState(0);
 
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
@@ -73,18 +76,18 @@ function NewEstimateContent() {
       if (!user) return router.push('/');
 
       const [prof, mats, ests] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user?.id).single(),
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase
           .from('materials')
           .select('*')
-          .eq('user_id', user?.id)
+          .eq('user_id', user.id)
           .order('name'),
         supabase
           .from('estimates')
           .select(
             'client_name, client_email, client_phone, client_address, created_at, custom_id, sections'
           )
-          .eq('user_id', user?.id)
+          .eq('user_id', user.id)
       ]);
 
       if (prof.data) {
@@ -102,6 +105,8 @@ function NewEstimateContent() {
                 date.getFullYear() === currentYear
               );
             }).length || 0;
+
+          setMonthlyCount(monthlyEstimates);
 
           if (monthlyEstimates >= 5 && (prof.data.estimate_credits || 0) <= 0) {
             setLimitReached(true);
@@ -289,6 +294,7 @@ function NewEstimateContent() {
       if (
         !editId &&
         profile.subscription_tier === 'free' &&
+        monthlyCount >= 5 &&
         profile.estimate_credits > 0
       ) {
         await supabase
@@ -302,12 +308,7 @@ function NewEstimateContent() {
     }
   };
 
-  if (loading || !lang)
-    return (
-      <div className="p-10 text-center font-sans text-black italic">
-        Chargement / Loading...
-      </div>
-    );
+  if (loading || !lang) return <LoadingDots />;
 
   if (limitReached) {
     return (
@@ -452,15 +453,14 @@ function NewEstimateContent() {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  {profile?.country === 'FR'
-                    ? 'Heures estimées'
-                    : 'Hours for this step'}
+                  {profile?.country === 'FR' ? 'Heures estimées' : 'Hours'}
                 </label>
                 <input
                   type="number"
                   min="0"
+                  placeholder="0"
                   className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
-                  value={sec.laborHours}
+                  value={sec.laborHours === 0 ? '' : sec.laborHours}
                   onChange={(e) =>
                     updateSection(
                       sIdx,
@@ -477,8 +477,9 @@ function NewEstimateContent() {
                 <input
                   type="number"
                   min="0"
+                  placeholder="0"
                   className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
-                  value={sec.hourlyRate}
+                  value={sec.hourlyRate === 0 ? '' : sec.hourlyRate}
                   onChange={(e) =>
                     updateSection(
                       sIdx,
@@ -495,8 +496,9 @@ function NewEstimateContent() {
                 <input
                   type="number"
                   min="0"
+                  placeholder="0"
                   className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
-                  value={sec.laborTaxRate}
+                  value={sec.laborTaxRate === 0 ? '' : sec.laborTaxRate}
                   onChange={(e) =>
                     updateSection(
                       sIdx,
@@ -540,8 +542,8 @@ function NewEstimateContent() {
                     <input
                       type="number"
                       min="0"
-                      className="w-24 p-2 pl-9 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
                       placeholder="0"
+                      className="w-24 p-2 pl-9 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
                       value={item.qty === 0 ? '' : item.qty}
                       onChange={(e) =>
                         updateItem(
@@ -561,9 +563,9 @@ function NewEstimateContent() {
                     <input
                       type="number"
                       min="0"
-                      className="w-28 p-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
                       placeholder="0"
-                      value={item.taxRate}
+                      className="w-28 p-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
+                      value={item.taxRate === 0 ? '' : item.taxRate}
                       onChange={(e) =>
                         updateItem(
                           sIdx,
@@ -675,7 +677,6 @@ function NewEstimateContent() {
         </div>
       </div>
 
-      {/* GLOBAL DIALOG UI */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">

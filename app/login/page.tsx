@@ -4,12 +4,20 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+const LoadingDots = () => (
+  <div className="flex items-center justify-center space-x-2 p-12">
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+  </div>
+);
+
 export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center text-xs font-black uppercase tracking-widest text-gray-400">
-          Loading...
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <LoadingDots />
         </div>
       }
     >
@@ -35,7 +43,6 @@ function LoginContent() {
     onConfirm?: () => void;
   } | null>(null);
 
-  // Catch the URL parameter when the page loads
   useEffect(() => {
     const viewParam = searchParams.get('view');
     if (viewParam === 'signup' || viewParam === 'forgot') {
@@ -193,7 +200,6 @@ function LoginContent() {
         </div>
       </div>
 
-      {/* GLOBAL DIALOG UI */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">

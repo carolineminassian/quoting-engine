@@ -5,13 +5,20 @@ import { supabase } from '@/lib/supabase';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+const LoadingDots = () => (
+  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+  </div>
+);
+
 export default function MaterialsPage() {
   const [materials, setMaterials] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [lang, setLang] = useState<any>(translations.US);
   const [loading, setLoading] = useState(true);
 
-  // NEW: Dialog State
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
     title?: string;
@@ -143,12 +150,7 @@ export default function MaterialsPage() {
     });
   };
 
-  if (loading)
-    return (
-      <div className="p-10 text-center font-sans text-black italic">
-        Chargement / Loading...
-      </div>
-    );
+  if (loading) return <LoadingDots />;
 
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-black font-sans relative">
@@ -220,8 +222,9 @@ export default function MaterialsPage() {
                 type="number"
                 min="0"
                 step="0.01"
+                placeholder="0.00"
                 className="w-full p-3 border rounded-lg outline-none focus:border-blue-500 font-mono font-bold"
-                value={newPrice}
+                value={newPrice === '0' || newPrice === 0 ? '' : newPrice}
                 onChange={(e) => setNewPrice(e.target.value)}
               />
             </div>
@@ -291,7 +294,12 @@ export default function MaterialsPage() {
                               type="number"
                               min="0"
                               step="0.01"
-                              value={editPrice}
+                              placeholder="0.00"
+                              value={
+                                editPrice === '0' || editPrice === 0
+                                  ? ''
+                                  : editPrice
+                              }
                               onChange={(e) => setEditPrice(e.target.value)}
                               className="w-32 p-2 border rounded text-right font-mono"
                             />
@@ -364,7 +372,6 @@ export default function MaterialsPage() {
         </div>
       </div>
 
-      {/* GLOBAL DIALOG UI */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">

@@ -6,6 +6,14 @@ import { useRouter } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+const LoadingDots = () => (
+  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+  </div>
+);
+
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
@@ -131,7 +139,7 @@ export default function ProfilePage() {
     if (error) {
       setDialog({ type: 'alert', message: error.message });
     } else {
-      setNewPassword(''); // Clear password field on success
+      setNewPassword('');
       setDialog({
         type: 'alert',
         message:
@@ -160,12 +168,7 @@ export default function ProfilePage() {
     });
   };
 
-  if (!lang)
-    return (
-      <div className="p-10 text-center font-sans text-black italic">
-        Chargement / Loading...
-      </div>
-    );
+  if (!lang) return <LoadingDots />;
 
   const isFreePlan = profile.subscription_tier === 'free';
 
@@ -227,10 +230,11 @@ export default function ProfilePage() {
                     type="number"
                     step="0.1"
                     min="0"
+                    placeholder="0"
                     className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold pr-8"
-                    value={taxRate}
+                    value={taxRate === 0 ? '' : taxRate}
                     onChange={(e) =>
-                      setTaxRate(parseFloat(e.target.value) || 0)
+                      setTaxRate(Math.max(0, parseFloat(e.target.value) || 0))
                     }
                   />
                   <span className="absolute right-3 top-3 text-gray-400 font-bold">
@@ -380,7 +384,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* GLOBAL DIALOG UI */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">

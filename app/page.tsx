@@ -57,6 +57,21 @@ export default function LandingPage() {
           </Link>
         </div>
       </div>
+      {/* FOOTER */}
+      <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-center gap-8 z-10 border-t border-gray-200/50 bg-gray-50/50 backdrop-blur-sm">
+        <Link
+          href="/privacy"
+          className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-colors"
+        >
+          Privacy Policy
+        </Link>
+        <Link
+          href="/terms"
+          className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-colors"
+        >
+          Terms of Service
+        </Link>
+      </div>
     </main>
   );
 }

@@ -6,6 +6,14 @@ import { useRouter } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+const LoadingDots = () => (
+  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+  </div>
+);
+
 export default function DashboardPage() {
   const router = useRouter();
   const [estimates, setEstimates] = useState<any[]>([]);
@@ -80,7 +88,6 @@ export default function DashboardPage() {
     let csv = '';
 
     if (type === 'summary') {
-      // Summary Header
       csv =
         'Estimate ID,Date,Client Name,Client Email,Amount,Currency,Status\n';
       estimates.forEach((e) => {
@@ -90,7 +97,6 @@ export default function DashboardPage() {
         csv += `"${e.custom_id || e.id}","${date}","${e.client_name || ''}","${e.client_email || ''}",${amt},${e.currency_snapshot},${status}\n`;
       });
     } else {
-      // Detailed Header
       csv =
         'Estimate ID,Date,Client Name,Status,Section Title,Item Type,Item Name,Quantity,Cost/Rate,Tax %\n';
       estimates.forEach((e) => {
@@ -99,11 +105,9 @@ export default function DashboardPage() {
         const baseInfo = `"${e.custom_id || e.id}","${date}","${e.client_name || ''}",${status}`;
 
         (e.sections || []).forEach((sec: any) => {
-          // Labor Row
           if (sec.laborHours > 0) {
             csv += `${baseInfo},"${sec.title}","Labor","",${sec.laborHours},${sec.hourlyRate},${sec.laborTaxRate}\n`;
           }
-          // Material Rows
           (sec.items || []).forEach((item: any) => {
             const m = materials.find((mat) => mat.id === item.materialId);
             if (m) {
@@ -138,12 +142,20 @@ export default function DashboardPage() {
     });
   };
 
-  if (loading || !lang)
+  if (loading || !lang) return <LoadingDots />;
+
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const monthlyEstimates = estimates.filter((e) => {
+    const date = new Date(e.created_at);
     return (
-      <div className="p-10 text-center font-sans italic text-black">
-        Chargement / Loading...
-      </div>
+      date.getMonth() === currentMonth && date.getFullYear() === currentYear
     );
+  }).length;
+
+  const isFreePlan = profile?.subscription_tier === 'free';
+  const remainingCredits = profile?.estimate_credits || 0;
+  const standardLimitReached = monthlyEstimates >= 5;
 
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-black font-sans relative">
@@ -153,9 +165,27 @@ export default function DashboardPage() {
             <h1 className="text-4xl font-black tracking-tighter uppercase">
               {lang.dashboard}
             </h1>
-            <p className="text-gray-400 text-sm font-bold uppercase tracking-widest mt-1">
-              {profile?.business_name}
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">
+                {profile?.business_name}
+              </p>
+              {isFreePlan && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                    Free Plan
+                  </span>
+                  {standardLimitReached ? (
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                      {remainingCredits} Credits Left
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                      {5 - monthlyEstimates} Free Left
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-4 w-full sm:w-auto">
             {profile.subscription_tier === 'pro' && estimates.length > 0 && (
