@@ -47,12 +47,15 @@ export default function LandingPage() {
 
     // Load language preference
     const storedLang = localStorage.getItem('public_lang');
-    if (storedLang === 'FR') setLang('FR');
+    if (storedLang === 'FR') {
+      setTimeout(() => setLang('FR'), 0);
+    }
   }, [router]);
 
   const toggleLang = (newLang: 'EN' | 'FR') => {
     setLang(newLang);
     localStorage.setItem('public_lang', newLang);
+    window.dispatchEvent(new Event('langChange'));
   };
 
   if (loading) return null;

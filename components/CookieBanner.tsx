@@ -11,12 +11,22 @@ export default function CookieBanner() {
 
   useEffect(() => {
     const storedLang = localStorage.getItem('public_lang');
-    if (storedLang === 'FR') setLang('FR');
+    if (storedLang === 'FR') {
+      setTimeout(() => setLang('FR'), 0);
+    }
+
+    // Listen for cross-component language toggles
+    const handleLangChange = () => {
+      const newLang = localStorage.getItem('public_lang');
+      if (newLang) setLang(newLang as 'EN' | 'FR');
+    };
+    window.addEventListener('langChange', handleLangChange);
 
     const consent = localStorage.getItem('cookie_consent');
     if (!consent) {
-      setShow(true);
+      setTimeout(() => setShow(true), 0);
     }
+    return () => window.removeEventListener('langChange', handleLangChange);
   }, []);
 
   const handleAccept = () => {

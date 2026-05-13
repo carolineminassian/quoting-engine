@@ -155,7 +155,7 @@ export default function ProfilePage() {
       setDialog({
         type: 'alert',
         message:
-          profile?.country === 'FR'
+          country === 'FR'
             ? 'Sécurité mise à jour. Si vous avez modifié votre email, veuillez vérifier votre boîte de réception pour le lien de confirmation.'
             : 'Security updated. If you changed your email, please check your inbox to verify the change.'
       });
@@ -313,14 +313,12 @@ export default function ProfilePage() {
         {/* ACCOUNT SECURITY SECTION */}
         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
           <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-100 pb-2">
-            {profile?.country === 'FR'
-              ? 'Sécurité du compte'
-              : 'Account Security'}
+            {country === 'FR' ? 'Sécurité du compte' : 'Account Security'}
           </p>
           <form onSubmit={handleSaveSecurity} className="space-y-6">
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
-                {profile?.country === 'FR' ? 'Adresse E-mail' : 'Email Address'}
+                {country === 'FR' ? 'Adresse E-mail' : 'Email Address'}
               </label>
               <input
                 type="email"
@@ -332,9 +330,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
-                {profile?.country === 'FR'
-                  ? 'Nouveau Mot de Passe'
-                  : 'New Password'}
+                {country === 'FR' ? 'Nouveau Mot de Passe' : 'New Password'}
               </label>
               <input
                 type="password"
@@ -344,7 +340,7 @@ export default function ProfilePage() {
                 onChange={(e) => setNewPassword(e.target.value)}
               />
               <p className="text-xs text-gray-400 mt-2">
-                {profile?.country === 'FR'
+                {country === 'FR'
                   ? 'Laissez vide pour conserver votre mot de passe actuel.'
                   : 'Leave blank to keep your current password.'}
               </p>
@@ -356,7 +352,7 @@ export default function ProfilePage() {
             >
               {savingSecurity
                 ? '...'
-                : profile?.country === 'FR'
+                : country === 'FR'
                   ? 'Mettre à jour la sécurité'
                   : 'Update Security'}
             </button>

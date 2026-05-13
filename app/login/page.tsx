@@ -33,7 +33,9 @@ const dict = {
     terms1: 'By creating an account, you agree to our',
     terms2: 'and',
     termsLink: 'Terms of Service',
-    privLink: 'Privacy Policy'
+    privLink: 'Privacy Policy',
+    showPass: 'Show',
+    hidePass: 'Hide'
   },
   FR: {
     welcome: 'Bon retour',
@@ -54,7 +56,9 @@ const dict = {
     terms1: 'En créant un compte, vous acceptez nos',
     terms2: 'et notre',
     termsLink: 'Conditions Générales',
-    privLink: 'Politique de Conf.'
+    privLink: 'Politique de Conf.',
+    showPass: 'Afficher',
+    hidePass: 'Masquer'
   }
 };
 
@@ -81,6 +85,7 @@ function LoginContent() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [dialog, setDialog] = useState<{
@@ -93,10 +98,12 @@ function LoginContent() {
   useEffect(() => {
     const viewParam = searchParams.get('view');
     if (viewParam === 'signup' || viewParam === 'forgot') {
-      setView(viewParam);
+      setTimeout(() => setView(viewParam), 0);
     }
     const storedLang = localStorage.getItem('public_lang');
-    if (storedLang === 'FR') setLang('FR');
+    if (storedLang === 'FR') {
+      setTimeout(() => setLang('FR'), 0);
+    }
   }, [searchParams]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -226,14 +233,23 @@ function LoginContent() {
                   </button>
                 )}
               </div>
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold bg-gray-50 focus:bg-white transition-colors"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="••••••••"
+                  className="w-full p-3 pr-16 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold bg-gray-50 focus:bg-white transition-colors"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-4 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showPassword ? t.hidePass : t.showPass}
+                </button>
+              </div>
             </div>
           )}
 

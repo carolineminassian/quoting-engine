@@ -16,6 +16,7 @@ export default function PrivacyPolicy() {
   const toggleLang = (newLang: 'EN' | 'FR') => {
     setLang(newLang);
     localStorage.setItem('public_lang', newLang);
+    window.dispatchEvent(new Event('langChange'));
   };
 
   return (
