@@ -10,6 +10,7 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const [lang, setLang] = useState<any>(null); // Start null to prevent English flash
+  const [country, setCountry] = useState<'US' | 'FR'>('US');
 
   useEffect(() => {
     async function fetchLang() {
@@ -22,6 +23,7 @@ export default function Navbar() {
         .select('country')
         .eq('id', user.id)
         .single();
+      setCountry(prof?.country === 'FR' ? 'FR' : 'US');
       setLang(prof?.country === 'FR' ? translations.FR : translations.US);
     }
     fetchLang();
@@ -65,6 +67,26 @@ export default function Navbar() {
               }
             >
               {lang.priceList}
+            </Link>
+            <Link
+              href="/clients"
+              className={
+                pathname.includes('/clients')
+                  ? 'text-black'
+                  : 'hover:text-black transition-colors'
+              }
+            >
+              {country === 'FR' ? 'Clients' : 'Clients'}
+            </Link>
+            <Link
+              href="/analytics"
+              className={
+                pathname.includes('/analytics')
+                  ? 'text-black'
+                  : 'hover:text-black transition-colors'
+              }
+            >
+              {country === 'FR' ? 'Analytique' : 'Analytics'}
             </Link>
             <Link
               href="/profile"

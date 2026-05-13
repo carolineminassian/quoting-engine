@@ -78,7 +78,7 @@ function NewEstimateContent() {
       } = await supabase.auth.getUser();
       if (!user) return router.push('/');
 
-      const [prof, mats, ests] = await Promise.all([
+      const [prof, mats, ests, clientsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase
           .from('materials')
@@ -90,9 +90,9 @@ function NewEstimateContent() {
           .select(
             'client_name, client_email, client_phone, client_address, created_at, custom_id, sections'
           )
-          .eq('user_id', user.id)
+          .eq('user_id', user.id),
+        supabase.from('clients').select('*').eq('user_id', user.id)
       ]);
-
       if (prof.data) {
         setProfile(prof.data);
         setLang(prof.data.country === 'FR' ? translations.FR : translations.US);
@@ -119,14 +119,8 @@ function NewEstimateContent() {
 
       setMaterials(mats.data || []);
 
-      if (ests.data) {
-        const uniqueClientsMap = new Map();
-        ests.data.forEach((e) => {
-          if (e.client_name && !uniqueClientsMap.has(e.client_name)) {
-            uniqueClientsMap.set(e.client_name, e);
-          }
-        });
-        setPastClients(Array.from(uniqueClientsMap.values()));
+      if (clientsRes?.data) {
+        setPastClients(clientsRes.data);
       }
 
       if (editId) {
@@ -171,13 +165,13 @@ function NewEstimateContent() {
   }, [editId, router]);
 
   const handleClientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = pastClients.find((c) => c.client_name === e.target.value);
+    const selected = pastClients.find((c) => c.name === e.target.value);
     if (selected) {
       setClient({
-        name: selected.client_name || '',
-        email: selected.client_email || '',
-        phone: selected.client_phone || '',
-        address: selected.client_address || ''
+        name: selected.name || '',
+        email: selected.email || '',
+        phone: selected.phone || '',
+        address: selected.address || ''
       });
     }
   };
@@ -308,6 +302,31 @@ function NewEstimateContent() {
       : await supabase.from('estimates').insert([payload]).select();
 
     if (!res.error) {
+      // Automatically save or update client in CRM
+      if (client.name) {
+        const existing = pastClients.find((c) => c.name === client.name);
+        if (existing) {
+          await supabase
+            .from('clients')
+            .update({
+              email: client.email,
+              phone: client.phone,
+              address: client.address
+            })
+            .eq('id', existing.id);
+        } else {
+          await supabase.from('clients').insert([
+            {
+              user_id: user?.id,
+              name: client.name,
+              email: client.email,
+              phone: client.phone,
+              address: client.address
+            }
+          ]);
+        }
+      }
+
       if (
         !editId &&
         profile.subscription_tier === 'free' &&
@@ -404,8 +423,8 @@ function NewEstimateContent() {
                   {lang.selectClient}
                 </option>
                 {pastClients.map((c, i) => (
-                  <option key={i} value={c.client_name}>
-                    {c.client_name}
+                  <option key={i} value={c.name}>
+                    {c.name}
                   </option>
                 ))}
               </select>
