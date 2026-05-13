@@ -239,8 +239,9 @@ export default function MaterialsPage() {
           </form>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-          <table className="w-full text-left min-w-[600px]">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[600px]">
               <thead className="bg-gray-50 border-b border-gray-200 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                 <tr>
                   <th className="p-5 text-left">{lang.materialName}</th>
