@@ -120,6 +120,7 @@ export default function ProfilePage() {
       currency: currency
     }));
     setLang(country === 'FR' ? translations.FR : translations.US);
+    localStorage.setItem('public_lang', country === 'FR' ? 'FR' : 'EN');
     setSavingProfile(false);
 
     // 2. Set dialog with a callback to reload the page and sync the Navbar

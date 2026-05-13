@@ -4,6 +4,7 @@ import './globals.css';
 import Navbar from '../components/Navbar';
 import { PHProvider } from './providers';
 import CookieBanner from '@/components/CookieBanner';
+import Footer from '@/components/Footer';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -30,12 +31,13 @@ export default function RootLayout({
     <html lang="en">
       <PHProvider>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} font-sans`}
+          className={`${geistSans.variable} ${geistMono.variable} font-sans flex flex-col min-h-screen`}
         >
           <Navbar />
 
-          {children}
+          <div className="flex-1 flex flex-col">{children}</div>
 
+          <Footer />
           <CookieBanner />
         </body>
       </PHProvider>

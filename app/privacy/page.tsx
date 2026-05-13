@@ -1,16 +1,52 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 export default function PrivacyPolicy() {
   const [lang, setLang] = useState<'EN' | 'FR'>('EN');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  React.useEffect(() => {
-    const storedLang = localStorage.getItem('public_lang');
-    if (storedLang === 'FR') {
-      setTimeout(() => setLang('FR'), 0);
-    }
+  useEffect(() => {
+    const syncLanguage = async () => {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+
+      if (session) {
+        setIsLoggedIn(true);
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('country')
+          .eq('id', session.user.id)
+          .single();
+
+        if (prof?.country) {
+          const dbLang = prof.country === 'FR' ? 'FR' : 'EN';
+          setTimeout(() => setLang(dbLang), 0);
+          localStorage.setItem('public_lang', dbLang);
+          setAuthLoading(false);
+          return;
+        }
+      }
+
+      const storedLang = localStorage.getItem('public_lang');
+      if (storedLang === 'FR') {
+        setTimeout(() => setLang('FR'), 0);
+      }
+      setAuthLoading(false);
+    };
+
+    syncLanguage();
+
+    const handleLangChange = () => {
+      const newLang = localStorage.getItem('public_lang');
+      if (newLang) setLang(newLang as 'EN' | 'FR');
+    };
+    window.addEventListener('langChange', handleLangChange);
+    return () => window.removeEventListener('langChange', handleLangChange);
   }, []);
 
   const toggleLang = (newLang: 'EN' | 'FR') => {
@@ -20,37 +56,32 @@ export default function PrivacyPolicy() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans">
-      <div className="max-w-3xl mx-auto bg-white p-10 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex justify-between items-center mb-10 pb-6 border-b border-gray-100">
-          <Link
-            href="/"
-            className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black"
-          >
-            ← {lang === 'FR' ? 'Retour' : 'Back'}
-          </Link>
-          <div className="flex gap-2">
-            <button
-              onClick={() => toggleLang('EN')}
-              className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded ${lang === 'EN' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400'}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => toggleLang('FR')}
-              className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded ${lang === 'FR' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400'}`}
-            >
-              FR
-            </button>
-          </div>
+    <main className="min-h-screen bg-gray-50 flex flex-col p-8 font-sans text-black">
+      <div className="max-w-3xl mx-auto w-full bg-white p-8 sm:p-12 rounded-xl shadow-sm border border-gray-200 mt-10 mb-20">
+        <div className="flex justify-between items-center mb-10 border-b border-gray-100 pb-6">
+          <h1 className="text-3xl font-black uppercase tracking-tighter text-gray-900">
+            {lang === 'FR' ? 'Politique de Confidentialité' : 'Privacy Policy'}
+          </h1>
+
+          {!authLoading && !isLoggedIn && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => toggleLang('EN')}
+                className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded transition-colors ${lang === 'EN' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => toggleLang('FR')}
+                className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded transition-colors ${lang === 'FR' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+              >
+                FR
+              </button>
+            </div>
+          )}
         </div>
 
-        <h1 className="text-3xl font-black uppercase tracking-tighter mb-8">
-          {lang === 'FR' ? 'Politique de Confidentialité' : 'Privacy Policy'}
-        </h1>
-
-        <div className="space-y-6 text-sm text-gray-600 leading-relaxed">
-          {/* REPLACE WITH YOUR ACTUAL LEGAL TEXT */}
+        <div className="space-y-6 text-sm text-gray-600 leading-relaxed font-medium">
           {lang === 'FR' ? (
             <>
               <p>
@@ -62,10 +93,9 @@ export default function PrivacyPolicy() {
               </p>
               <p>
                 <strong>2. Utilisation :</strong> Vos données sont stockées de
-                manière sécurisée (via Supabase) exclusivement pour vous fournir
-                le service de devis. Nous utilisons PostHog pour l'analyse
-                d'audience (uniquement si vous acceptez les cookies) afin
-                d'améliorer la plateforme.
+                manière sécurisée exclusivement pour vous fournir le service de
+                devis. Nous utilisons des cookies d'analyse d'audience
+                (uniquement si vous acceptez) afin d'améliorer la plateforme.
               </p>
               <p>
                 <strong>3. Partage :</strong> Nous ne vendons ni ne louons
@@ -90,10 +120,10 @@ export default function PrivacyPolicy() {
                 never touch or store your credit card information.
               </p>
               <p>
-                <strong>2. Usage:</strong> Your data is securely hosted (via
-                Supabase) strictly to provide you with the estimating service.
-                We use PostHog for product analytics (only if you opt-in via
-                cookies) to help us improve the platform.
+                <strong>2. Usage:</strong> Your data is securely hosted strictly
+                to provide you with the estimating service. We use product
+                analytics (only if you opt-in via cookies) to help us improve
+                the platform.
               </p>
               <p>
                 <strong>3. Sharing:</strong> We never sell or rent your data. It
@@ -109,11 +139,15 @@ export default function PrivacyPolicy() {
               </p>
             </>
           )}
-          <p>
-            {lang === 'FR'
-              ? '[Insérez votre texte juridique ici. Expliquez quelles données vous collectez via Supabase, comment Stripe gère les paiements, et votre conformité au RGPD.]'
-              : '[Insert your legal text here. Explain what data you collect via Supabase, how Stripe handles payments securely, and your compliance with data protection laws.]'}
-          </p>
+        </div>
+
+        <div className="mt-12 pt-6 border-t border-gray-100">
+          <Link
+            href={isLoggedIn ? '/dashboard' : '/'}
+            className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            ← {lang === 'FR' ? 'Retour' : 'Return'}
+          </Link>
         </div>
       </div>
     </main>
