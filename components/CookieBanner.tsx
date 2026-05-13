@@ -7,7 +7,12 @@ import posthog from 'posthog-js';
 export default function CookieBanner() {
   const [show, setShow] = useState(false);
 
+  const [lang, setLang] = useState<'EN' | 'FR'>('EN');
+
   useEffect(() => {
+    const storedLang = localStorage.getItem('public_lang');
+    if (storedLang === 'FR') setLang('FR');
+
     const consent = localStorage.getItem('cookie_consent');
     if (!consent) {
       setShow(true);
@@ -30,12 +35,19 @@ export default function CookieBanner() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm bg-gray-900 text-white p-6 rounded-xl shadow-2xl z-[100] border border-gray-800">
-      <h3 className="text-sm font-black uppercase tracking-widest mb-2">Cookies & Privacy</h3>
+      <h3 className="text-sm font-black uppercase tracking-widest mb-2">
+        Cookies & Privacy
+      </h3>
       <p className="text-xs text-gray-400 font-medium leading-relaxed mb-6">
-        Nous utilisons des cookies analytiques pour améliorer l'application. Les cookies de session essentiels sont toujours actifs pour la sécurité. / We use analytic cookies to improve the app. Essential session cookies are always active for security.
+        {lang === 'FR'
+          ? "Nous utilisons des cookies analytiques pour améliorer l'application. Les cookies de session essentiels sont toujours actifs pour la sécurité."
+          : 'We use analytic cookies to improve the app. Essential session cookies are always active for security.'}
         <br />
-        <Link href="/privacy" className="text-blue-400 hover:text-blue-300 underline mt-2 inline-block">
-          Privacy Policy
+        <Link
+          href="/privacy"
+          className="text-blue-400 hover:text-blue-300 underline mt-2 inline-block"
+        >
+          {lang === 'FR' ? 'Politique de Confidentialité' : 'Privacy Policy'}
         </Link>
       </p>
       <div className="flex gap-3">
@@ -43,13 +55,13 @@ export default function CookieBanner() {
           onClick={handleDecline}
           className="flex-1 bg-gray-800 text-gray-300 border border-gray-700 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[9px] hover:bg-gray-700 transition-colors"
         >
-          Refuser / Decline
+          {lang === 'FR' ? 'Refuser' : 'Decline'}
         </button>
         <button
           onClick={handleAccept}
           className="flex-1 bg-white text-gray-900 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[9px] hover:bg-gray-100 transition-colors"
         >
-          Accepter / Accept
+          {lang === 'FR' ? 'Accepter' : 'Accept'}
         </button>
       </div>
     </div>

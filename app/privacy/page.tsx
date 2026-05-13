@@ -6,6 +6,18 @@ import Link from 'next/link';
 export default function PrivacyPolicy() {
   const [lang, setLang] = useState<'EN' | 'FR'>('EN');
 
+  React.useEffect(() => {
+    const storedLang = localStorage.getItem('public_lang');
+    if (storedLang === 'FR') {
+      setTimeout(() => setLang('FR'), 0);
+    }
+  }, []);
+
+  const toggleLang = (newLang: 'EN' | 'FR') => {
+    setLang(newLang);
+    localStorage.setItem('public_lang', newLang);
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-black font-sans">
       <div className="max-w-3xl mx-auto bg-white p-10 rounded-xl shadow-sm border border-gray-200">
@@ -18,13 +30,13 @@ export default function PrivacyPolicy() {
           </Link>
           <div className="flex gap-2">
             <button
-              onClick={() => setLang('EN')}
+              onClick={() => toggleLang('EN')}
               className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded ${lang === 'EN' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400'}`}
             >
               EN
             </button>
             <button
-              onClick={() => setLang('FR')}
+              onClick={() => toggleLang('FR')}
               className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded ${lang === 'FR' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400'}`}
             >
               FR

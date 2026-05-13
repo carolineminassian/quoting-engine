@@ -113,14 +113,26 @@ export default function ProfilePage() {
       })
       .eq('id', profile.id);
 
+    // 1. Update local profile state so the dialog buttons use the NEW language instantly
+    setProfile((prev: any) => ({
+      ...prev,
+      country: country,
+      currency: currency
+    }));
     setLang(country === 'FR' ? translations.FR : translations.US);
     setSavingProfile(false);
+
+    // 2. Set dialog with a callback to reload the page and sync the Navbar
     setDialog({
       type: 'alert',
       message:
         country === 'FR'
           ? 'Paramètres du profil mis à jour.'
-          : 'Profile settings updated.'
+          : 'Profile settings updated.',
+      onConfirm: () => {
+        setDialog(null);
+        window.location.reload();
+      }
     });
   };
 
