@@ -138,7 +138,16 @@ export default function AnalyticsPage() {
     );
   }
 
-  const maxVal = Math.max(...chartData.map((d) => d.val), 100); // Prevent divide by zero
+  // Add 15% headroom above the highest value so bars don't touch the ceiling
+  const maxVal = Math.max(...chartData.map((d) => d.val), 10) * 1.15;
+
+  // Enforce strict 2-decimal formatting based on locale
+  const formatMoney = (val: number) => {
+    return val.toLocaleString(lang === 'FR' ? 'fr-FR' : 'en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
 
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-black font-sans">
@@ -157,7 +166,7 @@ export default function AnalyticsPage() {
             </p>
             <p className="text-3xl font-black text-blue-600 font-mono">
               {currency}
-              {metrics.totalRev.toLocaleString()}
+              {formatMoney(metrics.totalRev)}
             </p>
           </div>
           <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
@@ -166,7 +175,7 @@ export default function AnalyticsPage() {
             </p>
             <p className="text-3xl font-black text-gray-800 font-mono">
               {currency}
-              {metrics.avg.toLocaleString()}
+              {formatMoney(metrics.avg)}
             </p>
           </div>
           <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
@@ -184,24 +193,25 @@ export default function AnalyticsPage() {
             {t.last6Months}
           </p>
 
-          <div className="h-64 flex items-end justify-between gap-4">
+          <div className="h-64 flex items-end justify-between gap-2 sm:gap-4">
             {chartData.map((d, i) => (
               <div
                 key={i}
-                className="flex-1 flex flex-col items-center gap-3 group relative"
+                className="flex-1 h-full flex flex-col justify-end items-center gap-3 group"
               >
-                <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono">
-                  {currency}
-                  {d.val.toLocaleString()}
-                </div>
                 <div
-                  className="w-full bg-blue-100 rounded-t-sm border-t-4 border-blue-600 transition-all duration-500 hover:bg-blue-200"
+                  className="w-full bg-blue-100 rounded-t-sm border-t-4 border-blue-600 transition-all duration-500 hover:bg-blue-200 relative flex justify-center"
                   style={{
                     height: `${(d.val / maxVal) * 100}%`,
                     minHeight: '4px'
                   }}
-                ></div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                >
+                  <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                    {currency}
+                    {formatMoney(d.val)}
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 shrink-0">
                   {d.label}
                 </span>
               </div>
