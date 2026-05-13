@@ -227,7 +227,13 @@ export default function ProfilePage() {
                 <select
                   className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold bg-white"
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
+                  onChange={(e) => {
+                    const newCountry = e.target.value;
+                    setCountry(newCountry);
+                    setLang(
+                      newCountry === 'FR' ? translations.FR : translations.US
+                    );
+                  }}
                 >
                   <option value="US">United States (USD / English)</option>
                   <option value="FR">France (EUR / Français)</option>

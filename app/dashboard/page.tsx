@@ -172,15 +172,21 @@ export default function DashboardPage() {
               {isFreePlan && (
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                    Free Plan
+                    {profile?.country === 'FR' ? 'Plan Gratuit' : 'Free Plan'}
                   </span>
                   {standardLimitReached ? (
                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
-                      {remainingCredits} Credits Left
+                      {remainingCredits}{' '}
+                      {profile?.country === 'FR'
+                        ? 'Crédits Restants'
+                        : 'Credits Left'}
                     </span>
                   ) : (
                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                      {5 - monthlyEstimates} Free Left
+                      {5 - monthlyEstimates}{' '}
+                      {profile?.country === 'FR'
+                        ? 'Gratuits Restants'
+                        : 'Free Left'}
                     </span>
                   )}
                 </div>
