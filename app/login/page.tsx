@@ -62,7 +62,16 @@ function LoginContent() {
       });
 
       if (error) {
-        setDialog({ type: 'alert', message: error.message });
+        if (error.message.toLowerCase().includes('already registered')) {
+          setDialog({
+            type: 'alert',
+            message:
+              'An account with this email already exists. Please sign in.'
+          });
+          setView('login');
+        } else {
+          setDialog({ type: 'alert', message: error.message });
+        }
       } else {
         setDialog({
           type: 'alert',

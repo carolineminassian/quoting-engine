@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import posthog from 'posthog-js';
 
 export default function CookieBanner() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // Check if the user has already consented
     const consent = localStorage.getItem('cookie_consent');
     if (!consent) {
       setShow(true);
@@ -15,7 +15,14 @@ export default function CookieBanner() {
   }, []);
 
   const handleAccept = () => {
-    localStorage.setItem('cookie_consent', 'true');
+    localStorage.setItem('cookie_consent', 'granted');
+    posthog.opt_in_capturing();
+    setShow(false);
+  };
+
+  const handleDecline = () => {
+    localStorage.setItem('cookie_consent', 'denied');
+    posthog.opt_out_capturing();
     setShow(false);
   };
 
@@ -23,23 +30,28 @@ export default function CookieBanner() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm bg-gray-900 text-white p-6 rounded-xl shadow-2xl z-[100] border border-gray-800">
-      <p className="text-xs text-gray-300 font-medium leading-relaxed mb-4">
-        Nous utilisons des cookies pour analyser le trafic et sécuriser les
-        paiements. / We use cookies to analyze traffic and secure payments.
+      <h3 className="text-sm font-black uppercase tracking-widest mb-2">Cookies & Privacy</h3>
+      <p className="text-xs text-gray-400 font-medium leading-relaxed mb-6">
+        Nous utilisons des cookies analytiques pour améliorer l'application. Les cookies de session essentiels sont toujours actifs pour la sécurité. / We use analytic cookies to improve the app. Essential session cookies are always active for security.
         <br />
-        <Link
-          href="/privacy"
-          className="text-blue-400 hover:text-blue-300 underline mt-1 inline-block"
-        >
+        <Link href="/privacy" className="text-blue-400 hover:text-blue-300 underline mt-2 inline-block">
           Privacy Policy
         </Link>
       </p>
-      <button
-        onClick={handleAccept}
-        className="w-full bg-white text-gray-900 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 transition-colors"
-      >
-        Accepter / Accept
-      </button>
+      <div className="flex gap-3">
+        <button
+          onClick={handleDecline}
+          className="flex-1 bg-gray-800 text-gray-300 border border-gray-700 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[9px] hover:bg-gray-700 transition-colors"
+        >
+          Refuser / Decline
+        </button>
+        <button
+          onClick={handleAccept}
+          className="flex-1 bg-white text-gray-900 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[9px] hover:bg-gray-100 transition-colors"
+        >
+          Accepter / Accept
+        </button>
+      </div>
     </div>
   );
 }

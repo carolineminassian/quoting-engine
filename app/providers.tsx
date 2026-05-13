@@ -6,13 +6,18 @@ import { useEffect } from 'react';
 
 export function PHProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Only initialize if we are in the browser
     if (typeof window !== 'undefined') {
       posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY as string, {
         api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST as string,
-        capture_pageview: false, // We handle this manually in Next.js App Router
-        capture_pageleave: true
+        capture_pageview: false,
+        capture_pageleave: true,
+        opt_out_capturing_by_default: true // Enforces GDPR compliance
       });
+
+      // Check if user previously granted consent
+      if (localStorage.getItem('cookie_consent') === 'granted') {
+        posthog.opt_in_capturing();
+      }
     }
   }, []);
 
