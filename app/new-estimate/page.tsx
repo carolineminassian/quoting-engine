@@ -479,7 +479,7 @@ function NewEstimateContent() {
               onChange={(e) => updateSection(sIdx, 'title', e.target.value)}
             />
 
-            <div className="grid grid-cols-3 gap-4 mb-8 bg-slate-50 p-6 rounded-lg border border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 bg-slate-50 p-6 rounded-lg border border-slate-100">
               <div className="col-span-3 mb-2">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   {profile?.country === 'FR'
@@ -666,9 +666,9 @@ function NewEstimateContent() {
           + {lang.serviceStep}
         </button>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-6 shadow-2xl z-50">
-          <div className="max-w-4xl mx-auto flex justify-between items-center">
-            <div className="flex gap-10">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 sm:p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-40">
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 sm:gap-0 justify-between items-center">
+            <div className="flex w-full sm:w-auto justify-between sm:justify-start gap-4 sm:gap-10">
               <div>
                 <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">
                   {lang.subtotal}

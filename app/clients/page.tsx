@@ -157,7 +157,7 @@ export default function ClientsPage() {
             {clients.map((c) => (
               <div
                 key={c.id}
-                className="p-6 border-b border-gray-100 flex justify-between items-start hover:bg-gray-50 transition-colors"
+                className="p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-start hover:bg-gray-50 transition-colors"
               >
                 <div>
                   <p className="font-black text-lg text-gray-900">{c.name}</p>

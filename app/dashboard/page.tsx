@@ -230,7 +230,7 @@ export default function DashboardPage() {
             estimates.map((est) => (
               <div
                 key={est.id}
-                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-blue-200 transition-colors"
+                className="p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 sm:gap-0 justify-between items-start sm:items-center hover:bg-gray-50 transition-colors"
               >
                 <div
                   className="flex-1 cursor-pointer w-full"
