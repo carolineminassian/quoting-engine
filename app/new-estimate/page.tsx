@@ -18,6 +18,9 @@ interface EstimateItem {
   materialId: string;
   qty: number;
   taxRate: number;
+  unit?: string;
+  name?: string;
+  cost_per_unit_cents?: number;
 }
 
 interface EstimateSection {
@@ -266,6 +269,20 @@ function NewEstimateContent() {
     } = await supabase.auth.getUser();
     const totals = calculateTotals();
 
+    // Deep snapshot: Lock in the exact name, cost, and unit at the time of creation
+    const enrichedSections = sections.map((sec) => ({
+      ...sec,
+      items: sec.items.map((item) => {
+        const mat = materials.find((m) => m.id === item.materialId);
+        return {
+          ...item,
+          name: mat?.name || 'Unknown Material',
+          cost_per_unit_cents: mat?.cost_per_unit_cents || 0,
+          unit: mat?.unit || ''
+        };
+      })
+    }));
+
     const payload = {
       user_id: user?.id,
       client_name: client.name,
@@ -275,7 +292,7 @@ function NewEstimateContent() {
       custom_id: customRef.trim() || null,
       total_amount_cents: totals.totalCents,
       tax_amount_cents: totals.tax,
-      sections: sections,
+      sections: enrichedSections,
       is_locked: false,
       business_name_snapshot: profile.business_name,
       country_snapshot: profile.country,

@@ -88,8 +88,13 @@ export default function EstimateView() {
 
   const getSectionTotal = (sec: any) => {
     const mats = sec.items.reduce((acc: number, item: any) => {
-      const m = materials.find((m) => m.id === item.materialId);
-      return acc + (m ? m.cost_per_unit_cents * item.qty : 0);
+      const snapshottedCost = item.cost_per_unit_cents;
+      const liveCost =
+        materials.find((m) => m.id === item.materialId)?.cost_per_unit_cents ||
+        0;
+      const finalCost =
+        snapshottedCost !== undefined ? snapshottedCost : liveCost;
+      return acc + finalCost * item.qty;
     }, 0);
     const labor = Math.round(sec.laborHours * sec.hourlyRate * 100);
     return (mats + labor) / 100;
@@ -109,15 +114,19 @@ export default function EstimateView() {
       }
 
       (sec.items || []).forEach((item: any) => {
-        const m = materials.find((mat) => mat.id === item.materialId);
-        if (m) {
-          const matCents = m.cost_per_unit_cents * item.qty;
-          if (matCents > 0) {
-            subtotal += matCents;
-            const r =
-              item.taxRate !== undefined ? item.taxRate : profile.tax_rate;
-            groups[r] = (groups[r] || 0) + Math.round(matCents * (r / 100));
-          }
+        const snapshottedCost = item.cost_per_unit_cents;
+        const liveCost =
+          materials.find((mat) => mat.id === item.materialId)
+            ?.cost_per_unit_cents || 0;
+        const finalCost =
+          snapshottedCost !== undefined ? snapshottedCost : liveCost;
+        const matCents = finalCost * item.qty;
+
+        if (matCents > 0) {
+          subtotal += matCents;
+          const r =
+            item.taxRate !== undefined ? item.taxRate : profile.tax_rate;
+          groups[r] = (groups[r] || 0) + Math.round(matCents * (r / 100));
         }
       });
     });
@@ -132,9 +141,14 @@ export default function EstimateView() {
       : 'Comprehensive delivery including all necessary professional labor, logistics, and materials required for this project phase.';
 
     const zeroCostMats = sec.items
-      .map((item: any) => materials.find((m) => m.id === item.materialId))
-      .filter((m: any) => m && m.cost_per_unit_cents === 0)
-      .map((m: any) => m.name);
+      .map((item: any) => {
+        if (item.name && item.cost_per_unit_cents !== undefined) {
+          return item.cost_per_unit_cents === 0 ? item.name : null;
+        }
+        const m = materials.find((m) => m.id === item.materialId);
+        return m && m.cost_per_unit_cents === 0 ? m.name : null;
+      })
+      .filter(Boolean);
 
     if (zeroCostMats.length > 0) {
       const matString = zeroCostMats.join(', ');
@@ -489,12 +503,20 @@ export default function EstimateView() {
                           const m = materials.find(
                             (mat) => mat.id === item.materialId
                           );
-                          if (!m) return null;
+                          const displayName =
+                            item.name || m?.name || 'Unknown Material';
+                          const displayCost =
+                            item.cost_per_unit_cents !== undefined
+                              ? item.cost_per_unit_cents
+                              : m?.cost_per_unit_cents || 0;
+                          const rawUnit = item.unit || m?.unit || '';
+                          const displayUnit = lang?.units?.[rawUnit] || rawUnit;
+
                           return (
                             <p key={i}>
-                              ↳ {m.name}: {item.qty}{' '}
-                              {lang.units?.[m.unit] || ''} @{' '}
-                              {(m.cost_per_unit_cents / 100).toFixed(2)}
+                              ↳ {displayName}: {item.qty}
+                              {displayUnit ? ` ${displayUnit}` : ''} @{' '}
+                              {(displayCost / 100).toFixed(2)}
                               {profile.currency === 'EUR'
                                 ? '€'
                                 : '$'} (Tax:{' '}
@@ -513,11 +535,16 @@ export default function EstimateView() {
                             const m = materials.find(
                               (mat) => mat.id === item.materialId
                             );
-                            if (!m) return null;
+                            const displayName =
+                              item.name || m?.name || 'Unknown Material';
+                            const rawUnit = item.unit || m?.unit || '';
+                            const displayUnit =
+                              lang?.units?.[rawUnit] || rawUnit;
+
                             return (
                               <p key={i}>
-                                • {m.name} ({item.qty}{' '}
-                                {lang.units?.[m.unit] || ''})
+                                • {displayName} ({item.qty}
+                                {displayUnit ? ` ${displayUnit}` : ''})
                               </p>
                             );
                           })}
