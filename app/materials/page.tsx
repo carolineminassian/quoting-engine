@@ -224,7 +224,7 @@ export default function MaterialsPage() {
                 step="0.01"
                 placeholder="0.00"
                 className="w-full p-3 border rounded-lg outline-none focus:border-blue-500 font-mono font-bold"
-                value={newPrice === '0' || newPrice === 0 ? '' : newPrice}
+                value={newPrice === '0' ? '' : newPrice}
                 onChange={(e) => setNewPrice(e.target.value)}
               />
             </div>
@@ -295,11 +295,7 @@ export default function MaterialsPage() {
                               min="0"
                               step="0.01"
                               placeholder="0.00"
-                              value={
-                                editPrice === '0' || editPrice === 0
-                                  ? ''
-                                  : editPrice
-                              }
+                              value={editPrice === '0' ? '' : editPrice}
                               onChange={(e) => setEditPrice(e.target.value)}
                               className="w-32 p-2 border rounded text-right font-mono"
                             />

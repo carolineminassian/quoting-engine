@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 const LoadingDots = () => (
   <div className="flex items-center justify-center space-x-2 p-12">
