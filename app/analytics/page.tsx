@@ -141,9 +141,9 @@ export default function AnalyticsPage() {
   // Add 15% headroom above the highest value so bars don't touch the ceiling
   const maxVal = Math.max(...chartData.map((d) => d.val), 10) * 1.15;
 
-  // Enforce strict 2-decimal formatting based on locale
+  // Enforce strict 2-decimal formatting based on currency
   const formatMoney = (val: number) => {
-    return val.toLocaleString(lang === 'FR' ? 'fr-FR' : 'en-US', {
+    return val.toLocaleString(currency === '€' ? 'fr-FR' : 'en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });

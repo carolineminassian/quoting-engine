@@ -220,7 +220,7 @@ export default function ProfilePage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
                   {country === 'FR' ? 'Marché Principal' : 'Primary Market'}

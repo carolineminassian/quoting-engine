@@ -345,7 +345,12 @@ export default function MaterialsPage() {
                         <div className="text-right">
                           <p className="font-mono font-black text-xl text-blue-600">
                             {profile?.currency === 'EUR' ? '€' : '$'}
-                            {(m.cost_per_unit_cents / 100).toFixed(2)}
+                            {(m.cost_per_unit_cents / 100)
+                              .toFixed(2)
+                              .replace(
+                                '.',
+                                profile?.currency === 'EUR' ? ',' : '.'
+                              )}
                           </p>
                         </div>
                       </div>
@@ -390,7 +395,9 @@ export default function MaterialsPage() {
                     </div>
                     <div className="hidden sm:block w-full col-span-2 text-right font-mono font-bold text-gray-700">
                       {profile?.currency === 'EUR' ? '€' : '$'}
-                      {(m.cost_per_unit_cents / 100).toFixed(2)}
+                      {(m.cost_per_unit_cents / 100)
+                        .toFixed(2)
+                        .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
                     </div>
                     <div className="hidden sm:flex w-full col-span-2 justify-end gap-6">
                       <button

@@ -516,10 +516,13 @@ export default function EstimateView() {
                             <p key={i}>
                               ↳ {displayName}: {item.qty}
                               {displayUnit ? ` ${displayUnit}` : ''} @{' '}
-                              {(displayCost / 100).toFixed(2)}
-                              {profile.currency === 'EUR'
-                                ? '€'
-                                : '$'} (Tax:{' '}
+                              {(displayCost / 100)
+                                .toFixed(2)
+                                .replace(
+                                  '.',
+                                  profile.currency === 'EUR' ? ',' : '.'
+                                )}
+                              {profile.currency === 'EUR' ? '€' : '$'} (Tax:{' '}
                               {item.taxRate !== undefined
                                 ? item.taxRate
                                 : profile.tax_rate}
@@ -554,7 +557,9 @@ export default function EstimateView() {
                   </td>
                   <td className="py-8 text-right font-mono font-black text-xl text-gray-700 align-top">
                     {profile.currency === 'EUR' ? '€' : '$'}
-                    {getSectionTotal(sec).toFixed(2)}
+                    {getSectionTotal(sec)
+                      .toFixed(2)
+                      .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                   </td>
                 </tr>
               ))}
@@ -569,10 +574,11 @@ export default function EstimateView() {
                 </span>
                 <span className="text-gray-600 font-mono">
                   {profile.currency === 'EUR' ? '€' : '$'}
-                  {(subtotal / 100).toFixed(2)}
+                  {(subtotal / 100)
+                    .toFixed(2)
+                    .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                 </span>
               </div>
-
               {Object.entries(groups)
                 .sort((a, b) => Number(b[0]) - Number(a[0]))
                 .map(([rate, amt]) => (
@@ -585,20 +591,24 @@ export default function EstimateView() {
                     </span>
                     <span className="text-gray-600 font-mono">
                       {profile.currency === 'EUR' ? '€' : '$'}
-                      {(amt / 100).toFixed(2)}
+                      {(amt / 100)
+                        .toFixed(2)
+                        .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                     </span>
                   </div>
                 ))}
-
               <div className="flex justify-between border-t-4 border-black pt-6">
                 <span className="text-2xl font-black uppercase tracking-tighter">
                   {profile.country === 'FR' ? 'Total TTC' : 'Grand Total'}
                 </span>
                 <span className="text-3xl font-black font-mono text-blue-600">
                   {profile.currency === 'EUR' ? '€' : '$'}
-                  {(estimate.total_amount_cents / 100).toFixed(2)}
+                  {(estimate.total_amount_cents / 100)
+                    .toFixed(2)
+                    .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                 </span>
               </div>
+              \
             </div>
           </div>
 

@@ -569,7 +569,13 @@ function NewEstimateContent() {
                       <option key={m.id} value={m.id}>
                         {m.name} ({lang.units?.[m.unit] || m.unit}) (
                         {profile?.currency === 'EUR' ? '€' : '$'}
-                        {(m.cost_per_unit_cents / 100).toFixed(2)})
+                        {(m.cost_per_unit_cents / 100)
+                          .toFixed(2)
+                          .replace(
+                            '.',
+                            profile?.currency === 'EUR' ? ',' : '.'
+                          )}
+                        )
                       </option>
                     ))}
                   </select>
@@ -678,7 +684,9 @@ function NewEstimateContent() {
                 </p>
                 <p className="text-xl font-mono font-bold">
                   {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(subtotalCents / 100).toFixed(2)}
+                  {(subtotalCents / 100)
+                    .toFixed(2)
+                    .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
                 </p>
               </div>
               <div>
@@ -687,7 +695,9 @@ function NewEstimateContent() {
                 </p>
                 <p className="text-xl font-mono font-bold">
                   {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(tax / 100).toFixed(2)}
+                  {(tax / 100)
+                    .toFixed(2)
+                    .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
                 </p>
               </div>
               <div>
@@ -696,7 +706,9 @@ function NewEstimateContent() {
                 </p>
                 <p className="text-3xl font-black text-blue-600 tracking-tighter">
                   {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(totalCents / 100).toFixed(2)}
+                  {(totalCents / 100)
+                    .toFixed(2)
+                    .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
                 </p>
               </div>
             </div>

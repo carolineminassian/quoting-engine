@@ -257,7 +257,12 @@ export default function DashboardPage() {
                     {/* Mobile Price */}
                     <p className="sm:hidden font-mono font-black text-lg text-blue-600">
                       {est.currency_snapshot === 'EUR' ? '€' : '$'}
-                      {(est.total_amount_cents / 100).toFixed(2)}
+                      {(est.total_amount_cents / 100)
+                        .toFixed(2)
+                        .replace(
+                          '.',
+                          est.currency_snapshot === 'EUR' ? ',' : '.'
+                        )}
                     </p>
                   </div>
 
@@ -291,7 +296,12 @@ export default function DashboardPage() {
                     </p>
                     <p className="font-mono font-black text-xl text-gray-800 group-hover:text-blue-600 transition-colors">
                       {est.currency_snapshot === 'EUR' ? '€' : '$'}
-                      {(est.total_amount_cents / 100).toFixed(2)}
+                      {(est.total_amount_cents / 100)
+                        .toFixed(2)
+                        .replace(
+                          '.',
+                          est.currency_snapshot === 'EUR' ? ',' : '.'
+                        )}
                     </p>
                   </div>
 
