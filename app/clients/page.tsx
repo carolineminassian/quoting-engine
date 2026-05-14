@@ -149,29 +149,42 @@ export default function ClientsPage() {
         </div>
 
         {clients.length === 0 ? (
-          <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400 font-bold uppercase tracking-widest text-xs">
+          <div className="bg-white p-12 text-center rounded-xl shadow-sm border border-gray-200 text-gray-400 font-bold uppercase tracking-widest text-xs">
             {t.noClients}
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {clients.map((c) => (
               <div
                 key={c.id}
-                className="p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-start hover:bg-gray-50 transition-colors"
+                className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 transition-all group"
               >
                 <div>
-                  <p className="font-black text-lg text-gray-900">{c.name}</p>
-                  <div className="flex gap-4 mt-2 text-xs text-gray-500 font-medium">
-                    {c.email && <p>✉️ {c.email}</p>}
-                    {c.phone && <p>📞 {c.phone}</p>}
+                  <h3 className="font-black text-xl text-gray-900 group-hover:text-blue-600 transition-colors mb-4 truncate">
+                    {c.name}
+                  </h3>
+                  <div className="space-y-3 text-xs text-gray-500 font-medium">
+                    {c.email && (
+                      <p className="flex items-center gap-3">
+                        <span className="text-gray-300 text-base">✉️</span>
+                        <span className="truncate">{c.email}</span>
+                      </p>
+                    )}
+                    {c.phone && (
+                      <p className="flex items-center gap-3">
+                        <span className="text-gray-300 text-base">📞</span>
+                        <span>{c.phone}</span>
+                      </p>
+                    )}
+                    {c.address && (
+                      <p className="flex items-start gap-3 mt-4 pt-4 border-t border-gray-50">
+                        <span className="text-gray-300 text-base">📍</span>
+                        <span className="leading-relaxed">{c.address}</span>
+                      </p>
+                    )}
                   </div>
-                  {c.address && (
-                    <p className="text-xs text-gray-400 mt-1 block">
-                      {c.address}
-                    </p>
-                  )}
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-6 mt-6 pt-4 border-t border-gray-100 justify-end">
                   <button
                     onClick={() => setEditingClient(c)}
                     className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors"
