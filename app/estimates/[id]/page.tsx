@@ -608,7 +608,6 @@ export default function EstimateView() {
                     .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                 </span>
               </div>
-              \
             </div>
           </div>
 
