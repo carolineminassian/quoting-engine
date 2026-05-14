@@ -230,64 +230,84 @@ export default function DashboardPage() {
             estimates.map((est) => (
               <div
                 key={est.id}
-                className="p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 sm:gap-0 justify-between items-start sm:items-center hover:bg-gray-50 transition-colors"
+                onClick={() =>
+                  router.push(
+                    est.is_locked
+                      ? `/estimates/${est.id}`
+                      : `/new-estimate?edit=${est.id}`
+                  )
+                }
+                className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 cursor-pointer transition-all group"
               >
-                <div
-                  className="flex-1 cursor-pointer w-full"
-                  onClick={() =>
-                    router.push(
-                      est.is_locked
-                        ? `/estimates/${est.id}`
-                        : `/new-estimate?edit=${est.id}`
-                    )
-                  }
-                >
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-lg text-gray-800">
-                      {est.client_name ||
-                        (profile.country === 'FR'
-                          ? 'Projet sans nom'
-                          : 'Untitled Project')}
-                    </h3>
-                    <span
-                      className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${est.is_locked ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}`}
-                    >
-                      {est.is_locked ? lang.finalized : lang.draft}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-400 font-medium">
-                    {formatDate(est.created_at)} •{' '}
-                    {est.client_email ||
-                      (profile.country === 'FR'
-                        ? 'Aucun contact'
-                        : 'No contact email')}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between w-full sm:w-auto gap-6 border-t sm:border-0 pt-4 sm:pt-0 border-gray-100">
-                  <div className="w-32 text-left sm:text-right">
-                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                      {lang.grandTotal}
-                    </p>
-                    <p className="font-mono font-black text-xl text-gray-800">
+                <div className="flex-1 w-full">
+                  <div className="flex justify-between items-start mb-1 sm:mb-0">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-black text-lg text-gray-900 group-hover:text-blue-600 transition-colors">
+                        {est.client_name ||
+                          (profile.country === 'FR'
+                            ? 'Projet sans nom'
+                            : 'Untitled Project')}
+                      </h3>
+                      <span
+                        className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${est.is_locked ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}`}
+                      >
+                        {est.is_locked ? lang.finalized : lang.draft}
+                      </span>
+                    </div>
+                    {/* Mobile Price */}
+                    <p className="sm:hidden font-mono font-black text-lg text-blue-600">
                       {est.currency_snapshot === 'EUR' ? '€' : '$'}
                       {(est.total_amount_cents / 100).toFixed(2)}
                     </p>
                   </div>
 
-                  <div className="w-6 flex justify-end">
+                  <div className="flex items-center gap-3 text-xs text-gray-400 font-medium mt-2 sm:mt-1">
+                    <span>{formatDate(est.created_at)}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="hidden sm:inline">
+                      {est.client_email ||
+                        (profile.country === 'FR'
+                          ? 'Aucun contact'
+                          : 'No contact email')}
+                    </span>
+                    <span className="sm:hidden font-mono bg-gray-100 px-2 py-0.5 rounded text-[10px] text-gray-500">
+                      {est.custom_id || est.id.slice(0, 8)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-6 mt-4 pt-4 border-t border-gray-100 sm:mt-0 sm:pt-0 sm:border-0">
+                  {/* Mobile Status Badge */}
+                  <span
+                    className={`sm:hidden text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${est.is_locked ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}`}
+                  >
+                    {est.is_locked ? lang.finalized : lang.draft}
+                  </span>
+
+                  {/* Desktop Price */}
+                  <div className="hidden sm:block text-right">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                      {lang.grandTotal}
+                    </p>
+                    <p className="font-mono font-black text-xl text-gray-800 group-hover:text-blue-600 transition-colors">
+                      {est.currency_snapshot === 'EUR' ? '€' : '$'}
+                      {(est.total_amount_cents / 100).toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="w-8 flex justify-end">
                     {!est.is_locked && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDelete(est.id);
                         }}
-                        className="text-gray-200 hover:text-red-400 transition-colors p-2"
+                        className="text-gray-300 hover:text-red-500 hover:bg-red-50 rounded p-2 transition-all"
                         title="Delete Draft"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-6 w-6 sm:h-5 sm:w-5"
+                          className="h-5 w-5"
                           viewBox="0 0 20 20"
                           fill="currentColor"
                         >

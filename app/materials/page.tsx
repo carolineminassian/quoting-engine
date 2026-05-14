@@ -191,7 +191,7 @@ export default function MaterialsPage() {
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
-            <div className="col-span-6 sm:col-span-3">
+            <div className="col-span-12 sm:col-span-3">
               <label className="block text-[10px] font-black uppercase text-gray-300 mb-2 tracking-widest text-left">
                 {lang.unitLabel}
               </label>
@@ -212,7 +212,7 @@ export default function MaterialsPage() {
                 ))}
               </select>
             </div>
-            <div className="col-span-6 sm:col-span-2">
+            <div className="col-span-12 sm:col-span-2">
               <label className="block text-[10px] font-black uppercase text-gray-300 mb-2 tracking-widest text-left">
                 {lang.cost}
               </label>
@@ -239,132 +239,185 @@ export default function MaterialsPage() {
           </form>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[600px]">
-              <thead className="bg-gray-50 border-b border-gray-200 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-                <tr>
-                  <th className="p-5 text-left">{lang.materialName}</th>
-                  <th className="p-5 text-left">{lang.unitLabel}</th>
-                  <th className="p-5 text-right">{lang.unitCost}</th>
-                  <th className="p-5 text-right">{lang.actions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {materials.map((m) => {
-                  const isOutOfRegion = !Object.keys(lang.units).includes(
-                    m.unit
-                  );
+        {/* Desktop Header */}
+        <div className="hidden sm:grid grid-cols-12 gap-4 bg-gray-50 border border-gray-200 rounded-t-xl text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 p-5">
+          <div className="col-span-5">{lang.materialName}</div>
+          <div className="col-span-3">{lang.unitLabel}</div>
+          <div className="col-span-2 text-right">{lang.unitCost}</div>
+          <div className="col-span-2 text-right">{lang.actions}</div>
+        </div>
 
-                  return (
-                    <tr
-                      key={m.id}
-                      className={`transition-colors ${isOutOfRegion ? 'bg-yellow-50/50' : 'hover:bg-gray-50'}`}
-                    >
-                      {editingId === m.id ? (
-                        <>
-                          <td className="p-3">
-                            <input
-                              title={lang.itemNameTooltip}
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              className="w-full p-2 border rounded font-bold"
-                            />
-                          </td>
-                          <td className="p-3">
-                            <select
-                              title={lang.unitTooltip}
-                              value={editUnit}
-                              onChange={(e) => setEditUnit(e.target.value)}
-                              className="w-full p-2 border rounded bg-white text-xs font-bold uppercase"
-                            >
-                              <option value="" disabled hidden>
-                                {lang.unitPlaceholder}
-                              </option>
-                              {Object.keys(lang.units).map((key) => (
-                                <option key={key} value={key}>
-                                  {lang.units[key]}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="p-3 text-right">
-                            <input
-                              title={lang.costTooltip}
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={editPrice === '0' ? '' : editPrice}
-                              onChange={(e) => setEditPrice(e.target.value)}
-                              className="w-32 p-2 border rounded text-right font-mono"
-                            />
-                          </td>
-                          <td className="p-3 text-right space-x-3">
-                            <button
-                              onClick={() => handleUpdate(m.id)}
-                              className="text-green-600 font-black text-[10px] uppercase tracking-widest"
-                            >
-                              {lang.save}
-                            </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="text-gray-400 font-black text-[10px] uppercase tracking-widest"
-                            >
-                              {lang.cancel}
-                            </button>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="p-5 font-bold text-gray-800">
+        {/* Materials List / Cards */}
+        <div className="flex flex-col gap-4 sm:gap-0 sm:bg-white sm:border-x sm:border-b sm:border-gray-200 sm:rounded-b-xl sm:divide-y sm:divide-gray-100">
+          {materials.map((m) => {
+            const isOutOfRegion = !Object.keys(lang.units).includes(m.unit);
+
+            return (
+              <div
+                key={m.id}
+                className={`bg-white p-5 sm:p-5 rounded-xl sm:rounded-none shadow-sm sm:shadow-none border border-gray-200 sm:border-none flex flex-col sm:grid sm:grid-cols-12 gap-4 items-start sm:items-center transition-all ${isOutOfRegion ? 'ring-2 ring-yellow-400 sm:ring-0 sm:bg-yellow-50/50' : 'hover:border-blue-200 hover:shadow-md sm:hover:border-none sm:hover:shadow-none sm:hover:bg-gray-50'} group`}
+              >
+                {editingId === m.id ? (
+                  // ----- EDIT MODE -----
+                  <div className="w-full flex flex-col sm:contents gap-4">
+                    <div className="w-full sm:col-span-5">
+                      <label className="sm:hidden text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">
+                        {lang.materialName}
+                      </label>
+                      <input
+                        title={lang.itemNameTooltip}
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full p-3 sm:p-2 border border-gray-200 rounded-lg sm:rounded font-bold outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="w-full sm:col-span-3">
+                      <label className="sm:hidden text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">
+                        {lang.unitLabel}
+                      </label>
+                      <select
+                        title={lang.unitTooltip}
+                        value={editUnit}
+                        onChange={(e) => setEditUnit(e.target.value)}
+                        className="w-full p-3 sm:p-2 border border-gray-200 rounded-lg sm:rounded bg-gray-50 sm:bg-white text-xs font-bold uppercase outline-none focus:border-blue-500"
+                      >
+                        <option value="" disabled hidden>
+                          {lang.unitPlaceholder}
+                        </option>
+                        {Object.keys(lang.units).map((key) => (
+                          <option key={key} value={key}>
+                            {lang.units[key]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-full sm:col-span-2">
+                      <label className="sm:hidden text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">
+                        {lang.unitCost}
+                      </label>
+                      <input
+                        title={lang.costTooltip}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={editPrice === '0' ? '' : editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        className="w-full sm:w-32 p-3 sm:p-2 border border-gray-200 rounded-lg sm:rounded sm:text-right font-mono outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="w-full sm:col-span-2 flex sm:justify-end gap-3 mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-gray-100 sm:border-0">
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="flex-1 sm:flex-none text-gray-500 bg-gray-100 sm:bg-transparent px-4 py-3 sm:p-0 rounded-lg sm:rounded-none font-black text-[10px] uppercase tracking-widest"
+                      >
+                        {lang.cancel}
+                      </button>
+                      <button
+                        onClick={() => handleUpdate(m.id)}
+                        className="flex-1 sm:flex-none text-white sm:text-green-600 bg-green-600 sm:bg-transparent px-4 py-3 sm:p-0 rounded-lg sm:rounded-none font-black text-[10px] uppercase tracking-widest shadow-sm sm:shadow-none"
+                      >
+                        {lang.save}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // ----- VIEW MODE -----
+                  <>
+                    {/* MOBILE LAYOUT (Cards) */}
+                    <div className="w-full sm:hidden flex flex-col gap-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-black text-lg text-gray-900 group-hover:text-blue-600 transition-colors leading-tight">
                             {m.name}
-                            {isOutOfRegion && (
-                              <span className="ml-3 text-[8px] font-black uppercase tracking-widest text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
-                                {lang.outOfRegion}
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-5">
-                            <span
-                              className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${isOutOfRegion ? 'text-yellow-600 bg-yellow-100' : 'text-gray-400 bg-gray-100'}`}
-                            >
-                              {lang.units[m.unit] || m.unit}
+                          </h3>
+                          <span
+                            className={`inline-block mt-2 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${isOutOfRegion ? 'text-yellow-600 bg-yellow-100' : 'text-gray-500 bg-gray-100'}`}
+                          >
+                            {lang.units[m.unit] || m.unit}
+                          </span>
+                          {isOutOfRegion && (
+                            <span className="ml-2 inline-block text-[8px] font-black uppercase tracking-widest text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                              {lang.outOfRegion}
                             </span>
-                          </td>
-                          <td className="p-5 text-right font-mono font-bold text-gray-700">
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-mono font-black text-xl text-blue-600">
                             {profile?.currency === 'EUR' ? '€' : '$'}
                             {(m.cost_per_unit_cents / 100).toFixed(2)}
-                          </td>
-                          <td className="p-5 text-right space-x-6">
-                            <button
-                              onClick={() => {
-                                setEditingId(m.id);
-                                setEditName(m.name);
-                                setEditPrice(
-                                  (m.cost_per_unit_cents / 100).toString()
-                                );
-                                setEditUnit(isOutOfRegion ? '' : m.unit);
-                              }}
-                              className="text-blue-600 text-[10px] font-black uppercase tracking-widest"
-                            >
-                              {lang.edit}
-                            </button>
-                            <button
-                              onClick={() => handleDelete(m.id)}
-                              className="text-red-400 text-[10px] font-black uppercase tracking-widest"
-                            >
-                              {lang.delete}
-                            </button>
-                          </td>
-                        </>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 pt-4 border-t border-gray-100">
+                        <button
+                          onClick={() => {
+                            setEditingId(m.id);
+                            setEditName(m.name);
+                            setEditPrice(
+                              (m.cost_per_unit_cents / 100).toString()
+                            );
+                            setEditUnit(isOutOfRegion ? '' : m.unit);
+                          }}
+                          className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
+                        >
+                          {lang.edit}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(m.id)}
+                          className="flex-1 bg-red-50 text-red-500 hover:bg-red-100 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
+                        >
+                          {lang.delete}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* DESKTOP LAYOUT (Table Rows) */}
+                    <div className="hidden sm:flex w-full col-span-5 font-bold text-gray-800 items-center">
+                      {m.name}
+                      {isOutOfRegion && (
+                        <span className="ml-3 text-[8px] font-black uppercase tracking-widest text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                          {lang.outOfRegion}
+                        </span>
                       )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                    <div className="hidden sm:block w-full col-span-3">
+                      <span
+                        className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${isOutOfRegion ? 'text-yellow-600 bg-yellow-100' : 'text-gray-400 bg-gray-100'}`}
+                      >
+                        {lang.units[m.unit] || m.unit}
+                      </span>
+                    </div>
+                    <div className="hidden sm:block w-full col-span-2 text-right font-mono font-bold text-gray-700">
+                      {profile?.currency === 'EUR' ? '€' : '$'}
+                      {(m.cost_per_unit_cents / 100).toFixed(2)}
+                    </div>
+                    <div className="hidden sm:flex w-full col-span-2 justify-end gap-6">
+                      <button
+                        onClick={() => {
+                          setEditingId(m.id);
+                          setEditName(m.name);
+                          setEditPrice(
+                            (m.cost_per_unit_cents / 100).toString()
+                          );
+                          setEditUnit(isOutOfRegion ? '' : m.unit);
+                        }}
+                        className="text-blue-600 font-black text-[10px] uppercase tracking-widest hover:text-blue-800 transition-colors"
+                      >
+                        {lang.edit}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(m.id)}
+                        className="text-red-400 font-black text-[10px] uppercase tracking-widest hover:text-red-600 transition-colors"
+                      >
+                        {lang.delete}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

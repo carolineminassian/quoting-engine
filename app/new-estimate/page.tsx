@@ -430,10 +430,10 @@ function NewEstimateContent() {
               </select>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
               placeholder={lang.clientName}
-              className="col-span-2 p-3 border rounded-lg outline-none focus:border-blue-500 font-bold"
+              className="col-span-1 sm:col-span-2 p-3 border rounded-lg outline-none focus:border-blue-500 font-bold"
               value={client.name}
               onChange={(e) => setClient({ ...client, name: e.target.value })}
             />
@@ -480,7 +480,7 @@ function NewEstimateContent() {
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 bg-slate-50 p-6 rounded-lg border border-slate-100">
-              <div className="col-span-3 mb-2">
+              <div className="col-span-1 sm:col-span-3 mb-2">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   {profile?.country === 'FR'
                     ? "Paramètres de Main-d'œuvre"
@@ -549,11 +549,14 @@ function NewEstimateContent() {
             <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">
               {lang.materials}
             </p>
-            <div className="space-y-3">
+            <div className="space-y-4 sm:space-y-3">
               {sec.items.map((item, iIdx) => (
-                <div key={iIdx} className="flex gap-2 sm:gap-4 items-center">
+                <div
+                  key={iIdx}
+                  className="flex flex-wrap sm:flex-nowrap gap-3 sm:gap-4 items-center bg-gray-50 sm:bg-transparent p-3 sm:p-0 rounded-lg sm:rounded-none border border-gray-200 sm:border-none"
+                >
                   <select
-                    className="flex-1 p-2 border border-gray-100 rounded bg-gray-50 font-bold text-xs outline-none focus:border-blue-500"
+                    className="w-full sm:flex-1 p-3 sm:p-2 border border-gray-200 sm:border-gray-100 rounded-lg sm:rounded bg-white sm:bg-gray-50 font-bold text-xs outline-none focus:border-blue-500"
                     value={item.materialId}
                     onChange={(e) =>
                       updateItem(sIdx, iIdx, 'materialId', e.target.value)

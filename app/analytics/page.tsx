@@ -10,20 +10,20 @@ const dict = {
     title: 'Analytics',
     subtitle: 'Insights based on your finalized estimates.',
     lockedOnly: 'Pro Feature',
-    totalRev: 'Total Revenue',
+    totalRev: 'Projected Value',
     totalProj: 'Finalized Projects',
     avgValue: 'Avg Estimate Value',
-    last6Months: 'Revenue (Last 6 Months)',
+    last6Months: 'Projected (Last 6 Months)',
     upgradeAlert: 'Analytics are exclusively available on the Pro Plan.'
   },
   FR: {
     title: 'Analytique',
     subtitle: 'Données basées sur vos devis finalisés.',
     lockedOnly: 'Fonctionnalité Pro',
-    totalRev: "Chiffre d'Affaires",
+    totalRev: 'Revenus Projetés',
     totalProj: 'Projets Finalisés',
     avgValue: 'Valeur Moyenne',
-    last6Months: 'Revenus (6 Derniers Mois)',
+    last6Months: 'Projections (6 Derniers Mois)',
     upgradeAlert:
       'Les analyses sont exclusivement disponibles avec le Plan Pro.'
   }
