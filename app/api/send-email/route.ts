@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     console.log(`Reply-To set to: ${userEmail}`);
 
     const data = await resend.emails.send({
-      from: `${businessName} <estimates@changexchange.fr>`,
+      from: `${businessName} <estimates@pactestim.com>`,
       to: [email],
       // This is the critical line for client replies
       replyTo: userEmail,
