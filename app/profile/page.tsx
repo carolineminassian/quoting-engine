@@ -20,9 +20,10 @@ export default function ProfilePage() {
   const [lang, setLang] = useState<any>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
+  const [processingDelete, setProcessingDelete] = useState(false);
 
   const [dialog, setDialog] = useState<{
-    type: 'alert' | 'confirm';
+    type: 'alert' | 'confirm' | 'danger';
     title?: string;
     message: string;
     onConfirm?: () => void;
@@ -176,6 +177,61 @@ export default function ProfilePage() {
           .eq('id', profile.id);
         location.reload();
       }
+    });
+  };
+
+  // Execution call to the secure backend API route
+  const executeAccountDeletion = async () => {
+    setDialog(null);
+    setProcessingDelete(true);
+
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session token identified.');
+
+      const response = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || 'Failed to complete administrative account erasure.'
+        );
+      }
+
+      // Explicitly sign out client state and flush cached storage footprints
+      await supabase.auth.signOut();
+      localStorage.clear();
+      router.push('/');
+      router.refresh();
+    } catch (err: any) {
+      setProcessingDelete(false);
+      setDialog({
+        type: 'alert',
+        title: country === 'FR' ? 'Erreur' : 'Error',
+        message: err.message || 'An unexpected connectivity error occurred.'
+      });
+    }
+  };
+
+  // Dual-stage conformation modal warning interceptor
+  const triggerDeleteAccountFlow = () => {
+    setDialog({
+      type: 'danger',
+      title: country === 'FR' ? 'Suppression Définitive' : 'Permanent Deletion',
+      message:
+        country === 'FR'
+          ? 'Attention: Cette action est irréversible. Toutes vos données d’entreprise, listes de prix de matériaux, répertoire clients et devis archivés seront définitivement effacés conformément à la politique RGPD. Confirmer la suppression ?'
+          : 'Warning: This action cannot be undone. All your business parameters, material rosters, master price lists, client profiles, and historical finalized estimates will be purged permanently. Confirm account erasure?',
+      onConfirm: executeAccountDeletion
     });
   };
 
@@ -360,7 +416,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={savingSecurity}
-              className="bg-red-50 text-red-600 border border-red-100/60 px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-100 transition-transform active:scale-95"
+              className="bg-gray-100 text-gray-700 border border-gray-200 px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-transform active:scale-95"
             >
               {savingSecurity
                 ? '...'
@@ -372,7 +428,7 @@ export default function ProfilePage() {
         </div>
 
         {/* SUBSCRIPTION PLAN SECTION */}
-        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
           <p className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest border-b border-gray-50 pb-3">
             {lang.currentPlan || 'Current Plan'}
           </p>
@@ -408,13 +464,45 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* COMPLIANCE DANGER ZONE - ACCOUNT ERASURE BLOCK */}
+        <div className="bg-red-50/10 p-6 sm:p-8 rounded-2xl border border-red-200/60">
+          <p className="text-[10px] font-black uppercase text-red-500/80 mb-4 tracking-[0.2em] border-b border-red-100/40 playbook pb-3">
+            {country === 'FR' ? 'Zone de Danger' : 'Danger Zone'}
+          </p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+            <div className="max-w-md">
+              <p className="font-black text-base text-gray-900 tracking-tight uppercase mb-1">
+                {country === 'FR' ? 'Supprimer le compte' : 'Delete Account'}
+              </p>
+              <p className="text-xs text-gray-400 font-bold leading-relaxed">
+                {country === 'FR'
+                  ? 'Supprimez définitivement votre profil, tous les devis archivés, listes de prix et données clients. Cette opération est immédiate et irréversible.'
+                  : 'Permanently eliminate your account authentication profile, all historical estimates, materials, and clients records.'}
+              </p>
+            </div>
+            <button
+              onClick={triggerDeleteAccountFlow}
+              disabled={processingDelete}
+              className="w-full sm:w-auto text-center bg-red-600 text-white px-6 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-red-700 transition-colors shrink-0 disabled:opacity-40"
+            >
+              {processingDelete
+                ? '...'
+                : country === 'FR'
+                  ? 'Supprimer le compte'
+                  : 'Delete Account'}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Synchronized Custom Form Dialog Component */}
+      {/* Dialog Overlay Component Wrapper */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
-            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
+            <h3
+              className={`text-sm font-black uppercase tracking-widest mb-3 ${dialog.type === 'danger' ? 'text-red-600' : 'text-gray-900'}`}
+            >
               {dialog.title ||
                 (profile?.country === 'FR' ? 'Notification' : 'Notice')}
             </h3>
@@ -422,7 +510,7 @@ export default function ProfilePage() {
               {dialog.message}
             </p>
             <div className="flex gap-2 justify-end">
-              {dialog.type === 'confirm' && (
+              {(dialog.type === 'confirm' || dialog.type === 'danger') && (
                 <button
                   onClick={() => setDialog(null)}
                   className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
@@ -435,9 +523,19 @@ export default function ProfilePage() {
                   if (dialog.onConfirm) dialog.onConfirm();
                   else setDialog(null);
                 }}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+                className={`px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-white rounded-lg shadow-sm transition-colors ${
+                  dialog.type === 'danger'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
-                {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
+                {dialog.type === 'danger'
+                  ? profile?.country === 'FR'
+                    ? 'Supprimer Définitivement'
+                    : 'Delete Permanently'
+                  : profile?.country === 'FR'
+                    ? 'Confirmer'
+                    : 'OK'}
               </button>
             </div>
           </div>
