@@ -99,7 +99,7 @@ export default function LandingPage() {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <Link
-            href="/login?view=signup"
+            href="/new-estimate"
             className="w-full sm:w-auto bg-blue-600 text-white px-10 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-blue-700 transition-transform hover:scale-105 active:scale-95"
           >
             {t.btnStart}

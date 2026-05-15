@@ -1,25 +1,22 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Roboto } from 'next/font/google'; // Changed from Geist
 import './globals.css';
 import Navbar from '../components/Navbar';
 import { PHProvider } from './providers';
 import CookieBanner from '@/components/CookieBanner';
 import Footer from '@/components/Footer';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin']
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin']
+// Configure Roboto font
+const roboto = Roboto({
+  weight: ['300', '400', '500', '700', '900'],
+  subsets: ['latin'],
+  display: 'swap'
 });
 
 export const metadata: Metadata = {
   title: 'Professional Quoting Engine for Contractors and Businesses',
   description:
-    'Precision estimates for contractors and businesses. Create, manage, and send detailed project quotes with ease. Streamline your workflow and impress clients with professional estimates.'
+    'Precision estimates for contractors and businesses. Create, manage, and send detailed project quotes with ease.'
 };
 
 export default function RootLayout({
@@ -30,13 +27,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <PHProvider>
+        {/* Added roboto.className here */}
         <body
-          className={`${geistSans.variable} ${geistMono.variable} font-sans flex flex-col min-h-screen`}
+          className={`${roboto.className} font-sans flex flex-col min-h-screen`}
         >
           <Navbar />
-
           <div className="flex-1 flex flex-col">{children}</div>
-
           <Footer />
           <CookieBanner />
         </body>

@@ -60,6 +60,10 @@ function NewEstimateContent() {
   const [limitReached, setLimitReached] = useState(false);
   const [monthlyCount, setMonthlyCount] = useState(0);
 
+  // Logic for Guest Handling
+  const [isGuest, setIsGuest] = useState(false);
+  const [businessName, setBusinessName] = useState('');
+
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
     title?: string;
@@ -81,11 +85,52 @@ function NewEstimateContent() {
 
   useEffect(() => {
     async function fetchData() {
+      // 1. Capture cached data in local variables immediately to prevent overwrite
+      let cachedBusinessName = '';
+      const pendingRaw = localStorage.getItem('pactestim_pending_estimate');
+
+      if (pendingRaw) {
+        try {
+          const pending = JSON.parse(pendingRaw);
+          if (pending.client) setClient(pending.client);
+          if (pending.sections) setSections(pending.sections);
+          if (pending.customRef) setCustomRef(pending.customRef);
+          if (pending.businessName) {
+            cachedBusinessName = pending.businessName;
+            setBusinessName(pending.businessName);
+          }
+        } catch (e) {
+          console.error('Failed to parse pending estimate');
+        }
+      }
+
       const {
         data: { user }
       } = await supabase.auth.getUser();
-      if (!user) return router.push('/');
 
+      // 2. Handle Language Sync (Priority: LocalStorage > Browser Language)
+      const storedLang = localStorage.getItem('public_lang');
+      const isFrChoice =
+        storedLang === 'FR' ||
+        (!storedLang && navigator.language.toLowerCase().startsWith('fr'));
+
+      // 3. Handle Unauthenticated (Guest) User
+      if (!user) {
+        setIsGuest(true);
+        setProfile({
+          country: isFrChoice ? 'FR' : 'US',
+          currency: isFrChoice ? 'EUR' : 'USD',
+          default_hourly_rate: 50,
+          default_tax_rate: 0
+        });
+        setLang(isFrChoice ? translations.FR : translations.US);
+        setMaterials([]);
+        setPastClients([]);
+        setLoading(false);
+        return;
+      }
+
+      // 4. Handle Authenticated User
       const [prof, mats, ests, clientsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase
@@ -95,9 +140,7 @@ function NewEstimateContent() {
           .order('name'),
         supabase
           .from('estimates')
-          .select(
-            'client_name, client_email, client_phone, client_address, created_at, custom_id, sections'
-          )
+          .select('client_name, created_at')
           .eq('user_id', user.id),
         supabase.from('clients').select('*').eq('user_id', user.id)
       ]);
@@ -105,6 +148,13 @@ function NewEstimateContent() {
       if (prof.data) {
         setProfile(prof.data);
         setLang(prof.data.country === 'FR' ? translations.FR : translations.US);
+
+        // DATA PERSISTENCE FIX: Priority to cached guest name over empty profile name
+        if (cachedBusinessName) {
+          setBusinessName(cachedBusinessName);
+        } else {
+          setBusinessName(prof.data.business_name || '');
+        }
 
         if (!editId && prof.data.subscription_tier === 'free') {
           const currentMonth = new Date().getMonth();
@@ -119,7 +169,6 @@ function NewEstimateContent() {
             }).length || 0;
 
           setMonthlyCount(monthlyEstimates);
-
           if (monthlyEstimates >= 5 && (prof.data.estimate_credits || 0) <= 0) {
             setLimitReached(true);
           }
@@ -127,12 +176,9 @@ function NewEstimateContent() {
       }
 
       setMaterials(mats.data || []);
+      if (clientsRes?.data) setPastClients(clientsRes.data);
 
-      if (clientsRes?.data) {
-        setPastClients(clientsRes.data);
-      }
-
-      if (editId) {
+      if (editId && !pendingRaw) {
         const { data: est } = await supabase
           .from('estimates')
           .select('*')
@@ -162,7 +208,7 @@ function NewEstimateContent() {
           }));
           setSections(loadedSections);
         }
-      } else if (prof.data) {
+      } else if (prof.data && !pendingRaw) {
         const n = [...sections];
         n[0].hourlyRate = prof.data.default_hourly_rate || 50;
         n[0].laborTaxRate = prof.data.default_tax_rate || 0;
@@ -213,16 +259,13 @@ function NewEstimateContent() {
   ) => {
     const tempId = `temp_${Math.random().toString(36).substring(2, 9)}`;
     const defaultUnit = lang?.units ? Object.keys(lang.units)[0] : 'ea';
-
     const newMaterial = {
       id: tempId,
       name: rawName,
       cost_per_unit_cents: 0,
       unit: defaultUnit
     };
-
     setMaterials([...materials, newMaterial]);
-
     updateItem(sIdx, iIdx, 'materialId', tempId);
     updateItem(sIdx, iIdx, 'name', rawName);
     updateItem(sIdx, iIdx, 'cost_per_unit_cents', 0);
@@ -232,25 +275,20 @@ function NewEstimateContent() {
   const calculateTotals = () => {
     let subtotalCents = 0;
     let totalTaxCents = 0;
-
     sections.forEach((sec) => {
       const laborCents = Math.round(sec.laborHours * sec.hourlyRate * 100);
       const laborTaxCents = Math.round(
         laborCents * ((sec.laborTaxRate || 0) / 100)
       );
-
       subtotalCents += laborCents;
       totalTaxCents += laborTaxCents;
-
       sec.items.forEach((item) => {
         const itemCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
         const itemTax = Math.round(itemCost * ((item.taxRate || 0) / 100));
-
         subtotalCents += itemCost;
         totalTaxCents += itemTax;
       });
     });
-
     return {
       subtotalCents,
       tax: totalTaxCents,
@@ -290,14 +328,44 @@ function NewEstimateContent() {
     const {
       data: { user }
     } = await supabase.auth.getUser();
-    const totals = calculateTotals();
 
+    // 1. Guest Check: Cache and Redirect to Signup view on Login page
+    if (!user) {
+      const pendingData = { client, sections, customRef, businessName };
+      localStorage.setItem(
+        'pactestim_pending_estimate',
+        JSON.stringify(pendingData)
+      );
+      setDialog({
+        type: 'confirm',
+        title:
+          profile?.country === 'FR'
+            ? 'Inscription Requise'
+            : 'Sign Up Required',
+        message:
+          profile?.country === 'FR'
+            ? 'Créez un compte gratuit pour enregistrer et générer ce devis.'
+            : 'Create a free account to save and generate this estimate.',
+        onConfirm: () => router.push('/login?view=signup')
+      });
+      return;
+    }
+
+    // 2. Auth Logic: Update profile if business name was provided or changed
+    if (businessName && businessName !== profile?.business_name) {
+      await supabase
+        .from('profiles')
+        .update({ business_name: businessName })
+        .eq('id', user.id);
+    }
+
+    const totals = calculateTotals();
     const finalSections = [];
+
     for (const sec of sections) {
       const finalItems = [];
       for (const item of sec.items) {
         let finalMatId = item.materialId;
-
         if (finalMatId.startsWith('temp_') && user?.id) {
           const { data, error } = await supabase
             .from('materials')
@@ -312,11 +380,9 @@ function NewEstimateContent() {
             ])
             .select()
             .single();
-
           if (error) console.error('Material Insert Error:', error);
           if (data) finalMatId = data.id;
         }
-
         finalItems.push({
           ...item,
           materialId: finalMatId,
@@ -339,7 +405,7 @@ function NewEstimateContent() {
       tax_amount_cents: totals.tax,
       sections: finalSections,
       is_locked: false,
-      business_name_snapshot: profile.business_name,
+      business_name_snapshot: businessName || profile.business_name,
       country_snapshot: profile.country,
       currency_snapshot: profile.currency
     };
@@ -353,6 +419,7 @@ function NewEstimateContent() {
       : await supabase.from('estimates').insert([payload]).select();
 
     if (!res.error) {
+      // Client Sync logic
       if (client.name) {
         const existing = pastClients.find((c) => c.name === client.name);
         if (existing) {
@@ -377,6 +444,7 @@ function NewEstimateContent() {
         }
       }
 
+      // Billing credit deduction
       if (
         !editId &&
         profile.subscription_tier === 'free' &&
@@ -388,6 +456,9 @@ function NewEstimateContent() {
           .update({ estimate_credits: profile.estimate_credits - 1 })
           .eq('id', profile.id);
       }
+
+      // 3. Clear Cache and Redirect to newly created view
+      localStorage.removeItem('pactestim_pending_estimate');
       router.push(`/estimates/${res.data[0].id}`);
     } else {
       setDialog({ type: 'alert', message: res.error.message });
@@ -433,6 +504,7 @@ function NewEstimateContent() {
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-black pb-40 font-sans relative">
       <div className="max-w-4xl mx-auto">
+        {/* Header Area */}
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
             <div className="flex justify-between items-center w-full sm:w-auto">
@@ -450,7 +522,6 @@ function NewEstimateContent() {
                 {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
               </Link>
             </div>
-
             <input
               type="text"
               placeholder={lang.customRef}
@@ -459,15 +530,61 @@ function NewEstimateContent() {
               className="text-xs p-3 sm:p-2 border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 font-mono w-full sm:w-48 text-gray-500 shadow-sm"
             />
           </div>
-
           <Link
-            href="/dashboard"
+            href={isGuest ? '/' : '/dashboard'}
             className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
           >
             {profile?.country === 'FR' ? 'Annuler et Quitter' : 'Cancel & Exit'}
           </Link>
         </div>
 
+        {/* Guest Context Banner */}
+        {isGuest && (
+          <div className="bg-blue-50 border border-blue-100 p-4 sm:p-5 rounded-xl mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-xl shrink-0">👋</span>
+              <p className="text-xs font-bold text-blue-900 leading-relaxed">
+                {profile?.country === 'FR'
+                  ? 'Vous utilisez le générateur en mode invité. Votre progression est sauvegardée localement. Créez un compte pour finaliser ce devis.'
+                  : 'You are using the builder as a guest. Your progress is saved locally. Create an account to finalize this estimate.'}
+              </p>
+            </div>
+            <Link
+              href="/login?view=signup"
+              className="w-full sm:w-auto text-center text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shrink-0"
+            >
+              {profile?.country === 'FR' ? 'Créer un compte' : 'Create Account'}
+            </Link>
+          </div>
+        )}
+
+        {/* Business Settings Section - Only shown for guests or users without a business name */}
+        {(isGuest || !profile?.business_name) && (
+          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
+            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-4">
+              {profile?.country === 'FR' ? 'Votre Entreprise' : 'Your Business'}
+            </p>
+            <div className="group relative">
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                  B
+                </div>
+                <input
+                  placeholder={
+                    profile?.country === 'FR'
+                      ? 'Nom de votre entreprise'
+                      : 'Your Business Name'
+                  }
+                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Client Contact Section */}
         <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
@@ -478,7 +595,7 @@ function NewEstimateContent() {
             {pastClients.length > 0 && (
               <select
                 value={
-                  pastClients.some((c) => c.client_name === client.name)
+                  pastClients.some((c) => c.name === client.name)
                     ? client.name
                     : ''
                 }
@@ -496,7 +613,6 @@ function NewEstimateContent() {
               </select>
             )}
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-1 sm:col-span-2 group relative">
               <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
@@ -513,7 +629,6 @@ function NewEstimateContent() {
                 />
               </div>
             </div>
-
             <div className="group relative">
               <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                 <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
@@ -529,7 +644,6 @@ function NewEstimateContent() {
                 />
               </div>
             </div>
-
             <div className="group relative">
               <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                 <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
@@ -545,7 +659,6 @@ function NewEstimateContent() {
                 />
               </div>
             </div>
-
             <textarea
               placeholder={lang.address}
               className="col-span-1 sm:col-span-2 p-4 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-gray-50 font-bold text-sm resize-none h-24 text-gray-800 transition-all"
@@ -557,6 +670,7 @@ function NewEstimateContent() {
           </div>
         </div>
 
+        {/* Sections Map */}
         {sections.map((sec, sIdx) => (
           <div
             key={sIdx}
@@ -568,7 +682,6 @@ function NewEstimateContent() {
             >
               {profile?.country === 'FR' ? 'Supprimer' : 'Remove Step'}
             </button>
-
             <input
               placeholder={lang.serviceStep}
               className="text-xl font-black uppercase w-full mb-6 border-b-2 border-gray-50 outline-none focus:border-blue-500 pb-2 italic tracking-tight"
@@ -717,7 +830,6 @@ function NewEstimateContent() {
                       />
                     )}
                   </div>
-
                   <div className="w-24 relative shrink-0 group">
                     <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
                       {profile?.country === 'FR' ? 'Qté' : 'Qty'}
@@ -738,7 +850,6 @@ function NewEstimateContent() {
                       }
                     />
                   </div>
-
                   <div className="w-36 relative shrink-0 group">
                     <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500 z-10">
                       {profile?.country === 'FR' ? 'Unité' : 'Unit'}
@@ -748,7 +859,7 @@ function NewEstimateContent() {
                       onChange={(val) => updateItem(sIdx, iIdx, 'unit', val)}
                     >
                       <div className="relative">
-                        <ListboxButton className="w-full py-2 pl-12 pr-8 text-left text-xs font-bold text-gray-900 border border-gray-100 rounded outline-none focus:border-blue-500 transition-colors bg-white cursor-pointer flex items-center">
+                        <ListboxButton className="w-full py-2 pl-12 pr-8 text-left text-xs font-bold text-gray-900 border border-gray-100 rounded outline-none focus:border-blue-500 transition-colors bg-white cursor-pointer flex items-center h-[34px]">
                           <span className="block truncate">
                             {lang?.units
                               ? lang.units[getResolvedUnitKey(item.unit)]
@@ -776,13 +887,13 @@ function NewEstimateContent() {
                           leaveFrom="opacity-100"
                           leaveTo="opacity-0"
                         >
-                          <ListboxOptions className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 text-base shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-gray-100 ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                          <ListboxOptions className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white shadow-xl border border-gray-100">
                             {Object.entries(lang?.units || { ea: 'ea' }).map(
                               ([key, label]) => (
                                 <ListboxOption
                                   key={key}
                                   className={({ focus }) =>
-                                    `relative cursor-pointer select-none py-2 px-4 transition-colors ${
+                                    `cursor-pointer select-none py-2 px-4 transition-colors ${
                                       focus
                                         ? 'bg-blue-50 text-blue-900'
                                         : 'text-gray-900'
@@ -792,7 +903,11 @@ function NewEstimateContent() {
                                 >
                                   {({ selected }) => (
                                     <span
-                                      className={`block truncate text-xs ${selected ? 'font-black text-blue-600' : 'font-bold'}`}
+                                      className={`block truncate text-xs ${
+                                        selected
+                                          ? 'font-black text-blue-600'
+                                          : 'font-bold'
+                                      }`}
                                     >
                                       {label as string}
                                     </span>
@@ -805,7 +920,6 @@ function NewEstimateContent() {
                       </div>
                     </Listbox>
                   </div>
-
                   <div className="w-32 relative shrink-0 group">
                     <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
                       {profile?.country === 'FR' ? 'Prix' : 'Cost'}
@@ -830,16 +944,15 @@ function NewEstimateContent() {
                       }
                     />
                   </div>
-
                   <div className="w-28 relative shrink-0 group">
                     <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
-                      {profile?.country === 'FR' ? 'TVA' : 'Tax'}
+                      Tax
                     </span>
                     <input
                       type="number"
                       min="0"
                       placeholder="0"
-                      className="w-full py-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full py-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white"
                       value={item.taxRate === 0 ? '' : item.taxRate}
                       onChange={(e) =>
                         updateItem(
@@ -854,7 +967,6 @@ function NewEstimateContent() {
                       %
                     </span>
                   </div>
-
                   <button
                     onClick={() => {
                       const n = [...sections];
@@ -907,7 +1019,8 @@ function NewEstimateContent() {
           + {lang.serviceStep}
         </button>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 sm:p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-40">
+        {/* Totals Footer */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 p-4 sm:p-6 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] z-40">
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 sm:gap-0 justify-between items-center">
             <div className="flex w-full sm:w-auto justify-between sm:justify-start gap-4 sm:gap-10">
               <div>
@@ -916,9 +1029,7 @@ function NewEstimateContent() {
                 </p>
                 <p className="text-xl font-mono font-bold">
                   {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(subtotalCents / 100)
-                    .toFixed(2)
-                    .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
+                  {(subtotalCents / 100).toFixed(2)}
                 </p>
               </div>
               <div>
@@ -927,9 +1038,7 @@ function NewEstimateContent() {
                 </p>
                 <p className="text-xl font-mono font-bold">
                   {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(tax / 100)
-                    .toFixed(2)
-                    .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
+                  {(tax / 100).toFixed(2)}
                 </p>
               </div>
               <div>
@@ -938,9 +1047,7 @@ function NewEstimateContent() {
                 </p>
                 <p className="text-3xl font-black text-blue-600 tracking-tighter">
                   {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(totalCents / 100)
-                    .toFixed(2)
-                    .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
+                  {(totalCents / 100).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -960,6 +1067,7 @@ function NewEstimateContent() {
         </div>
       </div>
 
+      {/* Dialog Intercepts */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
@@ -986,7 +1094,7 @@ function NewEstimateContent() {
                 }}
                 className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
               >
-                {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
+                OK
               </button>
             </div>
           </div>

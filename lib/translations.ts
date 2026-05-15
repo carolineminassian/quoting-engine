@@ -6,6 +6,7 @@ export const translations = {
     settings: 'Business Settings',
     signOut: 'Sign Out',
     newEstimate: '+ New Estimate',
+    editProject: 'Edit Project',
     clientName: 'Client Name',
     email: 'Email Address',
     phone: 'Phone Number',
@@ -15,6 +16,7 @@ export const translations = {
     grandTotal: 'Grand Total',
     subtotal: 'Subtotal',
     tax: 'Tax',
+    hourlyRate: 'Hourly Rate',
     selectMaterial: 'Select Material from Price List',
     unitPlaceholder: 'Select Unit',
     finalized: 'Finalized',
@@ -41,9 +43,11 @@ export const translations = {
     share: 'Share',
     invalidEmail: 'Please enter a valid email address.',
     invalidPhone: 'Please enter a valid phone number.',
+    yourBusiness: 'Your Business',
     businessName: 'Business Name',
     defaultTaxRate: 'Default Tax Rate (%)',
     logo: 'Company Logo',
+    analytics: 'Analytics',
     proFeature: 'Pro Feature',
     currentPlan: 'Current Plan',
     freePlan: 'Free Plan (5 Estimates/mo)',
@@ -60,7 +64,7 @@ export const translations = {
     chooseFile: 'Choose File',
     noFileChosen: 'No file chosen',
     // Upgrade Page
-    upgradeTitle: 'Upgrade Engine',
+    upgradeTitle: 'Upgrade PactEstim',
     upgradeSubtitle: 'Unlock unlimited potential',
     bestValue: 'Best Value',
     proPlanName: 'Pro',
@@ -70,6 +74,7 @@ export const translations = {
       '✓ Unlimited Estimates',
       '✓ Custom Company Logo',
       '✓ Excel Data Export',
+      '✓ Full Analytics Dashboard',
       '✓ Priority Support'
     ],
     payGoFeatures: [
@@ -77,7 +82,8 @@ export const translations = {
       '✓ No monthly commitment',
       '✓ Credits never expire',
       '✗ No Custom Logo',
-      '✗ No Excel Export'
+      '✗ No Excel Export',
+      '✗ No Analytics Dashboard'
     ],
     units: {
       ea: 'Each',
@@ -94,6 +100,7 @@ export const translations = {
     settings: 'Paramètres',
     signOut: 'Déconnexion',
     newEstimate: '+ Nouveau Devis',
+    editProject: 'Modifier le Projet',
     clientName: 'Nom du Client',
     email: 'Adresse E-mail',
     phone: 'Numéro de Téléphone',
@@ -103,6 +110,7 @@ export const translations = {
     grandTotal: 'Montant Total',
     subtotal: 'Sous-total',
     tax: 'TVA',
+    hourlyRate: 'Taux Horaire',
     selectMaterial: 'Sélectionner un matériau',
     unitPlaceholder: "Choisir l'unité",
     finalized: 'Finalisé',
@@ -129,9 +137,11 @@ export const translations = {
     share: 'Partager',
     invalidEmail: 'E-mail invalide.',
     invalidPhone: 'Téléphone invalide.',
+    yourBusiness: 'Votre Entreprise',
     businessName: "Nom de l'Entreprise",
     defaultTaxRate: 'Taux de TVA par défaut (%)',
     logo: "Logo de l'Entreprise",
+    analytics: 'Analytique',
     proFeature: 'Fonctionnalité Pro',
     currentPlan: 'Abonnement Actuel',
     freePlan: 'Plan Gratuit (5 Devis/mois)',
@@ -148,7 +158,7 @@ export const translations = {
     chooseFile: 'Choisir un fichier',
     noFileChosen: 'Aucun fichier choisi',
     // Upgrade Page
-    upgradeTitle: 'Mise à Niveau',
+    upgradeTitle: 'Mise à Niveau PactEstim',
     upgradeSubtitle: 'Débloquez un potentiel illimité',
     bestValue: 'Meilleur Choix',
     proPlanName: 'Pro',
@@ -158,6 +168,7 @@ export const translations = {
       '✓ Devis Illimités',
       "✓ Logo d'Entreprise Personnalisé",
       '✓ Exportation de Données Excel',
+      '✓ Tableau de bord Analytique complet',
       '✓ Support Prioritaire'
     ],
     payGoFeatures: [
@@ -165,7 +176,8 @@ export const translations = {
       '✓ Sans engagement mensuel',
       "✓ Les crédits n'expirent jamais",
       '✗ Pas de Logo Personnalisé',
-      "✗ Pas d'Exportation Excel"
+      "✗ Pas d'Exportation Excel",
+      '✗ Pas de Tableau de Bord Analytique'
     ],
     units: {
       ea: 'Unité',

@@ -106,13 +106,24 @@ function LoginContent() {
     }
   }, [searchParams]);
 
+  // Utility to handle redirection after login/signup
+  const handleRedirect = () => {
+    const hasPendingEstimate = localStorage.getItem(
+      'pactestim_pending_estimate'
+    );
+    if (hasPendingEstimate) {
+      router.push('/new-estimate');
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     if (view === 'signup') {
-      // Pass the language preference to Supabase User Meta Data
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -136,13 +147,17 @@ function LoginContent() {
         } else {
           setDialog({ type: 'alert', message: error.message });
         }
+      } else if (data.session) {
+        // SEAMLESS UX: Auto-login if session is returned (Email confirmation disabled)
+        handleRedirect();
       } else {
+        // Fallback if email confirmation is still enabled in Supabase
         setDialog({
           type: 'alert',
           message:
             lang === 'FR'
-              ? 'Compte créé ! Veuillez vérifier votre e-mail pour le lien de confirmation.'
-              : 'Account created! Please check your email for the verification link before logging in.'
+              ? 'Compte créé ! Veuillez vérifier votre e-mail pour finaliser.'
+              : 'Account created! Please check your email to finalize.'
         });
         setView('login');
       }
@@ -155,7 +170,8 @@ function LoginContent() {
       if (error) {
         setDialog({ type: 'alert', message: error.message });
       } else {
-        router.push('/dashboard');
+        // SEAMLESS UX: Check if they were working as a guest
+        handleRedirect();
       }
     } else if (view === 'forgot') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
