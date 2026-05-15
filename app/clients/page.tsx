@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/next';
 import { useRouter } from 'next/navigation';
 
 const LoadingDots = () => (
