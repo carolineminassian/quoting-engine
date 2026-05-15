@@ -503,8 +503,9 @@ export default function EstimateView() {
                           const m = materials.find(
                             (mat) => mat.id === item.materialId
                           );
+                          // Safe Fallbacks prioritized to snapshots
                           const displayName =
-                            item.name || m?.name || 'Unknown Material';
+                            item.name || m?.name || 'Material Item';
                           const displayCost =
                             item.cost_per_unit_cents !== undefined
                               ? item.cost_per_unit_cents
@@ -539,7 +540,7 @@ export default function EstimateView() {
                               (mat) => mat.id === item.materialId
                             );
                             const displayName =
-                              item.name || m?.name || 'Unknown Material';
+                              item.name || m?.name || 'Material Item';
                             const rawUnit = item.unit || m?.unit || '';
                             const displayUnit =
                               lang?.units?.[rawUnit] || rawUnit;
