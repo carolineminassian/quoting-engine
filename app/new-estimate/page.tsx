@@ -1,10 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
+import MaterialCombobox from '@/components/MaterialCombobox';
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOptions,
+  ListboxOption,
+  Transition
+} from '@headlessui/react';
 
 const LoadingDots = () => (
   <div className="flex items-center justify-center space-x-2 p-12 mt-20">
@@ -93,6 +101,7 @@ function NewEstimateContent() {
           .eq('user_id', user.id),
         supabase.from('clients').select('*').eq('user_id', user.id)
       ]);
+
       if (prof.data) {
         setProfile(prof.data);
         setLang(prof.data.country === 'FR' ? translations.FR : translations.US);
@@ -197,6 +206,29 @@ function NewEstimateContent() {
     setSections(n);
   };
 
+  const handleCreateMaterialOnTheFly = (
+    sIdx: number,
+    iIdx: number,
+    rawName: string
+  ) => {
+    const tempId = `temp_${Math.random().toString(36).substring(2, 9)}`;
+    const defaultUnit = lang?.units ? Object.keys(lang.units)[0] : 'ea';
+
+    const newMaterial = {
+      id: tempId,
+      name: rawName,
+      cost_per_unit_cents: 0,
+      unit: defaultUnit
+    };
+
+    setMaterials([...materials, newMaterial]);
+
+    updateItem(sIdx, iIdx, 'materialId', tempId);
+    updateItem(sIdx, iIdx, 'name', rawName);
+    updateItem(sIdx, iIdx, 'cost_per_unit_cents', 0);
+    updateItem(sIdx, iIdx, 'unit', defaultUnit);
+  };
+
   const calculateTotals = () => {
     let subtotalCents = 0;
     let totalTaxCents = 0;
@@ -211,14 +243,11 @@ function NewEstimateContent() {
       totalTaxCents += laborTaxCents;
 
       sec.items.forEach((item) => {
-        const m = materials.find((mat) => mat.id === item.materialId);
-        if (m) {
-          const itemCost = m.cost_per_unit_cents * item.qty;
-          const itemTax = Math.round(itemCost * ((item.taxRate || 0) / 100));
+        const itemCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
+        const itemTax = Math.round(itemCost * ((item.taxRate || 0) / 100));
 
-          subtotalCents += itemCost;
-          totalTaxCents += itemTax;
-        }
+        subtotalCents += itemCost;
+        totalTaxCents += itemTax;
       });
     });
 
@@ -263,19 +292,41 @@ function NewEstimateContent() {
     } = await supabase.auth.getUser();
     const totals = calculateTotals();
 
-    // Deep snapshot: Lock in the exact name, cost, and unit at the time of creation
-    const enrichedSections = sections.map((sec) => ({
-      ...sec,
-      items: sec.items.map((item) => {
-        const mat = materials.find((m) => m.id === item.materialId);
-        return {
+    const finalSections = [];
+    for (const sec of sections) {
+      const finalItems = [];
+      for (const item of sec.items) {
+        let finalMatId = item.materialId;
+
+        if (finalMatId.startsWith('temp_') && user?.id) {
+          const { data, error } = await supabase
+            .from('materials')
+            .insert([
+              {
+                user_id: user.id,
+                name: item.name,
+                cost_per_unit_cents: item.cost_per_unit_cents || 0,
+                unit:
+                  item.unit || (lang?.units ? Object.keys(lang.units)[0] : 'ea')
+              }
+            ])
+            .select()
+            .single();
+
+          if (error) console.error('Material Insert Error:', error);
+          if (data) finalMatId = data.id;
+        }
+
+        finalItems.push({
           ...item,
-          name: mat?.name || 'Unknown Material',
-          cost_per_unit_cents: mat?.cost_per_unit_cents || 0,
-          unit: mat?.unit || ''
-        };
-      })
-    }));
+          materialId: finalMatId,
+          name: item.name || 'Unknown Material',
+          cost_per_unit_cents: item.cost_per_unit_cents || 0,
+          unit: item.unit || (lang?.units ? Object.keys(lang.units)[0] : 'ea')
+        });
+      }
+      finalSections.push({ ...sec, items: finalItems });
+    }
 
     const payload = {
       user_id: user?.id,
@@ -286,7 +337,7 @@ function NewEstimateContent() {
       custom_id: customRef.trim() || null,
       total_amount_cents: totals.totalCents,
       tax_amount_cents: totals.tax,
-      sections: enrichedSections,
+      sections: finalSections,
       is_locked: false,
       business_name_snapshot: profile.business_name,
       country_snapshot: profile.country,
@@ -302,7 +353,6 @@ function NewEstimateContent() {
       : await supabase.from('estimates').insert([payload]).select();
 
     if (!res.error) {
-      // Automatically save or update client in CRM
       if (client.name) {
         const existing = pastClients.find((c) => c.name === client.name);
         if (existing) {
@@ -344,6 +394,12 @@ function NewEstimateContent() {
     }
   };
 
+  const getResolvedUnitKey = (rawUnit: string | undefined) => {
+    const u = (rawUnit || '').toLowerCase();
+    if (u === 'each' || u === 'unit') return 'ea';
+    return rawUnit || (lang?.units ? Object.keys(lang.units)[0] : 'ea');
+  };
+
   if (loading || !lang) return <LoadingDots />;
 
   if (limitReached) {
@@ -377,33 +433,43 @@ function NewEstimateContent() {
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-black pb-40 font-sans relative">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-black uppercase italic tracking-tighter">
-              {editId
-                ? profile?.country === 'FR'
-                  ? 'Modifier le Projet'
-                  : 'Edit Project'
-                : lang.newEstimate.replace('+', '')}
-            </h1>
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
+            <div className="flex justify-between items-center w-full sm:w-auto">
+              <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight max-w-[70%] sm:max-w-none">
+                {editId
+                  ? profile?.country === 'FR'
+                    ? 'Modifier le Projet'
+                    : 'Edit Project'
+                  : lang.newEstimate.replace('+', '')}
+              </h1>
+              <Link
+                href="/dashboard"
+                className="sm:hidden text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors shrink-0 text-right ml-4"
+              >
+                {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
+              </Link>
+            </div>
+
             <input
               type="text"
               placeholder={lang.customRef}
               value={customRef}
               onChange={(e) => setCustomRef(e.target.value)}
-              className="text-xs p-2 border rounded-md bg-transparent outline-none focus:border-blue-500 font-mono w-48 text-gray-500"
+              className="text-xs p-3 sm:p-2 border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 font-mono w-full sm:w-48 text-gray-500 shadow-sm"
             />
           </div>
+
           <Link
             href="/dashboard"
-            className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
+            className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
           >
             {profile?.country === 'FR' ? 'Annuler et Quitter' : 'Cancel & Exit'}
           </Link>
         </div>
 
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
-          <div className="flex justify-between items-center mb-6">
+        <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
               {profile?.country === 'FR'
                 ? 'Coordonnées du Client'
@@ -417,7 +483,7 @@ function NewEstimateContent() {
                     : ''
                 }
                 onChange={handleClientSelect}
-                className="text-[10px] border border-gray-200 p-2 rounded-lg font-bold uppercase tracking-widest text-gray-500 outline-none bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                className="w-full sm:w-auto text-[10px] border border-gray-200 p-3 sm:p-2 rounded-lg font-bold uppercase tracking-widest text-gray-500 outline-none bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <option value="" disabled hidden>
                   {lang.selectClient}
@@ -430,28 +496,59 @@ function NewEstimateContent() {
               </select>
             )}
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <input
-              placeholder={lang.clientName}
-              className="col-span-1 sm:col-span-2 p-3 border rounded-lg outline-none focus:border-blue-500 font-bold"
-              value={client.name}
-              onChange={(e) => setClient({ ...client, name: e.target.value })}
-            />
-            <input
-              placeholder={lang.email}
-              className="p-3 border rounded-lg outline-none focus:border-blue-500"
-              value={client.email}
-              onChange={(e) => setClient({ ...client, email: e.target.value })}
-            />
-            <input
-              placeholder={lang.phone}
-              className="p-3 border rounded-lg outline-none focus:border-blue-500"
-              value={client.phone}
-              onChange={(e) => setClient({ ...client, phone: e.target.value })}
-            />
+            <div className="col-span-1 sm:col-span-2 group relative">
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                  N
+                </div>
+                <input
+                  placeholder={lang.clientName}
+                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                  value={client.name}
+                  onChange={(e) =>
+                    setClient({ ...client, name: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="group relative">
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                  M
+                </div>
+                <input
+                  placeholder={lang.email}
+                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                  value={client.email}
+                  onChange={(e) =>
+                    setClient({ ...client, email: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="group relative">
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                  T
+                </div>
+                <input
+                  placeholder={lang.phone}
+                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                  value={client.phone}
+                  onChange={(e) =>
+                    setClient({ ...client, phone: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
             <textarea
               placeholder={lang.address}
-              className="col-span-2 p-3 border rounded-lg outline-none focus:border-blue-500 h-20"
+              className="col-span-1 sm:col-span-2 p-4 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-gray-50 font-bold text-sm resize-none h-24 text-gray-800 transition-all"
               value={client.address}
               onChange={(e) =>
                 setClient({ ...client, address: e.target.value })
@@ -555,40 +652,81 @@ function NewEstimateContent() {
                   key={iIdx}
                   className="flex flex-wrap sm:flex-nowrap gap-3 sm:gap-4 items-center bg-gray-50 sm:bg-transparent p-3 sm:p-0 rounded-lg sm:rounded-none border border-gray-200 sm:border-none"
                 >
-                  <select
-                    className="w-full sm:flex-1 p-3 sm:p-2 border border-gray-200 sm:border-gray-100 rounded-lg sm:rounded bg-white sm:bg-gray-50 font-bold text-xs outline-none focus:border-blue-500"
-                    value={item.materialId}
-                    onChange={(e) =>
-                      updateItem(sIdx, iIdx, 'materialId', e.target.value)
-                    }
-                  >
-                    <option value="" disabled hidden>
-                      {lang.selectMaterial}
-                    </option>
-                    {materials.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({lang.units?.[m.unit] || m.unit}) (
-                        {profile?.currency === 'EUR' ? '€' : '$'}
-                        {(m.cost_per_unit_cents / 100)
-                          .toFixed(2)
-                          .replace(
-                            '.',
-                            profile?.currency === 'EUR' ? ',' : '.'
-                          )}
-                        )
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-full sm:flex-[2] relative">
+                    {item.materialId ? (
+                      <div className="flex items-center justify-between w-full py-2 pl-3 pr-2 border border-gray-200 rounded-lg bg-gray-50 transition-colors">
+                        <span className="text-xs font-bold text-gray-900 truncate pr-4">
+                          {item.name}
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateItem(sIdx, iIdx, 'materialId', '')
+                          }
+                          className="text-[10px] text-gray-400 hover:text-blue-600 font-black uppercase tracking-widest transition-colors shrink-0"
+                        >
+                          {profile?.country === 'FR' ? 'Modifier' : 'Edit'}
+                        </button>
+                      </div>
+                    ) : (
+                      <MaterialCombobox
+                        materials={materials}
+                        selectedId={item.materialId}
+                        placeholder={lang.selectMaterial}
+                        createLabel={
+                          profile?.country === 'FR' ? 'Créer :' : 'Create:'
+                        }
+                        emptyStateLabel={
+                          profile?.country === 'FR'
+                            ? 'Aucun matériau.'
+                            : 'No materials found.'
+                        }
+                        currencySymbol={profile?.currency === 'EUR' ? '€' : '$'}
+                        unitLabels={lang?.units || {}}
+                        onChange={(val) => {
+                          if (!val) {
+                            updateItem(sIdx, iIdx, 'materialId', '');
+                            updateItem(sIdx, iIdx, 'name', '');
+                            updateItem(sIdx, iIdx, 'cost_per_unit_cents', 0);
+                            updateItem(
+                              sIdx,
+                              iIdx,
+                              'unit',
+                              lang?.units ? Object.keys(lang.units)[0] : 'ea'
+                            );
+                            return;
+                          }
+                          updateItem(sIdx, iIdx, 'materialId', val.id);
+                          updateItem(sIdx, iIdx, 'name', val.name);
+                          updateItem(
+                            sIdx,
+                            iIdx,
+                            'cost_per_unit_cents',
+                            val.cost_per_unit_cents || 0
+                          );
+                          updateItem(
+                            sIdx,
+                            iIdx,
+                            'unit',
+                            val.unit ||
+                              (lang?.units ? Object.keys(lang.units)[0] : 'ea')
+                          );
+                        }}
+                        onCreateNew={(name) =>
+                          handleCreateMaterialOnTheFly(sIdx, iIdx, name)
+                        }
+                      />
+                    )}
+                  </div>
 
-                  <div className="relative">
-                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
+                  <div className="w-24 relative shrink-0 group">
+                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
                       {profile?.country === 'FR' ? 'Qté' : 'Qty'}
                     </span>
                     <input
                       type="number"
                       min="0"
                       placeholder="0"
-                      className="w-24 p-2 pl-9 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
+                      className="w-full py-2 pl-9 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white"
                       value={item.qty === 0 ? '' : item.qty}
                       onChange={(e) =>
                         updateItem(
@@ -601,15 +739,107 @@ function NewEstimateContent() {
                     />
                   </div>
 
-                  <div className="relative">
-                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
+                  <div className="w-36 relative shrink-0 group">
+                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500 z-10">
+                      {profile?.country === 'FR' ? 'Unité' : 'Unit'}
+                    </span>
+                    <Listbox
+                      value={getResolvedUnitKey(item.unit)}
+                      onChange={(val) => updateItem(sIdx, iIdx, 'unit', val)}
+                    >
+                      <div className="relative">
+                        <ListboxButton className="w-full py-2 pl-12 pr-8 text-left text-xs font-bold text-gray-900 border border-gray-100 rounded outline-none focus:border-blue-500 transition-colors bg-white cursor-pointer flex items-center">
+                          <span className="block truncate">
+                            {lang?.units
+                              ? lang.units[getResolvedUnitKey(item.unit)]
+                              : 'ea'}
+                          </span>
+                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400">
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 9l6 6 6-6"
+                              />
+                            </svg>
+                          </span>
+                        </ListboxButton>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <ListboxOptions className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 text-base shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-gray-100 ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                            {Object.entries(lang?.units || { ea: 'ea' }).map(
+                              ([key, label]) => (
+                                <ListboxOption
+                                  key={key}
+                                  className={({ focus }) =>
+                                    `relative cursor-pointer select-none py-2 px-4 transition-colors ${
+                                      focus
+                                        ? 'bg-blue-50 text-blue-900'
+                                        : 'text-gray-900'
+                                    }`
+                                  }
+                                  value={key}
+                                >
+                                  {({ selected }) => (
+                                    <span
+                                      className={`block truncate text-xs ${selected ? 'font-black text-blue-600' : 'font-bold'}`}
+                                    >
+                                      {label as string}
+                                    </span>
+                                  )}
+                                </ListboxOption>
+                              )
+                            )}
+                          </ListboxOptions>
+                        </Transition>
+                      </div>
+                    </Listbox>
+                  </div>
+
+                  <div className="w-32 relative shrink-0 group">
+                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
+                      {profile?.country === 'FR' ? 'Prix' : 'Cost'}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0.00"
+                      className="w-full py-2 pl-12 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white"
+                      value={
+                        (item.cost_per_unit_cents || 0) === 0
+                          ? ''
+                          : item.cost_per_unit_cents! / 100
+                      }
+                      onChange={(e) =>
+                        updateItem(
+                          sIdx,
+                          iIdx,
+                          'cost_per_unit_cents',
+                          Math.max(0, parseFloat(e.target.value) || 0) * 100
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div className="w-28 relative shrink-0 group">
+                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
                       {profile?.country === 'FR' ? 'TVA' : 'Tax'}
                     </span>
                     <input
                       type="number"
                       min="0"
                       placeholder="0"
-                      className="w-28 p-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500"
+                      className="w-full py-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       value={item.taxRate === 0 ? '' : item.taxRate}
                       onChange={(e) =>
                         updateItem(
@@ -620,7 +850,7 @@ function NewEstimateContent() {
                         )
                       }
                     />
-                    <span className="absolute right-2 top-2 text-gray-400 text-xs font-bold pointer-events-none">
+                    <span className="absolute right-2 top-2.5 text-gray-400 text-[10px] font-bold pointer-events-none">
                       %
                     </span>
                   </div>
@@ -646,7 +876,9 @@ function NewEstimateContent() {
                 n[sIdx].items.push({
                   materialId: '',
                   qty: 0,
-                  taxRate: profile?.default_tax_rate || 0
+                  taxRate: profile?.default_tax_rate || 0,
+                  cost_per_unit_cents: 0,
+                  unit: lang?.units ? Object.keys(lang.units)[0] : 'ea'
                 });
                 setSections(n);
               }}

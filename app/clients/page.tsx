@@ -184,16 +184,16 @@ export default function ClientsPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-6 mt-6 pt-4 border-t border-gray-100 justify-end">
+                <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
                   <button
                     onClick={() => setEditingClient(c)}
-                    className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors"
+                    className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
                   >
                     {t.edit}
                   </button>
                   <button
                     onClick={() => handleDelete(c.id)}
-                    className="text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 transition-colors"
+                    className="flex-1 bg-red-50 text-red-500 hover:bg-red-100 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
                   >
                     {t.delete}
                   </button>

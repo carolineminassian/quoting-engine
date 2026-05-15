@@ -45,7 +45,7 @@ export default function Navbar() {
           href="/dashboard"
           className="text-xl font-black uppercase tracking-tighter text-blue-600 italic"
         >
-          Engine
+          PactEstim
         </Link>
 
         {/* Desktop Menu */}

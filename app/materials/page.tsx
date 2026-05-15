@@ -240,11 +240,11 @@ export default function MaterialsPage() {
         </div>
 
         {/* Desktop Header */}
-        <div className="hidden sm:grid grid-cols-12 gap-4 bg-gray-50 border border-gray-200 rounded-t-xl text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 p-5">
-          <div className="col-span-5">{lang.materialName}</div>
-          <div className="col-span-3">{lang.unitLabel}</div>
-          <div className="col-span-2 text-right">{lang.unitCost}</div>
-          <div className="col-span-2 text-right">{lang.actions}</div>
+        <div className="hidden sm:grid sm:grid-cols-12 gap-4 bg-gray-50 border border-gray-200 rounded-t-xl text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 p-5">
+          <div className="sm:col-span-4">{lang.materialName}</div>
+          <div className="sm:col-span-2">{lang.unitLabel}</div>
+          <div className="sm:col-span-2 text-right">{lang.unitCost}</div>
+          <div className="sm:col-span-4 text-right">{lang.actions}</div>
         </div>
 
         {/* Materials List / Cards */}
@@ -260,7 +260,7 @@ export default function MaterialsPage() {
                 {editingId === m.id ? (
                   // ----- EDIT MODE -----
                   <div className="w-full flex flex-col sm:contents gap-4">
-                    <div className="w-full sm:col-span-5">
+                    <div className="w-full sm:col-span-4">
                       <label className="sm:hidden text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">
                         {lang.materialName}
                       </label>
@@ -271,7 +271,7 @@ export default function MaterialsPage() {
                         className="w-full p-3 sm:p-2 border border-gray-200 rounded-lg sm:rounded font-bold outline-none focus:border-blue-500"
                       />
                     </div>
-                    <div className="w-full sm:col-span-3">
+                    <div className="w-full sm:col-span-2">
                       <label className="sm:hidden text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">
                         {lang.unitLabel}
                       </label>
@@ -303,19 +303,19 @@ export default function MaterialsPage() {
                         placeholder="0.00"
                         value={editPrice === '0' ? '' : editPrice}
                         onChange={(e) => setEditPrice(e.target.value)}
-                        className="w-full sm:w-32 p-3 sm:p-2 border border-gray-200 rounded-lg sm:rounded sm:text-right font-mono outline-none focus:border-blue-500"
+                        className="w-full sm:w-full p-3 sm:p-2 border border-gray-200 rounded-lg sm:rounded sm:text-right font-mono outline-none focus:border-blue-500"
                       />
                     </div>
-                    <div className="w-full sm:col-span-2 flex sm:justify-end gap-3 mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-gray-100 sm:border-0">
+                    <div className="w-full sm:col-span-4 flex sm:justify-end gap-3 mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-gray-100 sm:border-0">
                       <button
                         onClick={() => setEditingId(null)}
-                        className="flex-1 sm:flex-none text-gray-500 bg-gray-100 sm:bg-transparent px-4 py-3 sm:p-0 rounded-lg sm:rounded-none font-black text-[10px] uppercase tracking-widest"
+                        className="flex-1 sm:flex-none bg-gray-100 text-gray-600 hover:bg-gray-200 px-4 py-3 sm:py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
                       >
                         {lang.cancel}
                       </button>
                       <button
                         onClick={() => handleUpdate(m.id)}
-                        className="flex-1 sm:flex-none text-white sm:text-green-600 bg-green-600 sm:bg-transparent px-4 py-3 sm:p-0 rounded-lg sm:rounded-none font-black text-[10px] uppercase tracking-widest shadow-sm sm:shadow-none"
+                        className="flex-1 sm:flex-none bg-green-50 text-green-600 hover:bg-green-100 px-4 py-3 sm:py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors shadow-sm sm:shadow-none"
                       >
                         {lang.save}
                       </button>
@@ -378,28 +378,28 @@ export default function MaterialsPage() {
                     </div>
 
                     {/* DESKTOP LAYOUT (Table Rows) */}
-                    <div className="hidden sm:flex w-full col-span-5 font-bold text-gray-800 items-center">
-                      {m.name}
+                    <div className="hidden sm:flex sm:col-span-4 font-bold text-gray-800 items-center truncate pr-4">
+                      <span className="truncate">{m.name}</span>
                       {isOutOfRegion && (
-                        <span className="ml-3 text-[8px] font-black uppercase tracking-widest text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                        <span className="ml-3 shrink-0 text-[8px] font-black uppercase tracking-widest text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
                           {lang.outOfRegion}
                         </span>
                       )}
                     </div>
-                    <div className="hidden sm:block w-full col-span-3">
+                    <div className="hidden sm:flex sm:col-span-2 items-center">
                       <span
-                        className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${isOutOfRegion ? 'text-yellow-600 bg-yellow-100' : 'text-gray-400 bg-gray-100'}`}
+                        className={`inline-block text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${isOutOfRegion ? 'text-yellow-600 bg-yellow-100' : 'text-gray-400 bg-gray-100'}`}
                       >
                         {lang.units[m.unit] || m.unit}
                       </span>
                     </div>
-                    <div className="hidden sm:block w-full col-span-2 text-right font-mono font-bold text-gray-700">
+                    <div className="hidden sm:flex sm:col-span-2 justify-end items-center font-mono font-bold text-gray-700">
                       {profile?.currency === 'EUR' ? '€' : '$'}
                       {(m.cost_per_unit_cents / 100)
                         .toFixed(2)
                         .replace('.', profile?.currency === 'EUR' ? ',' : '.')}
                     </div>
-                    <div className="hidden sm:flex w-full col-span-2 justify-end gap-6">
+                    <div className="hidden sm:flex sm:col-span-4 justify-end items-center gap-3">
                       <button
                         onClick={() => {
                           setEditingId(m.id);
@@ -409,13 +409,13 @@ export default function MaterialsPage() {
                           );
                           setEditUnit(isOutOfRegion ? '' : m.unit);
                         }}
-                        className="text-blue-600 font-black text-[10px] uppercase tracking-widest hover:text-blue-800 transition-colors"
+                        className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
                       >
                         {lang.edit}
                       </button>
                       <button
                         onClick={() => handleDelete(m.id)}
-                        className="text-red-400 font-black text-[10px] uppercase tracking-widest hover:text-red-600 transition-colors"
+                        className="bg-red-50 text-red-500 hover:bg-red-100 px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
                       >
                         {lang.delete}
                       </button>
