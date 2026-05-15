@@ -30,6 +30,37 @@ const dict = {
   }
 };
 
+// Sleek vector branding logo block matching the navbar style
+const BrandIdentity = () => (
+  <div className="flex items-center gap-3 select-none mb-8 justify-center animate-fade-in">
+    <svg
+      className="w-10 h-10 text-gray-900"
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M16 2L28 9V23L16 30L4 23V9L16 2Z"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 20L14 14L19 18L25 10M25 10H20M25 10V15"
+        stroke="#2563eb"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+    <span className="text-2xl tracking-tighter font-sans antialiased">
+      <span className="font-black text-gray-900">Pact</span>
+      <span className="font-light text-blue-600">Estim</span>
+    </span>
+  </div>
+);
+
 export default function LandingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -68,13 +99,21 @@ export default function LandingPage() {
       <div className="absolute top-6 right-8 z-50 flex gap-2">
         <button
           onClick={() => toggleLang('EN')}
-          className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded transition-colors ${lang === 'EN' ? 'bg-gray-800 text-white' : 'bg-white text-gray-400 hover:text-gray-800'}`}
+          className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded transition-colors ${
+            lang === 'EN'
+              ? 'bg-gray-800 text-white'
+              : 'bg-white text-gray-400 hover:text-gray-800'
+          }`}
         >
           EN
         </button>
         <button
           onClick={() => toggleLang('FR')}
-          className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded transition-colors ${lang === 'FR' ? 'bg-gray-800 text-white' : 'bg-white text-gray-400 hover:text-gray-800'}`}
+          className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded transition-colors ${
+            lang === 'FR'
+              ? 'bg-gray-800 text-white'
+              : 'bg-white text-gray-400 hover:text-gray-800'
+          }`}
         >
           FR
         </button>
@@ -85,6 +124,9 @@ export default function LandingPage() {
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-green-100 rounded-full mix-blend-multiply filter blur-3xl opacity-40 pointer-events-none"></div>
 
       <div className="max-w-4xl mx-auto text-center relative z-10">
+        {/* Integrated Logo Identity */}
+        <BrandIdentity />
+
         <div className="inline-block mb-6 px-4 py-2 rounded-full bg-white border border-gray-200 text-gray-500 font-black text-[10px] uppercase tracking-[0.2em] shadow-sm">
           {t.badge}
         </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/link';
+import Link from 'next/next';
 import { useRouter } from 'next/navigation';
 
 const LoadingDots = () => (
@@ -16,33 +16,37 @@ const LoadingDots = () => (
 const dict = {
   EN: {
     title: 'Client Roster',
-    subtitle: 'Manage your saved client details.',
-    addBtn: 'Add Client',
-    edit: 'Edit',
+    subtitle: 'Manage and reference your saved client records.',
+    addBtn: 'Add New Client',
+    edit: 'Edit Profile',
     delete: 'Delete',
-    name: 'Name',
-    email: 'Email',
-    phone: 'Phone',
-    address: 'Address',
+    name: 'Client Name',
+    email: 'Email Address',
+    phone: 'Phone Number',
+    address: 'Billing Address',
     cancel: 'Cancel',
-    save: 'Save',
-    confirmDelete: 'Are you sure you want to delete this client?',
-    noClients: 'No clients saved yet.'
+    save: 'Save Client',
+    confirmDelete:
+      'Are you sure you want to permanently delete this client? This action cannot be undone.',
+    noClients: 'No clients saved yet.',
+    notice: 'Notice'
   },
   FR: {
     title: 'Répertoire Clients',
-    subtitle: 'Gérez les coordonnées de vos clients.',
+    subtitle: 'Gérez et référencez les coordonnées de vos clients.',
     addBtn: 'Ajouter un Client',
     edit: 'Modifier',
     delete: 'Supprimer',
-    name: 'Nom',
-    email: 'E-mail',
-    phone: 'Téléphone',
-    address: 'Adresse',
+    name: 'Nom du Client',
+    email: 'Adresse E-mail',
+    phone: 'Numéro de Téléphone',
+    address: 'Adresse de Facturation',
     cancel: 'Annuler',
     save: 'Enregistrer',
-    confirmDelete: 'Voulez-vous vraiment supprimer ce client ?',
-    noClients: 'Aucun client enregistré.'
+    confirmDelete:
+      'Voulez-vous vraiment supprimer définitivement ce client ? Cette action est irréversible.',
+    noClients: 'Aucun client enregistré.',
+    notice: 'Notification'
   }
 };
 
@@ -51,8 +55,12 @@ export default function ClientsPage() {
   const [lang, setLang] = useState<'EN' | 'FR'>('EN');
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [editingClient, setEditingClient] = useState<any>(null);
+  const [dialog, setDialog] = useState<{
+    title?: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -79,10 +87,16 @@ export default function ClientsPage() {
     loadData();
   }, [router]);
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm(dict[lang].confirmDelete)) return;
-    await supabase.from('clients').delete().eq('id', id);
-    setClients(clients.filter((c) => c.id !== id));
+  const triggerDeleteConfirm = (id: string) => {
+    setDialog({
+      title: t.delete,
+      message: t.confirmDelete,
+      onConfirm: async () => {
+        setDialog(null);
+        await supabase.from('clients').delete().eq('id', id);
+        setClients(clients.filter((c) => c.id !== id));
+      }
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -92,7 +106,6 @@ export default function ClientsPage() {
     } = await supabase.auth.getUser();
 
     if (editingClient.id) {
-      // Update
       const { data } = await supabase
         .from('clients')
         .update({
@@ -107,7 +120,6 @@ export default function ClientsPage() {
 
       if (data) setClients(clients.map((c) => (c.id === data.id ? data : c)));
     } else {
-      // Insert
       const { data } = await supabase
         .from('clients')
         .insert([
@@ -135,14 +147,15 @@ export default function ClientsPage() {
   if (loading) return <LoadingDots />;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 pb-40 text-black font-sans">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-end mb-8">
+    <main className="min-h-screen bg-gray-50 p-6 sm:p-12 pb-40 text-black font-sans">
+      <div className="max-w-5xl mx-auto">
+        {/* Header Action Row */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-12 border-b border-gray-100 pb-8">
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-tighter">
+            <h1 className="text-4xl font-black uppercase tracking-tighter italic leading-none mb-2">
               {t.title}
             </h1>
-            <p className="text-sm text-gray-500 font-medium mt-1">
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
               {t.subtitle}
             </p>
           </div>
@@ -150,58 +163,74 @@ export default function ClientsPage() {
             onClick={() =>
               setEditingClient({ name: '', email: '', phone: '', address: '' })
             }
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-blue-700 transition-colors"
+            className="w-full sm:w-auto bg-blue-600 text-white px-6 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-transform active:scale-95"
           >
             + {t.addBtn}
           </button>
         </div>
 
+        {/* Client Listing Grid */}
         {clients.length === 0 ? (
-          <div className="bg-white p-12 text-center rounded-xl shadow-sm border border-gray-200 text-gray-400 font-bold uppercase tracking-widest text-xs">
+          <div className="bg-white p-16 text-center rounded-2xl border border-gray-200/60 text-gray-400 font-black uppercase tracking-widest text-xs shadow-sm">
             {t.noClients}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {clients.map((c) => (
               <div
                 key={c.id}
-                className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 transition-all group"
+                className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 flex flex-col justify-between hover:border-blue-500/30 transition-all transform hover:-translate-y-0.5 duration-200 group"
               >
                 <div>
-                  <h3 className="font-black text-xl text-gray-900 group-hover:text-blue-600 transition-colors mb-4 truncate">
+                  <h3 className="font-black text-2xl text-gray-900 group-hover:text-blue-600 transition-colors mb-6 truncate tracking-tight">
                     {c.name}
                   </h3>
-                  <div className="space-y-3 text-xs text-gray-500 font-medium">
+
+                  <div className="space-y-4">
                     {c.email && (
-                      <p className="flex items-center gap-3">
-                        <span className="text-gray-300 text-base">✉️</span>
-                        <span className="truncate">{c.email}</span>
-                      </p>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 block mb-0.5">
+                          {t.email}
+                        </span>
+                        <p className="text-sm font-bold text-gray-600 truncate">
+                          {c.email}
+                        </p>
+                      </div>
                     )}
                     {c.phone && (
-                      <p className="flex items-center gap-3">
-                        <span className="text-gray-300 text-base">📞</span>
-                        <span>{c.phone}</span>
-                      </p>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 block mb-0.5">
+                          {t.phone}
+                        </span>
+                        <p className="text-sm font-bold text-gray-600 font-mono">
+                          {c.phone}
+                        </p>
+                      </div>
                     )}
                     {c.address && (
-                      <p className="flex items-start gap-3 mt-4 pt-4 border-t border-gray-50">
-                        <span className="text-gray-300 text-base">📍</span>
-                        <span className="leading-relaxed">{c.address}</span>
-                      </p>
+                      <div className="pt-4 border-t border-gray-50">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 block mb-1">
+                          {t.address}
+                        </span>
+                        <p className="text-xs font-bold text-gray-500 leading-relaxed whitespace-pre-wrap">
+                          {c.address}
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+
+                {/* Grid Item Card Actions */}
+                <div className="flex gap-3 mt-8 pt-4 border-t border-gray-100">
                   <button
                     onClick={() => setEditingClient(c)}
-                    className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
+                    className="flex-1 bg-gray-50 text-gray-700 hover:bg-gray-100 py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors border border-gray-100"
                   >
                     {t.edit}
                   </button>
                   <button
-                    onClick={() => handleDelete(c.id)}
-                    className="flex-1 bg-red-50 text-red-500 hover:bg-red-100 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
+                    onClick={() => triggerDeleteConfirm(c.id)}
+                    className="flex-1 bg-red-50 text-red-600 hover:bg-red-100/70 py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
                   >
                     {t.delete}
                   </button>
@@ -212,67 +241,121 @@ export default function ClientsPage() {
         )}
       </div>
 
+      {/* Modern Slide-Over / Centered Input Form Modal */}
       {editingClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl">
-            <h3 className="text-xl font-black uppercase tracking-tighter mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-100">
+            <h3 className="text-2xl font-black uppercase tracking-tighter mb-6">
               {editingClient.id ? t.edit : t.addBtn}
             </h3>
             <form onSubmit={handleSave} className="space-y-4">
-              <input
-                required
-                placeholder={t.name}
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold"
-                value={editingClient.name}
-                onChange={(e) =>
-                  setEditingClient({ ...editingClient, name: e.target.value })
-                }
-              />
-              <input
-                type="email"
-                placeholder={t.email}
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500"
-                value={editingClient.email || ''}
-                onChange={(e) =>
-                  setEditingClient({ ...editingClient, email: e.target.value })
-                }
-              />
-              <input
-                placeholder={t.phone}
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500"
-                value={editingClient.phone || ''}
-                onChange={(e) =>
-                  setEditingClient({ ...editingClient, phone: e.target.value })
-                }
-              />
-              <textarea
-                placeholder={t.address}
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 h-24"
-                value={editingClient.address || ''}
-                onChange={(e) =>
-                  setEditingClient({
-                    ...editingClient,
-                    address: e.target.value
-                  })
-                }
-              />
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                  {t.name}
+                </label>
+                <input
+                  required
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors shadow-inner bg-gray-50/30"
+                  value={editingClient.name}
+                  onChange={(e) =>
+                    setEditingClient({ ...editingClient, name: e.target.value })
+                  }
+                />
+              </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-100">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                  {t.email}
+                </label>
+                <input
+                  type="email"
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors shadow-inner bg-gray-50/30"
+                  value={editingClient.email || ''}
+                  onChange={(e) =>
+                    setEditingClient({
+                      ...editingClient,
+                      email: e.target.value
+                    })
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                  {t.phone}
+                </label>
+                <input
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors shadow-inner bg-gray-50/30"
+                  value={editingClient.phone || ''}
+                  onChange={(e) =>
+                    setEditingClient({
+                      ...editingClient,
+                      phone: e.target.value
+                    })
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                  {t.address}
+                </label>
+                <textarea
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors h-24 resize-none shadow-inner bg-gray-50/30"
+                  value={editingClient.address || ''}
+                  onChange={(e) =>
+                    setEditingClient({
+                      ...editingClient,
+                      address: e.target.value
+                    })
+                  }
+                />
+              </div>
+
+              <div className="flex gap-3 pt-6 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setEditingClient(null)}
-                  className="flex-1 bg-gray-100 text-gray-600 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px]"
+                  className="flex-1 bg-gray-100 text-gray-600 px-4 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-colors"
                 >
                   {t.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px]"
+                  className="flex-1 bg-blue-600 text-white px-4 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-blue-700 transition-transform active:scale-95"
                 >
                   {t.save}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Native In-App Confirmation Modal System */}
+      {dialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
+            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-red-600">
+              {dialog.title || t.notice}
+            </h3>
+            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
+              {dialog.message}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDialog(null)}
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
+              >
+                {t.cancel}
+              </button>
+              <button
+                onClick={dialog.onConfirm}
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700 transition-colors"
+              >
+                {t.delete}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -113,7 +113,6 @@ export default function ProfilePage() {
       })
       .eq('id', profile.id);
 
-    // 1. Update local profile state so the dialog buttons use the NEW language instantly
     setProfile((prev: any) => ({
       ...prev,
       country: country,
@@ -123,7 +122,6 @@ export default function ProfilePage() {
     localStorage.setItem('public_lang', country === 'FR' ? 'FR' : 'EN');
     setSavingProfile(false);
 
-    // 2. Set dialog with a callback to reload the page and sync the Navbar
     setDialog({
       type: 'alert',
       message:
@@ -186,12 +184,20 @@ export default function ProfilePage() {
   const isFreePlan = profile.subscription_tier === 'free';
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans relative">
+    <main className="min-h-screen bg-gray-50 p-6 sm:p-12 pb-40 text-black font-sans relative">
       <div className="max-w-3xl mx-auto">
-        <div className="flex justify-between items-end mb-12">
-          <h1 className="text-4xl font-black tracking-tighter uppercase">
-            {lang.settings || 'Settings'}
-          </h1>
+        {/* Header Navigation Section */}
+        <div className="flex justify-between items-end mb-12 border-b border-gray-100 pb-6">
+          <div>
+            <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none mb-2">
+              {lang.settings || 'Settings'}
+            </h1>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
+              {profile?.country === 'FR'
+                ? 'Configuration de la plateforme'
+                : 'Platform Configurations'}
+            </p>
+          </div>
           <Link
             href="/dashboard"
             className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
@@ -201,20 +207,21 @@ export default function ProfilePage() {
         </div>
 
         {/* BUSINESS PROFILE SECTION */}
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
-          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-100 pb-2">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
+          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-50 pb-3">
             {profile?.country === 'FR'
               ? "Profil de l'entreprise"
               : 'Business Profile'}
           </p>
+
           <form onSubmit={handleSaveProfile} className="space-y-6">
             <div>
-              <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                 {lang.businessName}
               </label>
               <input
                 required
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold"
+                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
               />
@@ -222,11 +229,11 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                   {country === 'FR' ? 'Marché Principal' : 'Primary Market'}
                 </label>
                 <select
-                  className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold bg-white"
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner appearance-none"
                   value={country}
                   onChange={(e) => {
                     const newCountry = e.target.value;
@@ -240,8 +247,9 @@ export default function ProfilePage() {
                   <option value="FR">France (EUR / Français)</option>
                 </select>
               </div>
+
               <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                   {lang.defaultTaxRate}
                 </label>
                 <div className="relative">
@@ -250,13 +258,13 @@ export default function ProfilePage() {
                     step="0.1"
                     min="0"
                     placeholder="0"
-                    className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold pr-8"
+                    className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold pr-10 transition-colors bg-gray-50/40 shadow-inner"
                     value={taxRate === 0 ? '' : taxRate}
                     onChange={(e) =>
                       setTaxRate(Math.max(0, parseFloat(e.target.value) || 0))
                     }
                   />
-                  <span className="absolute right-3 top-3 text-gray-400 font-bold">
+                  <span className="absolute right-4 top-4 text-gray-400 font-bold text-xs font-mono">
                     %
                   </span>
                 </div>
@@ -264,10 +272,10 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                 {lang.logo}{' '}
                 {isFreePlan && (
-                  <span className="text-blue-500 ml-2">
+                  <span className="text-blue-600 font-black ml-1.5">
                     ({lang.proFeature})
                   </span>
                 )}
@@ -282,19 +290,19 @@ export default function ProfilePage() {
                   className={`absolute inset-0 w-full h-full opacity-0 z-10 ${isFreePlan ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                 />
                 <div
-                  className={`flex items-center gap-4 w-full p-2 border rounded-lg bg-gray-50 transition-colors ${isFreePlan ? 'opacity-50 border-gray-200' : 'hover:border-blue-300 border-gray-200'}`}
+                  className={`flex items-center gap-4 w-full p-2.5 border rounded-xl bg-gray-50/50 transition-colors ${isFreePlan ? 'opacity-50 border-gray-200' : 'hover:border-blue-300 border-gray-200/80'}`}
                 >
-                  <span className="bg-blue-50 text-blue-700 font-black text-[10px] uppercase tracking-widest px-4 py-2 rounded border border-blue-100">
+                  <span className="bg-white text-gray-700 font-black text-[9px] uppercase tracking-widest px-4 py-2.5 rounded-lg border border-gray-200 shadow-sm">
                     {lang.chooseFile || 'Choose File'}
                   </span>
-                  <span className="text-xs text-gray-500 font-medium truncate flex-1">
+                  <span className="text-xs text-gray-500 font-bold truncate flex-1 pl-1">
                     {selectedFileName || lang.noFileChosen || 'No file chosen'}
                   </span>
                   {profile?.logo_url && !selectedFile && (
                     <img
                       src={profile.logo_url}
                       alt="Current Logo"
-                      className="h-6 w-6 object-contain"
+                      className="h-7 w-7 object-contain bg-white rounded p-0.5 border border-gray-100"
                     />
                   )}
                 </div>
@@ -304,7 +312,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={savingProfile}
-              className="bg-gray-800 text-white px-8 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-gray-900 transition-colors"
+              className="bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-blue-700 transition-transform active:scale-95"
             >
               {savingProfile ? '...' : lang.save}
             </button>
@@ -312,44 +320,47 @@ export default function ProfilePage() {
         </div>
 
         {/* ACCOUNT SECURITY SECTION */}
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
-          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-100 pb-2">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
+          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-50 pb-3">
             {country === 'FR' ? 'Sécurité du compte' : 'Account Security'}
           </p>
+
           <form onSubmit={handleSaveSecurity} className="space-y-6">
             <div>
-              <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                 {country === 'FR' ? 'Adresse E-mail' : 'Email Address'}
               </label>
               <input
                 type="email"
                 required
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold"
+                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
               />
             </div>
+
             <div>
-              <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest">
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                 {country === 'FR' ? 'Nouveau Mot de Passe' : 'New Password'}
               </label>
               <input
                 type="password"
                 placeholder="••••••••"
-                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold"
+                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner tracking-widest"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-[11px] font-bold text-gray-400 mt-2">
                 {country === 'FR'
                   ? 'Laissez vide pour conserver votre mot de passe actuel.'
                   : 'Leave blank to keep your current password.'}
               </p>
             </div>
+
             <button
               type="submit"
               disabled={savingSecurity}
-              className="bg-red-50 text-red-600 border border-red-100 px-8 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] hover:bg-red-100 transition-colors"
+              className="bg-red-50 text-red-600 border border-red-100/60 px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-100 transition-transform active:scale-95"
             >
               {savingSecurity
                 ? '...'
@@ -361,35 +372,35 @@ export default function ProfilePage() {
         </div>
 
         {/* SUBSCRIPTION PLAN SECTION */}
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-          <p className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest border-b border-gray-100 pb-2">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60">
+          <p className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest border-b border-gray-50 pb-3">
             {lang.currentPlan || 'Current Plan'}
           </p>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <p className="font-bold text-lg text-gray-800">
+              <p className="font-black text-xl text-gray-900 tracking-tight uppercase">
                 {profile?.subscription_tier === 'pro'
                   ? lang.proPlan || 'Pro Plan'
                   : lang.freePlan || 'Free Plan'}
               </p>
               {isFreePlan && profile?.estimate_credits > 0 && (
-                <p className="text-sm font-mono text-blue-600 mt-1">
+                <p className="text-xs font-black uppercase font-mono text-blue-600 tracking-wider mt-1.5">
                   {profile.estimate_credits} Credits remaining
                 </p>
               )}
             </div>
-            <div>
+            <div className="w-full sm:w-auto">
               {isFreePlan ? (
                 <Link
                   href="/upgrade"
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg inline-block hover:bg-blue-700 transition-colors"
+                  className="w-full sm:w-auto text-center bg-blue-600 text-white px-6 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg inline-block hover:bg-blue-700 transition-transform active:scale-95"
                 >
                   {lang.upgradeToPro || 'Upgrade to Pro'}
                 </Link>
               ) : (
                 <button
                   onClick={handleCancelSubClick}
-                  className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-gray-600 transition-colors"
+                  className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors"
                 >
                   {lang.cancelSub || 'Cancel Subscription'}
                 </button>
@@ -399,21 +410,22 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Synchronized Custom Form Dialog Component */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
-            <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
+            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
               {dialog.title ||
                 (profile?.country === 'FR' ? 'Notification' : 'Notice')}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mb-8">
+            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
               {dialog.message}
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-2 justify-end">
               {dialog.type === 'confirm' && (
                 <button
                   onClick={() => setDialog(null)}
-                  className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
                 >
                   {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
                 </button>
@@ -423,7 +435,7 @@ export default function ProfilePage() {
                   if (dialog.onConfirm) dialog.onConfirm();
                   else setDialog(null);
                 }}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
               >
                 {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
               </button>

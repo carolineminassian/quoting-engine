@@ -6,6 +6,44 @@ import { useRouter, usePathname } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+// Reusable custom crisp vector logo component
+const BrandLogo = () => (
+  <div className="flex items-center gap-2.5 select-none group">
+    {/* Geometric Hexagon/Growth-Arrow Icon */}
+    <svg
+      className="w-7 h-7 transition-transform duration-300 group-hover:scale-105"
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Outer Hexagonal Path Frame */}
+      <path
+        d="M16 2L28 9V23L16 30L4 23V9L16 2Z"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-gray-900"
+      />
+      {/* Dynamic Growth Arrow/Pact Chart Line */}
+      <path
+        d="M9 20L14 14L19 18L25 10M25 10H20M25 10V15"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-blue-600"
+      />
+    </svg>
+
+    {/* Typography Stack */}
+    <span className="text-lg tracking-tighter font-sans antialiased">
+      <span className="font-black text-gray-900">Pact</span>
+      <span className="font-light text-blue-600">Estim</span>
+    </span>
+  </div>
+);
+
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -72,11 +110,8 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link
-              href="/dashboard"
-              className="text-xl font-black uppercase tracking-tighter italic"
-            >
-              PactEstim
+            <Link href="/dashboard" className="flex items-center outline-none">
+              <BrandLogo />
             </Link>
 
             <div className="hidden sm:ml-10 sm:flex sm:space-x-8">
