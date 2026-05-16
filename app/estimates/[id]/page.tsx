@@ -23,8 +23,12 @@ export default function EstimateView() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-
   const [isOwner, setIsOwner] = useState(false);
+
+  // --- COMMENT THREAD STATE ---
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentInput, setCommentInput] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
@@ -52,9 +56,14 @@ export default function EstimateView() {
 
       setIsOwner(user?.id === est.user_id);
 
-      const [prof, mats] = await Promise.all([
+      const [prof, mats, comms] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', est.user_id).single(),
-        supabase.from('materials').select('*').eq('user_id', est.user_id)
+        supabase.from('materials').select('*').eq('user_id', est.user_id),
+        supabase
+          .from('estimate_comments')
+          .select('*')
+          .eq('estimate_id', id)
+          .order('created_at', { ascending: true })
       ]);
 
       import('@/lib/translations').then(({ translations }) => {
@@ -81,6 +90,7 @@ export default function EstimateView() {
       });
 
       setMaterials(mats.data || []);
+      setComments(comms.data || []);
       setLoading(false);
     }
     fetchData();
@@ -188,6 +198,49 @@ export default function EstimateView() {
     }
 
     return baseText;
+  };
+
+  // --- ACTIONS ---
+
+  const handlePostComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentInput.trim() || submittingComment) return;
+
+    setSubmittingComment(true);
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+
+    const payload = {
+      estimate_id: id,
+      user_id: user?.id || null,
+      author_name: isOwner
+        ? profile.business_name
+        : estimate.client_name ||
+          (profile.country === 'FR' ? 'Client' : 'Client'),
+      content: commentInput.trim(),
+      is_owner: isOwner
+    };
+
+    const { data, error } = await supabase
+      .from('estimate_comments')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      setDialog({
+        type: 'alert',
+        message:
+          profile.country === 'FR'
+            ? 'Impossible de publier le commentaire.'
+            : 'Failed to post message.'
+      });
+    } else if (data) {
+      setComments([...comments, data]);
+      setCommentInput('');
+    }
+    setSubmittingComment(false);
   };
 
   const handleSend = async (method: 'email' | 'phone') => {
@@ -428,9 +481,9 @@ export default function EstimateView() {
           </div>
         </div>
 
+        {/* --- MAIN ESTIMATE BOX --- */}
         <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none min-h-[1056px]">
           <div className="grid grid-cols-2 gap-4 sm:gap-8 mb-16 items-start">
-            {/* Left Side: Upper Left Title & Lower Left Client Info */}
             <div className="min-w-0 space-y-6 sm:space-y-12 flex flex-col text-left">
               <div>
                 <h1 className="text-2xl sm:text-5xl font-black uppercase tracking-tighter break-words text-gray-900">
@@ -463,7 +516,6 @@ export default function EstimateView() {
               </div>
             </div>
 
-            {/* Right Side: Continuous Upper Right Alignment for Business Details */}
             <div className="text-right flex flex-col items-end min-w-0 shrink-0">
               {profile.subscription_tier === 'pro' && profile.logo_url && (
                 <img
@@ -714,8 +766,95 @@ export default function EstimateView() {
             </div>
           </div>
         </div>
+
+        {/* --- INTERACTIVE SECURE COMMENT THREAD --- */}
+        <div className="mt-8 bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:hidden">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-900 border-b-2 border-black pb-2">
+            {profile.country === 'FR'
+              ? 'Discussions & Modifications'
+              : 'Discussion & Modifications'}
+          </h3>
+
+          {/* Messages Wrapper */}
+          <div className="space-y-4 max-h-96 overflow-y-auto mb-6 pr-2">
+            {comments.length === 0 ? (
+              <p className="text-xs text-gray-400 font-medium italic">
+                {profile.country === 'FR'
+                  ? 'Aucun message pour le moment. Utilisez le formulaire ci-dessous pour demander des ajustements.'
+                  : 'No messages yet. Use the field below to request adjustment notes.'}
+              </p>
+            ) : (
+              comments.map((comm) => (
+                <div
+                  key={comm.id}
+                  className={`flex flex-col max-w-[85%] rounded p-4 border ${
+                    comm.is_owner
+                      ? 'ml-auto bg-blue-50/50 border-blue-100 items-end'
+                      : 'mr-auto bg-gray-50 border-gray-100 items-start'
+                  }`}
+                >
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span
+                      className={`text-[10px] font-black uppercase tracking-wider ${comm.is_owner ? 'text-blue-600' : 'text-gray-500'}`}
+                    >
+                      {comm.author_name}
+                    </span>
+                    <span className="text-[9px] text-gray-300 font-mono">
+                      {new Date(comm.created_at).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
+                    {comm.content}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Submission Input Block */}
+          <form
+            onSubmit={handlePostComment}
+            className="mt-4 border-t border-gray-100 pt-4"
+          >
+            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+              {profile.country === 'FR'
+                ? 'Ajouter un message'
+                : 'Add a message'}
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+              <textarea
+                rows={2}
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder={
+                  profile.country === 'FR'
+                    ? "Demandez des modifications sur les quantités, la main-d'œuvre ou les matériaux..."
+                    : 'Request revisions regarding service quantities, labor rates, or material phases...'
+                }
+                className="flex-1 p-3 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-600 resize-none text-black placeholder-gray-300 bg-white"
+              />
+              <button
+                type="submit"
+                disabled={submittingComment || !commentInput.trim()}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-3 rounded tracking-wide transition-colors disabled:opacity-40 self-end sm:self-stretch flex items-center justify-center w-full sm:w-auto min-w-[120px]"
+              >
+                {submittingComment
+                  ? profile.country === 'FR'
+                    ? 'Envoi...'
+                    : 'Sending...'
+                  : profile.country === 'FR'
+                    ? 'Envoyer'
+                    : 'Send'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
 
+      {/* --- POPUP DIALOGS --- */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
