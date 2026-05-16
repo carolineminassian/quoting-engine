@@ -752,21 +752,16 @@ function NewEstimateContent() {
                 </p>
               </div>
               <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
                   {profile?.country === 'FR'
                     ? 'Nom de votre entreprise'
                     : 'Your Business Name'}
                 </label>
                 <input
                   required
-                  placeholder={
-                    profile?.country === 'FR'
-                      ? 'Nom de votre entreprise'
-                      : 'Your Business Name'
-                  }
-                  className="flex-1 p-2 bg-transparent outline-none font-bold text-sm text-gray-800"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
+                  className="flex-1 p-2 bg-transparent outline-none font-bold text-black border-t border-gray-100 pt-3"
                 />
               </div>
             </div>
