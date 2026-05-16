@@ -429,51 +429,60 @@ export default function EstimateView() {
         </div>
 
         <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none min-h-[1056px]">
-          <div className="flex flex-col-reverse sm:flex-row justify-between mb-16 gap-8 items-start">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter mb-6 break-words">
-                {profile.country === 'FR' ? 'Devis' : 'Estimate'}
-              </h1>
+          <div className="grid grid-cols-2 gap-4 sm:gap-8 mb-16 items-start">
+            {/* Left Side: Upper Left Title & Lower Left Client Info */}
+            <div className="min-w-0 space-y-6 sm:space-y-12 flex flex-col text-left">
+              <div>
+                <h1 className="text-2xl sm:text-5xl font-black uppercase tracking-tighter break-words text-gray-900">
+                  {profile.country === 'FR' ? 'Devis' : 'Estimate'}
+                </h1>
+              </div>
+
               <div className="space-y-1">
-                <p className="text-lg font-black text-gray-800 break-words max-w-md sm:max-w-xl">
+                <span className="block text-[9px] uppercase tracking-wider font-black text-gray-300">
+                  {profile.country === 'FR' ? 'Client' : 'Client'}
+                </span>
+                <p className="text-sm sm:text-lg font-black text-gray-800 break-words">
                   {estimate.client_name}
                 </p>
                 {estimate.client_address && (
-                  <p className="text-sm text-gray-400 whitespace-pre-wrap max-w-sm sm:max-w-xl break-words leading-relaxed">
+                  <p className="text-xs sm:text-sm text-gray-400 whitespace-pre-wrap break-words leading-relaxed">
                     {estimate.client_address}
                   </p>
                 )}
                 {estimate.client_phone && (
-                  <p className="text-xs text-gray-400 font-medium break-words max-w-xs sm:max-w-md">
+                  <p className="text-[10px] sm:text-xs text-gray-400 font-medium break-words">
                     {estimate.client_phone}
                   </p>
                 )}
                 {estimate.client_email && (
-                  <p className="text-xs text-gray-400 font-medium break-words max-w-xs sm:max-w-md">
+                  <p className="text-[10px] sm:text-xs text-gray-400 font-medium break-words">
                     {estimate.client_email}
                   </p>
                 )}
               </div>
             </div>
-            <div className="text-left sm:text-right flex flex-col sm:items-end w-full sm:w-auto min-w-0 shrink-0">
+
+            {/* Right Side: Continuous Upper Right Alignment for Business Details */}
+            <div className="text-right flex flex-col items-end min-w-0 shrink-0">
               {profile.subscription_tier === 'pro' && profile.logo_url && (
                 <img
                   src={profile.logo_url}
                   alt="Business Logo"
-                  className="h-16 w-auto object-contain mb-4"
+                  className="h-10 sm:h-16 w-auto object-contain mb-3 sm:mb-4"
                 />
               )}
 
-              <h2 className="text-2xl sm:text-3xl font-black italic text-blue-600 uppercase tracking-tighter mb-2 break-words max-w-xs sm:max-w-md">
+              <h2 className="text-lg sm:text-3xl font-black italic text-blue-600 uppercase tracking-tighter mb-1 sm:mb-2 break-words max-w-full">
                 {profile.business_name}
               </h2>
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+              <p className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-widest">
                 {profile.country === 'FR' ? 'Date :' : 'Date:'}{' '}
                 {new Date(estimate.created_at).toLocaleDateString(
                   profile.country === 'FR' ? 'fr-FR' : 'en-US'
                 )}
               </p>
-              <p className="text-xs text-gray-300 font-mono mt-1 break-all max-w-xs sm:max-w-md">
+              <p className="text-[10px] sm:text-xs text-gray-300 font-mono mt-0.5 sm:mt-1 break-all max-w-full">
                 {profile.country === 'FR' ? 'Réf :' : 'Ref:'}{' '}
                 {estimate.custom_id || estimate.id.slice(0, 8)}
               </p>
