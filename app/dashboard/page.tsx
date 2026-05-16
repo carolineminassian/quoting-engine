@@ -378,20 +378,20 @@ export default function DashboardPage() {
             {profile.subscription_tier === 'pro' && estimates.length > 0 && (
               <button
                 onClick={() => setExportModal(true)}
-                className="flex-1 sm:flex-none px-6 py-3 border border-green-200 bg-green-50 text-green-700 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:border-green-300 transition-colors"
+                className="flex flex-1 sm:flex-none items-center justify-center text-center px-6 py-3 border border-green-200 bg-green-50 text-green-700 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:border-green-300 transition-colors min-h-[44px]"
               >
                 {profile.country === 'FR' ? 'Exporter Excel' : 'Export Data'}
               </button>
             )}
             <Link
               href="/materials"
-              className="flex-1 sm:flex-none text-center px-6 py-3 border border-gray-200 bg-white rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:border-gray-300 transition-colors"
+              className="flex flex-1 sm:flex-none items-center justify-center text-center px-6 py-3 border border-gray-200 bg-white rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:border-gray-300 transition-colors min-h-[44px]"
             >
               {lang.priceList}
             </Link>
             <Link
               href="/new-estimate"
-              className="flex-1 sm:flex-none text-center px-6 py-3 bg-blue-600 text-white rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-colors"
+              className="flex flex-1 sm:flex-none items-center justify-center text-center px-6 py-3 bg-blue-600 text-white rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-colors min-h-[44px]"
             >
               {lang.newEstimate}
             </Link>

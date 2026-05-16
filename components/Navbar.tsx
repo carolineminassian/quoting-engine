@@ -6,37 +6,35 @@ import { useRouter, usePathname } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
-// Reusable custom crisp vector logo component
-const BrandLogo = () => (
+interface BrandLogoProps {
+  country: 'US' | 'FR';
+}
+
+const BrandLogo = ({ country }: BrandLogoProps) => (
   <div className="flex items-center gap-2.5 select-none group">
-    {/* Geometric Hexagon/Growth-Arrow Icon */}
     <svg
       className="w-7 h-7 transition-transform duration-300 group-hover:scale-105"
       viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Outer Hexagonal Path Frame */}
       <path
         d="M16 2L28 9V23L16 30L4 23V9L16 2Z"
         stroke="currentColor"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="text-gray-900"
+        className={country === 'FR' ? 'text-blue-600' : 'text-gray-900'}
       />
-      {/* Dynamic Growth Arrow/Pact Chart Line */}
       <path
         d="M9 20L14 14L19 18L25 10M25 10H20M25 10V15"
         stroke="currentColor"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="text-blue-600"
+        className={country === 'FR' ? 'text-gray-900' : 'text-blue-600'}
       />
     </svg>
-
-    {/* Typography Stack */}
     <span className="text-lg tracking-tighter font-sans antialiased">
       <span className="font-black text-gray-900">Pact</span>
       <span className="font-light text-blue-600">Estim</span>
@@ -53,7 +51,7 @@ export default function Navbar() {
   const [session, setSession] = useState<any>(null);
   const [hasBusinessProfile, setHasBusinessProfile] = useState<boolean>(false);
 
-  // 1. Initial Authentication & Profile Fetcher
+  // 1. Fetch Session & Profile Data
   useEffect(() => {
     async function fetchAuthAndLang() {
       const {
@@ -66,7 +64,6 @@ export default function Navbar() {
         return;
       }
 
-      // Fetch both country and business_name to check if profile is complete
       const { data: prof } = await supabase
         .from('profiles')
         .select('country, business_name')
@@ -74,53 +71,29 @@ export default function Navbar() {
         .single();
 
       if (prof) {
-        setCountry(prof.country === 'FR' ? 'FR' : 'US');
-        setLang(prof.country === 'FR' ? translations.FR : translations.US);
-
-        // If business_name exists, the profile is considered complete
+        const primaryCountry = prof.country === 'FR' ? 'FR' : 'US';
+        setCountry(primaryCountry);
+        setLang(primaryCountry === 'FR' ? translations.FR : translations.US);
         setHasBusinessProfile(!!prof.business_name);
       }
     }
     fetchAuthAndLang();
   }, [pathname]);
 
-  // 2. Dynamic Browser Document Sync (Tab Title & Favicon Inversion)
+  // 2. Sync Tab Title and Favicon Using Translation File Schema
   useEffect(() => {
-    if (!lang || !lang.tabTitle) return;
+    if (!lang || !lang.tabTitle || !lang.faviconUrl) return;
 
-    // Use a micro-timeout to ensure this runs strictly AFTER Next.js injects its default layout.tsx metadata during route transitions
-    const syncHead = setTimeout(() => {
-      // Instantly update the document tab string dynamically
-      document.title = lang.tabTitle;
+    // Changes the tab text string
+    document.title = lang.tabTitle;
 
-      // Define self-contained dynamic vector strings (%23 replaces the # hex symbol)
-      const usFavicon = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><path d='M16 2L28 9V23L16 30L4 23V9L16 2Z' stroke='%23111827' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 20L14 14L19 18L25 10M25 10H20M25 10V15' stroke='%232563eb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
+    // Selects and overrides the primary favicon link references
+    const links = document.querySelectorAll("link[rel~='icon']");
+    links.forEach((link: any) => {
+      link.href = `${lang.faviconUrl}?v=2`;
+    });
+  }, [lang, pathname]);
 
-      const frFavicon = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><path d='M16 2L28 9V23L16 30L4 23V9L16 2Z' stroke='%232563eb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 20L14 14L19 18L25 10M25 10H20M25 10V15' stroke='%23111827' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
-
-      // Select or generate the header link element node
-      let link: HTMLLinkElement | null =
-        document.querySelector("link[rel~='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-      }
-
-      // Inject the dynamic configuration directly based on current localization state
-      link.type = 'image/svg+xml';
-      link.href = country === 'FR' ? frFavicon : usFavicon;
-    }, 10); // 10ms delay wins the race condition against the Next.js router
-
-    // Cleanup the timeout if the component unmounts mid-transition
-    return () => clearTimeout(syncHead);
-  }, [lang, country, pathname]); // <-- Notice 'pathname' is now in the dependency array
-
-  // GUEST & PROFILE GUARD:
-  // We hide the navbar if:
-  // 1. We are on the landing page or login page
-  // 2. There is no active session (Guest)
-  // 3. The user is logged in but hasn't saved a business name yet (New account lock)
   if (
     pathname === '/' ||
     pathname === '/login' ||
@@ -136,15 +109,13 @@ export default function Navbar() {
     router.push('/login');
   };
 
-  const t = lang;
-
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center outline-none">
-              <BrandLogo />
+              <BrandLogo country={country} />
             </Link>
 
             <div className="hidden sm:ml-10 sm:flex sm:space-x-8">
@@ -156,7 +127,7 @@ export default function Navbar() {
                     : 'text-gray-400 hover:text-gray-900'
                 }`}
               >
-                {t.projects}
+                {lang.projects}
               </Link>
               <Link
                 href="/materials"
@@ -166,7 +137,7 @@ export default function Navbar() {
                     : 'text-gray-400 hover:text-gray-900'
                 }`}
               >
-                {t.priceList}
+                {lang.priceList}
               </Link>
               <Link
                 href="/clients"
@@ -196,7 +167,7 @@ export default function Navbar() {
                     : 'text-gray-400 hover:text-gray-900'
                 }`}
               >
-                {t.settings}
+                {lang.settings}
               </Link>
             </div>
           </div>
@@ -250,16 +221,14 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className={`py-4 ${pathname === '/dashboard' ? 'text-black' : ''}`}
             >
-              {t.projects}
+              {lang.projects}
             </Link>
             <Link
               href="/materials"
               onClick={() => setMobileMenuOpen(false)}
-              className={`py-4 ${
-                pathname === '/materials' ? 'text-black' : ''
-              }`}
+              className={`py-4 ${pathname === '/materials' ? 'text-black' : ''}`}
             >
-              {t.priceList}
+              {lang.priceList}
             </Link>
             <Link
               href="/clients"
@@ -280,7 +249,7 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className={`py-4 ${pathname === '/profile' ? 'text-black' : ''}`}
             >
-              {t.settings}
+              {lang.settings}
             </Link>
             <button
               onClick={handleSignOut}
