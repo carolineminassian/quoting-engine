@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 
 // Initialize Stripe with your private secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' // Use your current Stripe API version
+  apiVersion: '2026-04-22.dahlia'
 });
 
 export async function POST(request: Request) {
