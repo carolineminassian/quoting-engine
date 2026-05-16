@@ -86,18 +86,43 @@ export default function EstimateView() {
     fetchData();
   }, [id]);
 
+  // --- MARGIN ENGINE & MATH HELPERS ---
+
+  const getMultiplier = (
+    sec: any,
+    item: any = null,
+    isLabor: boolean = false
+  ) => {
+    const mode = estimate?.margin_mode_snapshot || 'none';
+    if (mode === 'global')
+      return 1 + (estimate.global_margin_snapshot || 0) / 100;
+    if (mode === 'service') return 1 + (sec.marginRate || 0) / 100;
+    if (mode === 'granular') {
+      if (isLabor) return 1 + (sec.laborMarginRate || 0) / 100;
+      if (item) return 1 + (item.marginRate || 0) / 100;
+    }
+    return 1;
+  };
+
+  const getEffectiveLaborRateCents = (sec: any) => {
+    const rawRateCents = (sec.hourlyRate || 0) * 100;
+    return Math.round(rawRateCents * getMultiplier(sec, null, true));
+  };
+
+  const getEffectiveItemCostCents = (sec: any, item: any) => {
+    const snapshottedCost = item.cost_per_unit_cents;
+    const liveCost =
+      materials.find((m) => m.id === item.materialId)?.cost_per_unit_cents || 0;
+    const rawCost = snapshottedCost !== undefined ? snapshottedCost : liveCost;
+    return Math.round(rawCost * getMultiplier(sec, item, false));
+  };
+
   const getSectionTotal = (sec: any) => {
-    const mats = sec.items.reduce((acc: number, item: any) => {
-      const snapshottedCost = item.cost_per_unit_cents;
-      const liveCost =
-        materials.find((m) => m.id === item.materialId)?.cost_per_unit_cents ||
-        0;
-      const finalCost =
-        snapshottedCost !== undefined ? snapshottedCost : liveCost;
-      return acc + finalCost * item.qty;
+    const laborCents = getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
+    const matsCents = sec.items.reduce((acc: number, item: any) => {
+      return acc + getEffectiveItemCostCents(sec, item) * (item.qty || 0);
     }, 0);
-    const labor = Math.round(sec.laborHours * sec.hourlyRate * 100);
-    return (mats + labor) / 100;
+    return (matsCents + laborCents) / 100;
   };
 
   const getTaxSummary = () => {
@@ -105,7 +130,9 @@ export default function EstimateView() {
     const groups: Record<number, number> = {};
 
     (estimate.sections || []).forEach((sec: any) => {
-      const laborCents = Math.round(sec.laborHours * sec.hourlyRate * 100);
+      const laborCents =
+        getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
+
       if (laborCents > 0) {
         subtotal += laborCents;
         const r =
@@ -114,13 +141,7 @@ export default function EstimateView() {
       }
 
       (sec.items || []).forEach((item: any) => {
-        const snapshottedCost = item.cost_per_unit_cents;
-        const liveCost =
-          materials.find((mat) => mat.id === item.materialId)
-            ?.cost_per_unit_cents || 0;
-        const finalCost =
-          snapshottedCost !== undefined ? snapshottedCost : liveCost;
-        const matCents = finalCost * item.qty;
+        const matCents = getEffectiveItemCostCents(sec, item) * (item.qty || 0);
 
         if (matCents > 0) {
           subtotal += matCents;
@@ -142,11 +163,10 @@ export default function EstimateView() {
 
     const zeroCostMats = sec.items
       .map((item: any) => {
-        if (item.name && item.cost_per_unit_cents !== undefined) {
-          return item.cost_per_unit_cents === 0 ? item.name : null;
-        }
-        const m = materials.find((m) => m.id === item.materialId);
-        return m && m.cost_per_unit_cents === 0 ? m.name : null;
+        const effectiveCost = getEffectiveItemCostCents(sec, item);
+        const m = materials.find((mat) => mat.id === item.materialId);
+        const name = item.name || m?.name;
+        return effectiveCost === 0 && name ? name : null;
       })
       .filter(Boolean);
 
@@ -157,7 +177,7 @@ export default function EstimateView() {
         : ` Materials included at no charge or client-provided: ${matString}.`;
     }
 
-    if (sec.laborHours > 0 && sec.hourlyRate === 0) {
+    if (sec.laborHours > 0 && getEffectiveLaborRateCents(sec) === 0) {
       baseText += isFr
         ? " Main-d'œuvre incluse sans frais supplémentaires."
         : ' Labor included at no charge for this phase.';
@@ -462,7 +482,7 @@ export default function EstimateView() {
                 <th className="py-4 text-left">
                   {profile.country === 'FR'
                     ? 'Etape du Service / Catégorie'
-                    : 'Service Component'}
+                    : 'Service Category / Step'}
                 </th>
                 <th className="py-4 text-right">
                   {profile.country === 'FR' ? 'Montant' : 'Amount'}
@@ -491,8 +511,26 @@ export default function EstimateView() {
                             {profile.country === 'FR'
                               ? "Main-d'œuvre"
                               : 'Labor'}
-                            : {sec.laborHours}h @ {sec.hourlyRate}
-                            {profile.currency === 'EUR' ? '€' : '$'}/h (Tax:{' '}
+                            : {sec.laborHours}
+                            {sec.laborType === 'daily'
+                              ? profile.country === 'FR'
+                                ? 'j'
+                                : 'd'
+                              : 'h'}{' '}
+                            @{' '}
+                            {(getEffectiveLaborRateCents(sec) / 100)
+                              .toFixed(2)
+                              .replace(
+                                '.',
+                                profile.currency === 'EUR' ? ',' : '.'
+                              )}
+                            {profile.currency === 'EUR' ? '€' : '$'}
+                            {sec.laborType === 'daily'
+                              ? profile.country === 'FR'
+                                ? '/j'
+                                : '/d'
+                              : '/h'}{' '}
+                            (Tax:{' '}
                             {sec.laborTaxRate !== undefined
                               ? sec.laborTaxRate
                               : profile.tax_rate}
@@ -503,13 +541,12 @@ export default function EstimateView() {
                           const m = materials.find(
                             (mat) => mat.id === item.materialId
                           );
-                          // Safe Fallbacks prioritized to snapshots
                           const displayName =
                             item.name || m?.name || 'Material Item';
-                          const displayCost =
-                            item.cost_per_unit_cents !== undefined
-                              ? item.cost_per_unit_cents
-                              : m?.cost_per_unit_cents || 0;
+                          const displayCostCents = getEffectiveItemCostCents(
+                            sec,
+                            item
+                          );
                           const rawUnit = item.unit || m?.unit || '';
                           const displayUnit = lang?.units?.[rawUnit] || rawUnit;
 
@@ -517,7 +554,7 @@ export default function EstimateView() {
                             <p key={i}>
                               ↳ {displayName}: {item.qty}
                               {displayUnit ? ` ${displayUnit}` : ''} @{' '}
-                              {(displayCost / 100)
+                              {(displayCostCents / 100)
                                 .toFixed(2)
                                 .replace(
                                   '.',

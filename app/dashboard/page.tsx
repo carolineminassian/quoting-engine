@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOptions,
+  ListboxOption,
+  Transition
+} from '@headlessui/react';
 
 const LoadingDots = () => (
   <div className="flex items-center justify-center space-x-2 p-12 mt-20">
@@ -21,6 +28,14 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<any>(null);
   const [lang, setLang] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Filter & Sort State
+  const [filterStatus, setFilterStatus] = useState<
+    'all' | 'draft' | 'finalized'
+  >('all');
+  const [sortBy, setSortBy] = useState<
+    'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
+  >('date_desc');
 
   // Modal States
   const [dialog, setDialog] = useState<{
@@ -84,42 +99,208 @@ export default function DashboardPage() {
     });
   };
 
+  const processedEstimates = [...estimates]
+    .filter((est) => {
+      if (filterStatus === 'draft') return !est.is_locked;
+      if (filterStatus === 'finalized') return est.is_locked;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'date_desc')
+        return (
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      if (sortBy === 'date_asc')
+        return (
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      if (sortBy === 'amount_desc')
+        return b.total_amount_cents - a.total_amount_cents;
+      if (sortBy === 'amount_asc')
+        return a.total_amount_cents - b.total_amount_cents;
+      return 0;
+    });
+
   const handleExportCSV = (type: 'summary' | 'detailed') => {
     let csv = '';
+    const isFr = profile?.country === 'FR';
+
+    // CSV Escape Helper: Wraps text in quotes and escapes internal quotes
+    const escapeCsv = (str: string) =>
+      `"${(str || '').toString().replace(/"/g, '""')}"`;
+
+    // Numeric formatters adapting to standard US vs FR (comma) decimals
+    const formatNum = (num: number) => {
+      const str = num.toFixed(2);
+      return isFr ? `"${str.replace('.', ',')}"` : str;
+    };
+    const formatPct = (pct: number) => {
+      const str = pct.toFixed(1);
+      return isFr ? `"${str.replace('.', ',')}%"` : `"${str}%"`;
+    };
+    const formatQty = (qty: number) => {
+      const str = qty.toString();
+      return isFr ? `"${str.replace('.', ',')}"` : str;
+    };
 
     if (type === 'summary') {
-      csv =
-        'Estimate ID,Date,Client Name,Client Email,Amount,Currency,Status\n';
-      estimates.forEach((e) => {
-        const date = new Date(e.created_at).toLocaleDateString();
-        const amt = (e.total_amount_cents / 100).toFixed(2);
-        const status = e.is_locked ? 'Finalized' : 'Draft';
-        csv += `"${e.custom_id || e.id}","${date}","${e.client_name || ''}","${e.client_email || ''}",${amt},${e.currency_snapshot},${status}\n`;
+      const headers = isFr
+        ? 'ID Devis,Date,Nom du Client,Email du Client,Téléphone du Client,Adresse du Client,Statut,Stratégie de Marge,% Marge Globale,Devise,Total TTC\n'
+        : 'Estimate ID,Date,Client Name,Client Email,Client Phone,Client Address,Status,Margin Strategy,Global Margin %,Currency,Grand Total\n';
+
+      csv = headers;
+
+      processedEstimates.forEach((e) => {
+        const date = escapeCsv(
+          new Date(e.created_at).toLocaleDateString(isFr ? 'fr-FR' : 'en-US')
+        );
+        const cName = escapeCsv(e.client_name);
+        const cEmail = escapeCsv(e.client_email);
+        const cPhone = escapeCsv(e.client_phone);
+        const cAddr = escapeCsv(e.client_address);
+        const statusText = isFr
+          ? e.is_locked
+            ? 'Finalisé'
+            : 'Brouillon'
+          : e.is_locked
+            ? 'Finalized'
+            : 'Draft';
+        const status = escapeCsv(statusText);
+        const marginMode = escapeCsv(e.margin_mode_snapshot || 'none');
+        const globalMargin = formatPct(e.global_margin_snapshot || 0);
+        const currency = escapeCsv(
+          e.currency_snapshot || (isFr ? 'EUR' : 'USD')
+        );
+        const grandTotal = formatNum(e.total_amount_cents / 100);
+
+        csv += `${escapeCsv(e.custom_id || e.id)},${date},${cName},${cEmail},${cPhone},${cAddr},${status},${marginMode},${globalMargin},${currency},${grandTotal}\n`;
       });
     } else {
-      csv =
-        'Estimate ID,Date,Client Name,Status,Section Title,Item Type,Item Name,Quantity,Cost/Rate,Tax %\n';
-      estimates.forEach((e) => {
-        const date = new Date(e.created_at).toLocaleDateString();
-        const status = e.is_locked ? 'Finalized' : 'Draft';
-        const baseInfo = `"${e.custom_id || e.id}","${date}","${e.client_name || ''}",${status}`;
+      const headers = isFr
+        ? "ID Devis,Date,Nom du Client,Email du Client,Téléphone du Client,Adresse du Client,Statut,Catégorie de Service,Catégorie de Coût,Nom de l'Article/Main d'œuvre,Quantité,Unité,Coût de Base,Montant de Base,% Marge,Montant Marge,Prix Client (HT),% TVA,Montant TVA,Prix Client (TTC),Devise\n"
+        : 'Estimate ID,Date,Client Name,Client Email,Client Phone,Client Address,Status,Service Category,Cost Category,Item/Labor Name,Quantity,Unit,Base Cost,Base Amount,Margin %,Margin Amount,Client Price (Before Tax),Tax %,Tax Amount,Client Price (Including Tax),Currency\n';
+
+      csv = headers;
+
+      processedEstimates.forEach((e) => {
+        const date = escapeCsv(
+          new Date(e.created_at).toLocaleDateString(isFr ? 'fr-FR' : 'en-US')
+        );
+        const cName = escapeCsv(e.client_name);
+        const cEmail = escapeCsv(e.client_email);
+        const cPhone = escapeCsv(e.client_phone);
+        const cAddr = escapeCsv(e.client_address);
+        const statusText = isFr
+          ? e.is_locked
+            ? 'Finalisé'
+            : 'Brouillon'
+          : e.is_locked
+            ? 'Finalized'
+            : 'Draft';
+        const status = escapeCsv(statusText);
+        const currency = escapeCsv(
+          e.currency_snapshot || (isFr ? 'EUR' : 'USD')
+        );
+
+        const baseInfo = `${escapeCsv(e.custom_id || e.id)},${date},${cName},${cEmail},${cPhone},${cAddr},${status}`;
+
+        const getMultiplier = (
+          sec: any,
+          item: any = null,
+          isLabor: boolean = false
+        ) => {
+          const mode = e.margin_mode_snapshot || 'none';
+          if (mode === 'global')
+            return 1 + (e.global_margin_snapshot || 0) / 100;
+          if (mode === 'service') return 1 + (sec.marginRate || 0) / 100;
+          if (mode === 'granular') {
+            if (isLabor) return 1 + (sec.laborMarginRate || 0) / 100;
+            if (item) return 1 + (item.marginRate || 0) / 100;
+          }
+          return 1;
+        };
 
         (e.sections || []).forEach((sec: any) => {
+          const serviceTitle = escapeCsv(
+            sec.title || (isFr ? 'Service' : 'Service')
+          );
+
+          // Process Labor
           if (sec.laborHours > 0) {
-            csv += `${baseInfo},"${sec.title}","Labor","",${sec.laborHours},${sec.hourlyRate},${sec.laborTaxRate}\n`;
+            const qty = sec.laborHours;
+            const baseCost = sec.hourlyRate || 0;
+            const baseAmount = baseCost * qty;
+
+            const mult = getMultiplier(sec, null, true);
+            const marginPct = (mult - 1) * 100;
+            const clientPriceBeforeTax = baseAmount * mult;
+            const marginAmount = clientPriceBeforeTax - baseAmount;
+
+            const taxRate = sec.laborTaxRate || 0;
+            const taxAmount = clientPriceBeforeTax * (taxRate / 100);
+            const clientPriceInclTax = clientPriceBeforeTax + taxAmount;
+
+            const unit =
+              sec.laborType === 'daily'
+                ? isFr
+                  ? 'Jours'
+                  : 'Days'
+                : isFr
+                  ? 'Heures'
+                  : 'Hours';
+            const laborName =
+              sec.laborType === 'daily'
+                ? isFr
+                  ? "Main-d'œuvre (Jour)"
+                  : 'Daily Labor'
+                : isFr
+                  ? "Main-d'œuvre (Heure)"
+                  : 'Hourly Labor';
+            const costCategory = isFr ? '"Main-d\'œuvre"' : '"Labor"';
+
+            csv += `${baseInfo},${serviceTitle},${costCategory},${escapeCsv(laborName)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
           }
+
+          // Process Materials
           (sec.items || []).forEach((item: any) => {
             const m = materials.find((mat) => mat.id === item.materialId);
-            if (m) {
-              const cost = (m.cost_per_unit_cents / 100).toFixed(2);
-              csv += `${baseInfo},"${sec.title}","Material","${m.name}",${item.qty},${cost},${item.taxRate}\n`;
+            const name =
+              item.name ||
+              m?.name ||
+              (isFr ? 'Article inconnu' : 'Unknown Material');
+
+            const rawCostCents =
+              item.cost_per_unit_cents !== undefined
+                ? item.cost_per_unit_cents
+                : m?.cost_per_unit_cents || 0;
+            const baseCost = rawCostCents / 100;
+            const qty = item.qty || 0;
+            const baseAmount = baseCost * qty;
+
+            const mult = getMultiplier(sec, item, false);
+            const marginPct = (mult - 1) * 100;
+            const clientPriceBeforeTax = baseAmount * mult;
+            const marginAmount = clientPriceBeforeTax - baseAmount;
+
+            const taxRate = item.taxRate || 0;
+            const taxAmount = clientPriceBeforeTax * (taxRate / 100);
+            const clientPriceInclTax = clientPriceBeforeTax + taxAmount;
+
+            let unit = item.unit || m?.unit || 'ea';
+            if (lang?.units?.[unit]) {
+              unit = lang.units[unit];
             }
+            const costCategory = isFr ? '"Matériel"' : '"Material"';
+
+            csv += `${baseInfo},${serviceTitle},${costCategory},${escapeCsv(name)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
           });
         });
       });
     }
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], {
+      type: 'text/csv;charset=utf-8;'
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -158,7 +339,7 @@ export default function DashboardPage() {
   const standardLimitReached = monthlyEstimates >= 5;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans relative">
+    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans relative pb-40">
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-12">
           <div>
@@ -217,17 +398,173 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* CONTROLS: SORT & FILTER */}
+        {estimates.length > 0 && (
+          <div className="bg-white p-3 sm:px-4 sm:py-2.5 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
+                {profile?.country === 'FR' ? 'Statut:' : 'Filter:'}
+              </span>
+              <Listbox value={filterStatus} onChange={setFilterStatus}>
+                <div className="relative w-full sm:w-40">
+                  <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {filterStatus === 'all' &&
+                        (profile?.country === 'FR'
+                          ? 'Tous les Projets'
+                          : 'All Projects')}
+                      {filterStatus === 'draft' &&
+                        (profile?.country === 'FR'
+                          ? 'Brouillons'
+                          : 'Drafts Only')}
+                      {filterStatus === 'finalized' &&
+                        (profile?.country === 'FR'
+                          ? 'Finalisés'
+                          : 'Finalized Only')}
+                    </span>
+                    <span className="pointer-events-none text-gray-400 text-[8px]">
+                      ▼
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[9px] uppercase tracking-widest font-bold">
+                      <ListboxOption
+                        value="all"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Tous les Projets'
+                          : 'All Projects'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="draft"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Brouillons'
+                          : 'Drafts Only'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="finalized"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Finalisés'
+                          : 'Finalized Only'}
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
+                {profile?.country === 'FR' ? 'Trier par:' : 'Sort by:'}
+              </span>
+              <Listbox value={sortBy} onChange={setSortBy}>
+                <div className="relative w-full sm:w-44">
+                  <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {sortBy === 'date_desc' &&
+                        (profile?.country === 'FR'
+                          ? 'Plus Récents'
+                          : 'Newest First')}
+                      {sortBy === 'date_asc' &&
+                        (profile?.country === 'FR'
+                          ? 'Plus Anciens'
+                          : 'Oldest First')}
+                      {sortBy === 'amount_desc' &&
+                        (profile?.country === 'FR'
+                          ? 'Montant Supérieur'
+                          : 'Highest Amount')}
+                      {sortBy === 'amount_asc' &&
+                        (profile?.country === 'FR'
+                          ? 'Montant Inférieur'
+                          : 'Lowest Amount')}
+                    </span>
+                    <span className="pointer-events-none text-gray-400 text-[8px]">
+                      ▼
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[9px] uppercase tracking-widest font-bold">
+                      <ListboxOption
+                        value="date_desc"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Plus Récents'
+                          : 'Newest First'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="date_asc"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Plus Anciens'
+                          : 'Oldest First'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="amount_desc"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Montant Supérieur'
+                          : 'Highest Amount'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="amount_asc"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Montant Inférieur'
+                          : 'Lowest Amount'}
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+          </div>
+        )}
+
+        {/* ESTIMATES LIST */}
         <div className="space-y-4">
-          {estimates.length === 0 ? (
+          {processedEstimates.length === 0 ? (
             <div className="bg-white p-10 text-center rounded-xl border border-gray-200">
-              <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
+              <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
                 {profile.country === 'FR'
-                  ? 'Aucun devis trouvé.'
-                  : 'No estimates found.'}
+                  ? 'Aucun devis ne correspond aux critères.'
+                  : 'No estimates match your criteria.'}
               </p>
             </div>
           ) : (
-            estimates.map((est) => (
+            processedEstimates.map((est) => (
               <div
                 key={est.id}
                 onClick={() =>
@@ -237,7 +574,7 @@ export default function DashboardPage() {
                       : `/new-estimate?edit=${est.id}`
                   )
                 }
-                className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 cursor-pointer transition-all group"
+                className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 cursor-pointer transition-all group"
               >
                 <div className="flex-1 w-full">
                   <div className="flex justify-between items-start mb-1 sm:mb-0">
@@ -340,13 +677,13 @@ export default function DashboardPage() {
       {/* EXPORT MODAL */}
       {exportModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full border border-gray-100">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
             <h3 className="text-lg font-black uppercase tracking-tighter mb-2 text-gray-900">
               {profile?.country === 'FR'
                 ? "Format d'exportation"
                 : 'Export Format'}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mb-6">
+            <p className="text-[11px] text-gray-500 font-bold mb-6 uppercase tracking-widest leading-relaxed">
               {profile?.country === 'FR'
                 ? 'Choisissez le niveau de détail pour votre rapport Excel (CSV).'
                 : 'Choose the level of detail for your Excel (CSV) report.'}
@@ -355,14 +692,14 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-3 mb-6">
               <button
                 onClick={() => handleExportCSV('summary')}
-                className="text-left p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors shadow-sm"
               >
-                <p className="font-bold text-sm text-gray-900">
+                <p className="font-black text-sm text-gray-900 uppercase tracking-widest">
                   {profile?.country === 'FR'
                     ? 'Vue Résumée'
                     : 'Summarized View'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-2 font-bold">
                   {profile?.country === 'FR'
                     ? 'Une ligne par devis avec les totaux.'
                     : 'One row per estimate with grand totals.'}
@@ -370,17 +707,17 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => handleExportCSV('detailed')}
-                className="text-left p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors shadow-sm"
               >
-                <p className="font-bold text-sm text-gray-900">
+                <p className="font-black text-sm text-gray-900 uppercase tracking-widest">
                   {profile?.country === 'FR'
                     ? 'Vue Détaillée'
                     : 'Detailed View'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-2 font-bold">
                   {profile?.country === 'FR'
-                    ? "Inclut la main-d'œuvre et les matériaux ligne par ligne."
-                    : 'Includes line-by-line breakdown of labor and materials.'}
+                    ? "Inclut la main-d'œuvre, les matériaux et marges ligne par ligne."
+                    : 'Line-by-line breakdown of labor, materials, and profit margins.'}
                 </p>
               </button>
             </div>
@@ -388,7 +725,7 @@ export default function DashboardPage() {
             <div className="flex justify-end">
               <button
                 onClick={() => setExportModal(false)}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-xl transition-colors border border-gray-100"
               >
                 {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
               </button>
@@ -400,19 +737,19 @@ export default function DashboardPage() {
       {/* STANDARD DIALOG */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
-            <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
+            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
               {dialog.title ||
                 (profile?.country === 'FR' ? 'Notification' : 'Notice')}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mb-8">
+            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
               {dialog.message}
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-2 justify-end">
               {dialog.type === 'confirm' && (
                 <button
                   onClick={() => setDialog(null)}
-                  className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
                 >
                   {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
                 </button>
@@ -422,7 +759,7 @@ export default function DashboardPage() {
                   if (dialog.onConfirm) dialog.onConfirm();
                   else setDialog(null);
                 }}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
               >
                 {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
               </button>

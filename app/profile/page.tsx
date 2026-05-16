@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOptions,
+  ListboxOption,
+  Transition
+} from '@headlessui/react';
 
 const LoadingDots = () => (
   <div className="flex items-center justify-center space-x-2 p-12 mt-20">
@@ -32,6 +39,8 @@ export default function ProfilePage() {
   // Business Profile State
   const [businessName, setBusinessName] = useState('');
   const [taxRate, setTaxRate] = useState<number>(0);
+  const [hourlyRate, setHourlyRate] = useState<number>(0);
+  const [dailyRate, setDailyRate] = useState<number>(0);
   const [country, setCountry] = useState('US');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
@@ -60,6 +69,8 @@ export default function ProfilePage() {
         setLang(prof.country === 'FR' ? translations.FR : translations.US);
         setBusinessName(prof.business_name || '');
         setTaxRate(prof.default_tax_rate || 0);
+        setHourlyRate(prof.default_hourly_rate || 0);
+        setDailyRate(prof.default_daily_rate || 0);
         setCountry(prof.country || 'US');
         if (prof.logo_url) {
           setSelectedFileName('Uploaded Logo');
@@ -108,6 +119,8 @@ export default function ProfilePage() {
       .update({
         business_name: businessName,
         default_tax_rate: taxRate,
+        default_hourly_rate: hourlyRate,
+        default_daily_rate: dailyRate,
         country: country,
         currency: currency,
         logo_url: finalLogoUrl
@@ -180,7 +193,6 @@ export default function ProfilePage() {
     });
   };
 
-  // Execution call to the secure backend API route
   const executeAccountDeletion = async () => {
     setDialog(null);
     setProcessingDelete(true);
@@ -207,7 +219,6 @@ export default function ProfilePage() {
         );
       }
 
-      // Explicitly sign out client state and flush cached storage footprints
       await supabase.auth.signOut();
       localStorage.clear();
       router.push('/');
@@ -222,7 +233,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Dual-stage conformation modal warning interceptor
   const triggerDeleteAccountFlow = () => {
     setDialog({
       type: 'danger',
@@ -238,6 +248,7 @@ export default function ProfilePage() {
   if (!lang) return <LoadingDots />;
 
   const isFreePlan = profile.subscription_tier === 'free';
+  const currencySymbol = country === 'FR' ? '€' : '$';
 
   return (
     <main className="min-h-screen bg-gray-50 p-6 sm:p-12 pb-40 text-black font-sans relative">
@@ -248,11 +259,11 @@ export default function ProfilePage() {
             <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none mb-2">
               {lang.settings || 'Settings'}
             </h1>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
+            {/* <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
               {profile?.country === 'FR'
                 ? 'Configuration de la plateforme'
                 : 'Platform Configurations'}
-            </p>
+            </p> */}
           </div>
           <Link
             href="/dashboard"
@@ -288,20 +299,61 @@ export default function ProfilePage() {
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                   {country === 'FR' ? 'Marché Principal' : 'Primary Market'}
                 </label>
-                <select
-                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner appearance-none"
+                <Listbox
                   value={country}
-                  onChange={(e) => {
-                    const newCountry = e.target.value;
+                  onChange={(newCountry) => {
                     setCountry(newCountry);
                     setLang(
                       newCountry === 'FR' ? translations.FR : translations.US
                     );
                   }}
                 >
-                  <option value="US">United States (USD / English)</option>
-                  <option value="FR">France (EUR / Français)</option>
-                </select>
+                  <div className="relative">
+                    <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {country === 'US'
+                          ? 'United States (USD / English)'
+                          : 'France (EUR / Français)'}
+                      </span>
+                      <span className="pointer-events-none text-gray-400">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                        <ListboxOption
+                          value="US"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${
+                              active
+                                ? 'bg-blue-50 text-blue-900'
+                                : 'text-gray-900'
+                            }`
+                          }
+                        >
+                          United States (USD / English)
+                        </ListboxOption>
+                        <ListboxOption
+                          value="FR"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${
+                              active
+                                ? 'bg-blue-50 text-blue-900'
+                                : 'text-gray-900'
+                            }`
+                          }
+                        >
+                          France (EUR / Français)
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
               </div>
 
               <div>
@@ -322,6 +374,54 @@ export default function ProfilePage() {
                   />
                   <span className="absolute right-4 top-4 text-gray-400 font-bold text-xs font-mono">
                     %
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {country === 'FR'
+                    ? 'Taux Horaire (Défaut)'
+                    : 'Default Hourly Rate'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold pr-10 transition-colors bg-gray-50/40 shadow-inner"
+                    value={hourlyRate === 0 ? '' : hourlyRate}
+                    onChange={(e) =>
+                      setHourlyRate(
+                        Math.max(0, parseFloat(e.target.value) || 0)
+                      )
+                    }
+                  />
+                  <span className="absolute right-4 top-4 text-gray-400 font-bold text-xs font-mono">
+                    {currencySymbol}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {country === 'FR'
+                    ? 'Taux Journalier (Défaut)'
+                    : 'Default Daily Rate'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold pr-10 transition-colors bg-gray-50/40 shadow-inner"
+                    value={dailyRate === 0 ? '' : dailyRate}
+                    onChange={(e) =>
+                      setDailyRate(Math.max(0, parseFloat(e.target.value) || 0))
+                    }
+                  />
+                  <span className="absolute right-4 top-4 text-gray-400 font-bold text-xs font-mono">
+                    {currencySymbol}
                   </span>
                 </div>
               </div>
