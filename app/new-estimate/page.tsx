@@ -34,6 +34,7 @@ interface EstimateItem {
 
 interface EstimateSection {
   title: string;
+  description?: string;
   laborHours: number;
   hourlyRate: number;
   laborType?: 'hourly' | 'daily';
@@ -91,6 +92,7 @@ function NewEstimateContent() {
   const [sections, setSections] = useState<EstimateSection[]>([
     {
       title: '',
+      description: '',
       laborHours: 0,
       hourlyRate: 50,
       laborTaxRate: 0,
@@ -102,6 +104,10 @@ function NewEstimateContent() {
   const [activeDropdownIdx, setActiveDropdownIdx] = useState<number | null>(
     null
   );
+  const [visibleDescriptions, setVisibleDescriptions] = useState<
+    Record<number, boolean>
+  >({});
+
   useEffect(() => {
     async function fetchData() {
       let cachedBusinessName = '';
@@ -237,6 +243,7 @@ function NewEstimateContent() {
 
           const loadedSections = (est.sections || []).map((sec: any) => ({
             ...sec,
+            description: sec.description || '',
             laborType: sec.laborType || 'hourly',
             laborTaxRate:
               sec.laborTaxRate !== undefined
@@ -306,6 +313,20 @@ function NewEstimateContent() {
     updateItem(sIdx, iIdx, 'name', rawName);
     updateItem(sIdx, iIdx, 'cost_per_unit_cents', 0);
     updateItem(sIdx, iIdx, 'unit', defaultUnit);
+  };
+
+  const isDescVisible = (sec: EstimateSection, sIdx: number) => {
+    if (visibleDescriptions[sIdx] !== undefined) {
+      return visibleDescriptions[sIdx];
+    }
+    return !!sec.description;
+  };
+
+  const toggleDescription = (sIdx: number) => {
+    setVisibleDescriptions((prev) => ({
+      ...prev,
+      [sIdx]: !isDescVisible(sections[sIdx], sIdx)
+    }));
   };
 
   const calculateTotals = () => {
@@ -970,6 +991,28 @@ function NewEstimateContent() {
                       </button>
                     </div>
 
+                    {/* Discrete inline layout contextual toggle button link */}
+                    <div className="mt-2 flex justify-start">
+                      <button
+                        type="button"
+                        onClick={() => toggleDescription(sIdx)}
+                        className="text-[10px] font-bold uppercase tracking-wider text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span className="text-xs font-mono leading-none">
+                          {isDescVisible(sec, sIdx) ? '−' : '＋'}
+                        </span>
+                        <span>
+                          {isDescVisible(sec, sIdx)
+                            ? profile?.country === 'FR'
+                              ? 'Masquer la description'
+                              : 'Hide Description'
+                            : profile?.country === 'FR'
+                              ? 'Ajouter une description'
+                              : 'Add Description'}
+                        </span>
+                      </button>
+                    </div>
+
                     {activeDropdownIdx === sIdx && (
                       <>
                         <div
@@ -1061,6 +1104,31 @@ function NewEstimateContent() {
                     </div>
                   )}
                 </div>
+
+                {/* Service Description Field (Conditionally Rendered via Discrete Toggle) */}
+                {isDescVisible(sec, sIdx) && (
+                  <div className="mb-6 transition-all animate-fade-in">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1 pointer-events-none">
+                      {profile?.country === 'FR'
+                        ? 'Description du Service'
+                        : 'Service Description'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={
+                        profile?.country === 'FR'
+                          ? 'Détails ou description des travaux pour ce service...'
+                          : 'Details or description of work for this service...'
+                      }
+                      className="w-full text-xs p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/20 text-gray-700 shadow-sm transition-colors"
+                      value={sec.description || ''}
+                      onChange={(e) =>
+                        updateSection(sIdx, 'description', e.target.value)
+                      }
+                    />
+                  </div>
+                )}
+
                 {/* Enhanced Labor Block (Sleek Listbox) */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
                   <div className="col-span-1 sm:col-span-4 lg:col-span-5 mb-2 flex justify-between items-center border-b border-slate-200/50 pb-4">
@@ -1513,6 +1581,7 @@ function NewEstimateContent() {
                 ...sections,
                 {
                   title: '',
+                  description: '',
                   laborHours: 0,
                   hourlyRate: profile?.default_hourly_rate || 50,
                   laborTaxRate: profile?.default_tax_rate || 0,

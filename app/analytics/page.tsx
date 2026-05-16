@@ -1,9 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOptions,
+  ListboxOption,
+  Transition
+} from '@headlessui/react';
 
 const dict = {
   EN: {
@@ -71,7 +78,6 @@ const LoadingDots = () => (
   </div>
 );
 
-// Taux de conversion fixe pour homogénéiser les calculs multi-devises
 const EXCHANGE_RATE_EUR_TO_USD = 1.1;
 
 type TimeFilterType = 'ALL' | 'YEAR' | 'MONTH' | '6MOS';
@@ -83,11 +89,8 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [isPro, setIsPro] = useState(true);
 
-  // États des filtres utilisateur
   const [timeFilter, setTimeFilter] = useState<TimeFilterType>('ALL');
   const [targetCurrency, setTargetCurrency] = useState<CurrencyType>('USD');
-
-  // Source brute des devis finalisés
   const [rawEstimates, setRawEstimates] = useState<any[]>([]);
 
   useEffect(() => {
@@ -117,7 +120,6 @@ export default function AnalyticsPage() {
         }
       }
 
-      // Récupération complète des nœuds de calculs pour reconstruire coûts/marges/services
       const { data: ests } = await supabase
         .from('estimates')
         .select(
@@ -136,7 +138,6 @@ export default function AnalyticsPage() {
     fetchData();
   }, [router]);
 
-  // Fonction de normalisation monétaire à la volée
   const getAmountInTargetCurrency = (cents: number, fromCurrency: string) => {
     const from = (fromCurrency || 'USD').toUpperCase();
     if (from === targetCurrency) return cents;
@@ -190,7 +191,6 @@ export default function AnalyticsPage() {
     );
   }
 
-  // 1. Filtrage temporel des données sources
   const now = new Date();
   const filteredEstimates = rawEstimates.filter((e) => {
     const date = new Date(e.created_at);
@@ -205,10 +205,9 @@ export default function AnalyticsPage() {
       sixMonthsAgo.setMonth(now.getMonth() - 6);
       return date >= sixMonthsAgo;
     }
-    return true; // ALL
+    return true;
   });
 
-  // 2. Calculs des Métriques Principales et Avancées
   let totalRevenueCents = 0;
   let totalTaxCents = 0;
   let totalLaborCostCents = 0;
@@ -231,7 +230,6 @@ export default function AnalyticsPage() {
     totalRevenueCents += grossTotal;
     totalTaxCents += taxTotal;
 
-    // Analyse par client
     const cName =
       est.client_name?.trim() ||
       (lang === 'FR' ? 'Client Anonyme' : 'Anonymous Client');
@@ -239,14 +237,12 @@ export default function AnalyticsPage() {
     clientMap[cName].total += grossTotal;
     clientMap[cName].count += 1;
 
-    // Décomposition structurelle des sections du devis
     if (Array.isArray(est.sections)) {
       est.sections.forEach((sec: any) => {
         const title =
           sec.title?.trim().toUpperCase() ||
           (lang === 'FR' ? 'INDÉTERMINÉ' : 'UNSPECIFIED');
 
-        // Reconstruction des coûts de main-d'œuvre
         const laborRaw = Math.round(
           (sec.laborHours || 0) * (sec.hourlyRate || 0) * 100
         );
@@ -256,7 +252,6 @@ export default function AnalyticsPage() {
         );
         totalLaborCostCents += laborNormalized;
 
-        // Reconstruction des coûts de matériaux
         let materialsNormalized = 0;
         if (Array.isArray(sec.items)) {
           sec.items.forEach((item: any) => {
@@ -271,7 +266,6 @@ export default function AnalyticsPage() {
         }
         totalMaterialCostCents += materialsNormalized;
 
-        // Allocation de la rentabilité par catégorie (CA de la section)
         const sectionTotalRaw =
           laborRaw +
           (Array.isArray(sec.items)
@@ -294,12 +288,10 @@ export default function AnalyticsPage() {
   const count = filteredEstimates.length;
   const avgValue = count > 0 ? Math.round(totalRevenueCents / count) : 0;
 
-  // CA Net (HT) & Calcul précis de la marge nette générée
   const netRevenueHT = totalRevenueCents - totalTaxCents;
   const totalCostBasis = totalLaborCostCents + totalMaterialCostCents;
   const netMarginCents = Math.max(0, netRevenueHT - totalCostBasis);
 
-  // Traitement du ratio Labor vs Materials
   const totalCombinedStructure = totalLaborCostCents + totalMaterialCostCents;
   const laborPercentage =
     totalCombinedStructure > 0
@@ -310,13 +302,11 @@ export default function AnalyticsPage() {
       ? Math.round((totalMaterialCostCents / totalCombinedStructure) * 100)
       : 50;
 
-  // Traitement top services
   const sortedServices = Object.entries(serviceMap)
     .map(([name, val]) => ({ name, val }))
     .sort((a, b) => b.val - a.val)
     .slice(0, 4);
 
-  // Traitement top clients et taux de fidélisation
   const clientList = Object.entries(clientMap)
     .map(([name, data]) => ({ name, total: data.total, count: data.count }))
     .sort((a, b) => b.total - a.total);
@@ -329,7 +319,6 @@ export default function AnalyticsPage() {
       ? Math.round((repeatClientsCount / totalUniqueClients) * 100)
       : 0;
 
-  // Génération historique courbe des 6 derniers mois (Trend)
   const chartData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - (5 - i));
@@ -360,7 +349,7 @@ export default function AnalyticsPage() {
   return (
     <main className="min-h-screen bg-gray-50 p-6 sm:p-8 text-black font-sans pb-24">
       <div className="max-w-4xl mx-auto">
-        {/* En-tête et Zone de Configuration des Filtres */}
+        {/* Header Area */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-gray-200 pb-8">
           <div>
             <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight mb-2">
@@ -372,45 +361,116 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="flex flex-wrap gap-4 w-full md:w-auto">
-            {/* Filtre Temporel */}
+            {/* Listbox Time Filter */}
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
               <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
                 {t.timeFilter}
               </span>
-              <select
-                value={timeFilter}
-                onChange={(e) =>
-                  setTimeFilter(e.target.value as TimeFilterType)
-                }
-                className="p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-blue-500 shadow-sm uppercase tracking-wider"
-              >
-                <option value="ALL">{t.allTime}</option>
-                <option value="YEAR">{t.thisYear}</option>
-                <option value="6MOS">{t.last6MonthsFilter}</option>
-                <option value="MONTH">{t.thisMonth}</option>
-              </select>
+              <Listbox value={timeFilter} onChange={setTimeFilter}>
+                <div className="relative w-full sm:w-44">
+                  <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors shadow-sm text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {timeFilter === 'ALL' && t.allTime}
+                      {timeFilter === 'YEAR' && t.thisYear}
+                      {timeFilter === '6MOS' && t.last6MonthsFilter}
+                      {timeFilter === 'MONTH' && t.thisMonth}
+                    </span>
+                    <span className="pointer-events-none text-gray-400 text-[10px]">
+                      ▼
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute right-0 z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                      <ListboxOption
+                        value="ALL"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {t.allTime}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="YEAR"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {t.thisYear}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="6MOS"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {t.last6MonthsFilter}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="MONTH"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {t.thisMonth}
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
             </div>
 
-            {/* Sélecteur Dynamique de Devises */}
+            {/* Listbox Currency Selector */}
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
               <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
                 {t.currencySelect}
               </span>
-              <select
-                value={targetCurrency}
-                onChange={(e) =>
-                  setTargetCurrency(e.target.value as CurrencyType)
-                }
-                className="p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-blue-500 shadow-sm uppercase tracking-wider"
-              >
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-              </select>
+              <Listbox value={targetCurrency} onChange={setTargetCurrency}>
+                <div className="relative w-full sm:w-36">
+                  <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors shadow-sm text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {targetCurrency === 'USD' ? 'USD ($)' : 'EUR (€)'}
+                    </span>
+                    <span className="pointer-events-none text-gray-400 text-[10px]">
+                      ▼
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute right-0 z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                      <ListboxOption
+                        value="USD"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        USD ($)
+                      </ListboxOption>
+                      <ListboxOption
+                        value="EUR"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        EUR (€)
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
             </div>
           </div>
         </div>
 
-        {/* Bloc KPIs Principaux */}
+        {/* KPIs Cards Block */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
@@ -442,7 +502,7 @@ export default function AnalyticsPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* GRAPHIQUE 1: CA Brut vs Marge Nette */}
+            {/* Gross Revenue vs Net Margin Card */}
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
                 {t.revenueVsMargin}
@@ -466,7 +526,6 @@ export default function AnalyticsPage() {
                     </span>
                   </div>
                 </div>
-                {/* Visualisation Barre de Progression de Performance de la Marge */}
                 <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-wider mb-2">
                     <span>Rentabilité</span>
@@ -489,9 +548,9 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* GRAPHIQUE 2 & 3: Ratio Opérationnel & Services les plus rentables */}
+            {/* Split Cards: Labor Ratio & Top Services */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Ratio Main-d'œuvre vs Matériaux */}
+              {/* Labor / Material Ratio Card */}
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
@@ -538,7 +597,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
-              {/* Top Services Répétés et Rentables */}
+              {/* Profitable Services Card */}
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
                   {t.profitableServices}
@@ -568,13 +627,12 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* GRAPHIQUE 4: Analyse Clients & Rétention */}
+            {/* Customer Retention Card */}
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
                 {t.topClients}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-                {/* Jauge Taux de Fidélisation */}
                 <div className="sm:col-span-1 bg-gray-50 p-6 rounded-xl border border-gray-100 flex flex-col items-center justify-center text-center">
                   <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-3">
                     {t.retentionRate}
@@ -610,7 +668,6 @@ export default function AnalyticsPage() {
                   </span>
                 </div>
 
-                {/* Liste Top Spend Customers */}
                 <div className="sm:col-span-2 space-y-4 flex flex-col justify-center">
                   {topClients.map((client, idx) => (
                     <div
@@ -646,7 +703,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Graphique Historique Linéaire Temporel (Volume) */}
+            {/* Revenue Trend Graph Card */}
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-8 border-b border-gray-100 pb-4">
                 {t.last6Months}
