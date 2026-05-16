@@ -17,8 +17,8 @@ export const metadata: Metadata = {
   description:
     'Precision estimates for contractors and businesses. Create, manage, and send detailed project quotes with ease.',
   icons: {
-    icon: '/favicon-us.png?v=2',
-    shortcut: '/favicon-us.png?v=2',
+    icon: '/favicon-us.svg?v=2',
+    shortcut: '/favicon-us.svg?v=2',
     apple: '/apple-touch-icon.png?v=2'
   }
 };
@@ -31,8 +31,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" type="image/png" href="/favicon-us.png?v=2" />
-        <link rel="shortcut icon" type="image/png" href="/favicon-us.png?v=2" />
+        <link rel="icon" type="image/svg+xml" href="/favicon-us.svg?v=2" />
+        <link
+          rel="shortcut icon"
+          type="image/svg+xml"
+          href="/favicon-us.svg?v=2"
+        />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
       </head>
       <PHProvider>
