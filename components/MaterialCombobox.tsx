@@ -84,30 +84,23 @@ export default function MaterialCombobox({
       }}
     >
       <div className="relative w-full">
-        <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white border border-gray-200 focus-within:border-blue-500 transition-colors sm:text-sm">
+        {/* SLEEK INNER-SHADOW WRAPPER */}
+        <div className="relative w-full cursor-default overflow-hidden rounded-xl bg-gray-50/40 border border-gray-200 focus-within:border-blue-500 transition-colors shadow-inner">
+          {/* Removed the 'uppercase tracking-widest text-[10px]' here to allow normal typing */}
           <ComboboxInput
-            className="w-full border-none py-3 sm:py-2 pl-3 pr-10 text-xs font-bold text-gray-900 outline-none leading-5"
+            className="w-full border-none bg-transparent py-3.5 pl-4 pr-10 text-xs font-bold text-gray-700 outline-none placeholder-gray-400"
             displayValue={(material: Material) => material?.name || ''}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
             autoComplete="off"
           />
-          <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
-            <svg
-              className="h-4 w-4 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 9l6 6 6-6"
-              />
-            </svg>
+          <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-4">
+            <span className="pointer-events-none text-gray-400 text-[10px]">
+              ▼
+            </span>
           </ComboboxButton>
         </div>
+
         <Transition
           as={Fragment}
           leave="transition ease-in duration-100"
@@ -115,12 +108,13 @@ export default function MaterialCombobox({
           leaveTo="opacity-0"
           afterLeave={() => setQuery('')}
         >
-          <ComboboxOptions className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 text-base shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-gray-100 ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+          {/* SLEEK DROPDOWN MENU */}
+          <ComboboxOptions className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white shadow-xl border border-gray-100 focus:outline-none">
             {filteredMaterials.map((material) => (
               <ComboboxOption
                 key={material.id}
                 className={({ focus }) =>
-                  `relative cursor-pointer select-none py-2 pl-10 pr-4 transition-colors ${
+                  `relative cursor-pointer select-none p-3 pl-10 pr-4 transition-colors border-b border-gray-50 last:border-none ${
                     focus ? 'bg-blue-50 text-blue-900' : 'text-gray-900'
                   }`
                 }
@@ -129,14 +123,14 @@ export default function MaterialCombobox({
                 {({ selected, focus }) => (
                   <>
                     <span
-                      className={`block truncate text-xs flex items-baseline gap-2 ${
-                        selected ? 'font-black' : 'font-medium'
+                      className={`block truncate flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs ${
+                        selected ? 'font-black' : 'font-bold'
                       }`}
                     >
                       <span>{material.name}</span>
                       <span
-                        className={`text-[10px] font-bold ${
-                          focus ? 'text-blue-400' : 'text-gray-400'
+                        className={`text-[10px] ${
+                          focus ? 'text-blue-500' : 'text-gray-400'
                         }`}
                       >
                         ({getUnitLabel(material.unit)}) — {currencySymbol}
@@ -167,28 +161,30 @@ export default function MaterialCombobox({
               </ComboboxOption>
             ))}
 
+            {/* SLEEK "CREATE NEW" OPTION */}
             {query.length > 0 && !exactMatchExists && (
               <ComboboxOption
                 value={{ id: 'NEW', isNew: true, name: query }}
                 className={({ focus }) =>
-                  `relative cursor-pointer select-none py-3 px-4 border-t border-gray-50 transition-colors ${
+                  `relative cursor-pointer select-none p-3 px-4 border-t border-gray-50 transition-colors ${
                     focus ? 'bg-green-50 text-green-900' : 'text-green-700'
                   }`
                 }
               >
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[10px] font-black text-green-600">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-[10px] font-black text-green-600">
                     +
                   </span>
-                  <span className="text-xs font-bold">
-                    {createLabel} <span className="italic">"{query}"</span>
+                  <span className="text-xs font-black">
+                    {createLabel}{' '}
+                    <span className="text-green-500">"{query}"</span>
                   </span>
                 </div>
               </ComboboxOption>
             )}
 
             {filteredMaterials.length === 0 && query === '' && (
-              <div className="relative cursor-default select-none py-4 px-4 text-center text-xs text-gray-500 font-medium">
+              <div className="relative cursor-default select-none py-4 px-4 text-center text-xs font-bold text-gray-400">
                 {emptyStateLabel}
               </div>
             )}

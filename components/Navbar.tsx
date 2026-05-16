@@ -53,6 +53,7 @@ export default function Navbar() {
   const [session, setSession] = useState<any>(null);
   const [hasBusinessProfile, setHasBusinessProfile] = useState<boolean>(false);
 
+  // 1. Initial Authentication & Profile Fetcher
   useEffect(() => {
     async function fetchAuthAndLang() {
       const {
@@ -82,6 +83,38 @@ export default function Navbar() {
     }
     fetchAuthAndLang();
   }, [pathname]);
+
+  // 2. Dynamic Browser Document Sync (Tab Title & Favicon Inversion)
+  useEffect(() => {
+    if (!lang || !lang.tabTitle) return;
+
+    // Use a micro-timeout to ensure this runs strictly AFTER Next.js injects its default layout.tsx metadata during route transitions
+    const syncHead = setTimeout(() => {
+      // Instantly update the document tab string dynamically
+      document.title = lang.tabTitle;
+
+      // Define self-contained dynamic vector strings (%23 replaces the # hex symbol)
+      const usFavicon = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><path d='M16 2L28 9V23L16 30L4 23V9L16 2Z' stroke='%23111827' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 20L14 14L19 18L25 10M25 10H20M25 10V15' stroke='%232563eb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
+
+      const frFavicon = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><path d='M16 2L28 9V23L16 30L4 23V9L16 2Z' stroke='%232563eb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 20L14 14L19 18L25 10M25 10H20M25 10V15' stroke='%23111827' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>`;
+
+      // Select or generate the header link element node
+      let link: HTMLLinkElement | null =
+        document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+
+      // Inject the dynamic configuration directly based on current localization state
+      link.type = 'image/svg+xml';
+      link.href = country === 'FR' ? frFavicon : usFavicon;
+    }, 10); // 10ms delay wins the race condition against the Next.js router
+
+    // Cleanup the timeout if the component unmounts mid-transition
+    return () => clearTimeout(syncHead);
+  }, [lang, country, pathname]); // <-- Notice 'pathname' is now in the dependency array
 
   // GUEST & PROFILE GUARD:
   // We hide the navbar if:

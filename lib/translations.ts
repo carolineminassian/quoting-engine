@@ -85,6 +85,8 @@ export const translations = {
       '✗ No Excel Export',
       '✗ No Analytics Dashboard'
     ],
+    tabTitle: 'PactEstim | Professional Estimate Software',
+    faviconUrl: '/favicon-us.png',
     units: {
       ea: 'Each',
       ft: 'Foot',
@@ -179,6 +181,8 @@ export const translations = {
       "✗ Pas d'Exportation Excel",
       '✗ Pas de Tableau de Bord Analytique'
     ],
+    tabTitle: 'PactEstim | Logiciel de Devis Professionnel',
+    faviconUrl: '/favicon-fr.png',
     units: {
       ea: 'Unité',
       m: 'Mètre',

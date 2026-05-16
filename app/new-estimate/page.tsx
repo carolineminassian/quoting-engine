@@ -26,6 +26,7 @@ interface EstimateItem {
   materialId: string;
   qty: number;
   taxRate: number;
+  marginRate?: number;
   unit?: string;
   name?: string;
   cost_per_unit_cents?: number;
@@ -35,7 +36,10 @@ interface EstimateSection {
   title: string;
   laborHours: number;
   hourlyRate: number;
+  laborType?: 'hourly' | 'daily';
   laborTaxRate: number;
+  laborMarginRate?: number;
+  marginRate?: number;
   items: EstimateItem[];
 }
 
@@ -60,7 +64,6 @@ function NewEstimateContent() {
   const [limitReached, setLimitReached] = useState(false);
   const [monthlyCount, setMonthlyCount] = useState(0);
 
-  // Logic for Guest Handling
   const [isGuest, setIsGuest] = useState(false);
   const [businessName, setBusinessName] = useState('');
 
@@ -79,13 +82,24 @@ function NewEstimateContent() {
   });
   const [customRef, setCustomRef] = useState('');
 
+  const [marginMode, setMarginMode] = useState<
+    'none' | 'global' | 'service' | 'granular'
+  >('none');
+  const [globalMargin, setGlobalMargin] = useState<number>(0);
+
   const [sections, setSections] = useState<EstimateSection[]>([
-    { title: '', laborHours: 0, hourlyRate: 50, laborTaxRate: 0, items: [] }
+    {
+      title: '',
+      laborHours: 0,
+      hourlyRate: 50,
+      laborTaxRate: 0,
+      laborType: 'hourly',
+      items: []
+    }
   ]);
 
   useEffect(() => {
     async function fetchData() {
-      // 1. Capture cached data in local variables immediately to prevent overwrite
       let cachedBusinessName = '';
       const pendingRaw = localStorage.getItem('pactestim_pending_estimate');
 
@@ -95,6 +109,8 @@ function NewEstimateContent() {
           if (pending.client) setClient(pending.client);
           if (pending.sections) setSections(pending.sections);
           if (pending.customRef) setCustomRef(pending.customRef);
+          if (pending.marginMode) setMarginMode(pending.marginMode);
+          if (pending.globalMargin) setGlobalMargin(pending.globalMargin);
           if (pending.businessName) {
             cachedBusinessName = pending.businessName;
             setBusinessName(pending.businessName);
@@ -108,13 +124,11 @@ function NewEstimateContent() {
         data: { user }
       } = await supabase.auth.getUser();
 
-      // 2. Handle Language Sync (Priority: LocalStorage > Browser Language)
       const storedLang = localStorage.getItem('public_lang');
       const isFrChoice =
         storedLang === 'FR' ||
         (!storedLang && navigator.language.toLowerCase().startsWith('fr'));
 
-      // 3. Handle Unauthenticated (Guest) User
       if (!user) {
         setIsGuest(true);
         setProfile({
@@ -130,7 +144,6 @@ function NewEstimateContent() {
         return;
       }
 
-      // 4. Handle Authenticated User
       const [prof, mats, ests, clientsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase
@@ -149,7 +162,6 @@ function NewEstimateContent() {
         setProfile(prof.data);
         setLang(prof.data.country === 'FR' ? translations.FR : translations.US);
 
-        // DATA PERSISTENCE FIX: Priority to cached guest name over empty profile name
         if (cachedBusinessName) {
           setBusinessName(cachedBusinessName);
         } else {
@@ -192,8 +204,12 @@ function NewEstimateContent() {
             address: est.client_address || ''
           });
           setCustomRef(est.custom_id || '');
+          setMarginMode(est.margin_mode_snapshot || 'none');
+          setGlobalMargin(est.global_margin_snapshot || 0);
+
           const loadedSections = (est.sections || []).map((sec: any) => ({
             ...sec,
+            laborType: sec.laborType || 'hourly',
             laborTaxRate:
               sec.laborTaxRate !== undefined
                 ? sec.laborTaxRate
@@ -218,18 +234,6 @@ function NewEstimateContent() {
     }
     fetchData();
   }, [editId, router]);
-
-  const handleClientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = pastClients.find((c) => c.name === e.target.value);
-    if (selected) {
-      setClient({
-        name: selected.name || '',
-        email: selected.email || '',
-        phone: selected.phone || '',
-        address: selected.address || ''
-      });
-    }
-  };
 
   const updateSection = (
     sIdx: number,
@@ -275,20 +279,71 @@ function NewEstimateContent() {
   const calculateTotals = () => {
     let subtotalCents = 0;
     let totalTaxCents = 0;
+
     sections.forEach((sec) => {
-      const laborCents = Math.round(sec.laborHours * sec.hourlyRate * 100);
-      const laborTaxCents = Math.round(
-        laborCents * ((sec.laborTaxRate || 0) / 100)
-      );
-      subtotalCents += laborCents;
-      totalTaxCents += laborTaxCents;
+      let secLaborCents = Math.round(sec.laborHours * sec.hourlyRate * 100);
+
+      if (marginMode === 'granular' && sec.laborMarginRate) {
+        secLaborCents = Math.round(
+          secLaborCents * (1 + sec.laborMarginRate / 100)
+        );
+      }
+
+      let secItemsCents = 0;
       sec.items.forEach((item) => {
-        const itemCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
-        const itemTax = Math.round(itemCost * ((item.taxRate || 0) / 100));
-        subtotalCents += itemCost;
-        totalTaxCents += itemTax;
+        let itemCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
+        if (marginMode === 'granular' && item.marginRate) {
+          itemCost = Math.round(itemCost * (1 + item.marginRate / 100));
+        }
+        secItemsCents += itemCost;
       });
+
+      let secTotalBeforeServiceMargin = secLaborCents + secItemsCents;
+
+      if (marginMode === 'service' && sec.marginRate) {
+        secTotalBeforeServiceMargin = Math.round(
+          secTotalBeforeServiceMargin * (1 + sec.marginRate / 100)
+        );
+      }
+
+      let secLaborTaxCents = 0;
+      let secItemsTaxCents = 0;
+
+      if (marginMode === 'service' && sec.marginRate) {
+        const marginMultiplier = 1 + sec.marginRate / 100;
+        secLaborTaxCents = Math.round(
+          secLaborCents * marginMultiplier * ((sec.laborTaxRate || 0) / 100)
+        );
+
+        sec.items.forEach((item) => {
+          let iCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
+          const marginedICost = Math.round(iCost * marginMultiplier);
+          secItemsTaxCents += Math.round(
+            marginedICost * ((item.taxRate || 0) / 100)
+          );
+        });
+      } else {
+        secLaborTaxCents = Math.round(
+          secLaborCents * ((sec.laborTaxRate || 0) / 100)
+        );
+        sec.items.forEach((item) => {
+          let iCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
+          if (marginMode === 'granular' && item.marginRate) {
+            iCost = Math.round(iCost * (1 + item.marginRate / 100));
+          }
+          secItemsTaxCents += Math.round(iCost * ((item.taxRate || 0) / 100));
+        });
+      }
+
+      subtotalCents += secTotalBeforeServiceMargin;
+      totalTaxCents += secLaborTaxCents + secItemsTaxCents;
     });
+
+    if (marginMode === 'global' && globalMargin) {
+      subtotalCents = Math.round(subtotalCents * (1 + globalMargin / 100));
+      totalTaxCents = Math.round(totalTaxCents * (1 + globalMargin / 100));
+    }
+
     return {
       subtotalCents,
       tax: totalTaxCents,
@@ -329,9 +384,15 @@ function NewEstimateContent() {
       data: { user }
     } = await supabase.auth.getUser();
 
-    // 1. Guest Check: Cache and Redirect to Signup view on Login page
     if (!user) {
-      const pendingData = { client, sections, customRef, businessName };
+      const pendingData = {
+        client,
+        sections,
+        customRef,
+        businessName,
+        marginMode,
+        globalMargin
+      };
       localStorage.setItem(
         'pactestim_pending_estimate',
         JSON.stringify(pendingData)
@@ -351,7 +412,6 @@ function NewEstimateContent() {
       return;
     }
 
-    // 2. Auth Logic: Update profile if business name was provided or changed
     if (businessName && businessName !== profile?.business_name) {
       await supabase
         .from('profiles')
@@ -407,7 +467,9 @@ function NewEstimateContent() {
       is_locked: false,
       business_name_snapshot: businessName || profile.business_name,
       country_snapshot: profile.country,
-      currency_snapshot: profile.currency
+      currency_snapshot: profile.currency,
+      margin_mode_snapshot: marginMode,
+      global_margin_snapshot: globalMargin
     };
 
     const res = editId
@@ -419,7 +481,6 @@ function NewEstimateContent() {
       : await supabase.from('estimates').insert([payload]).select();
 
     if (!res.error) {
-      // Client Sync logic
       if (client.name) {
         const existing = pastClients.find((c) => c.name === client.name);
         if (existing) {
@@ -444,7 +505,6 @@ function NewEstimateContent() {
         }
       }
 
-      // Billing credit deduction
       if (
         !editId &&
         profile.subscription_tier === 'free' &&
@@ -457,7 +517,6 @@ function NewEstimateContent() {
           .eq('id', profile.id);
       }
 
-      // 3. Clear Cache and Redirect to newly created view
       localStorage.removeItem('pactestim_pending_estimate');
       router.push(`/estimates/${res.data[0].id}`);
     } else {
@@ -476,16 +535,17 @@ function NewEstimateContent() {
   if (limitReached) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans text-black">
-        <div className="bg-white p-10 rounded-xl shadow-2xl max-w-md text-center border border-gray-200">
-          <div className="text-4xl mb-4">🔒</div>
-          <h2 className="text-2xl font-black uppercase tracking-tighter mb-4">
+        <div className="bg-white p-10 rounded-xl shadow-2xl max-w-sm w-full text-center border border-gray-100">
+          <h2 className="text-xl font-black uppercase tracking-tighter mb-4 text-gray-900">
             {lang.limitReached}
           </h2>
-          <p className="text-gray-500 mb-8">{lang.limitMessage}</p>
+          <p className="text-gray-500 text-sm font-medium mb-8 leading-relaxed">
+            {lang.limitMessage}
+          </p>
           <div className="flex flex-col gap-3">
             <Link
               href="/upgrade"
-              className="bg-blue-600 text-white px-6 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-colors"
+              className="w-full inline-block bg-blue-600 text-white px-6 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-colors"
             >
               {lang.upgradeToPro}
             </Link>
@@ -502,383 +562,419 @@ function NewEstimateContent() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black pb-40 font-sans relative">
-      <div className="max-w-4xl mx-auto">
-        {/* Header Area */}
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
-            <div className="flex justify-between items-center w-full sm:w-auto">
-              <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight max-w-[70%] sm:max-w-none">
-                {editId
-                  ? profile?.country === 'FR'
-                    ? 'Modifier le Projet'
-                    : 'Edit Project'
-                  : lang.newEstimate.replace('+', '')}
-              </h1>
-              <Link
-                href="/dashboard"
-                className="sm:hidden text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors shrink-0 text-right ml-4"
-              >
-                {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
-              </Link>
-            </div>
-            <input
-              type="text"
-              placeholder={lang.customRef}
-              value={customRef}
-              onChange={(e) => setCustomRef(e.target.value)}
-              className="text-xs p-3 sm:p-2 border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-500 font-mono w-full sm:w-48 text-gray-500 shadow-sm"
-            />
-          </div>
-          <Link
-            href={isGuest ? '/' : '/dashboard'}
-            className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
-          >
-            {profile?.country === 'FR' ? 'Annuler et Quitter' : 'Cancel & Exit'}
-          </Link>
-        </div>
+    <main className="min-h-screen bg-gray-50 text-black font-sans relative flex flex-col">
+      {/* Padded inner wrapper */}
+      <div className="flex-1 p-6 sm:p-8 pb-32 w-full">
+        <div className="max-w-4xl mx-auto">
+          {/* Header Area */}
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
+              <div className="flex justify-between items-center w-full sm:w-auto">
+                <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight max-w-[70%] sm:max-w-none">
+                  {editId
+                    ? profile?.country === 'FR'
+                      ? 'Modifier le Projet'
+                      : 'Edit Project'
+                    : lang.newEstimate?.replace('+', '') || 'New Estimate'}
+                </h1>
+                <Link
+                  href="/dashboard"
+                  className="sm:hidden text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors shrink-0 text-right ml-4"
+                >
+                  {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
+                </Link>
+              </div>
 
-        {/* Guest Context Banner */}
-        {isGuest && (
-          <div className="bg-blue-50 border border-blue-100 p-4 sm:p-5 rounded-xl mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xl shrink-0">👋</span>
-              <p className="text-xs font-bold text-blue-900 leading-relaxed">
-                {profile?.country === 'FR'
-                  ? 'Vous utilisez le générateur en mode invité. Votre progression est sauvegardée localement. Créez un compte pour finaliser ce devis.'
-                  : 'You are using the builder as a guest. Your progress is saved locally. Create an account to finalize this estimate.'}
-              </p>
+              <div className="flex gap-3 items-center">
+                <input
+                  type="text"
+                  placeholder={lang.customRef || 'Custom Ref #'}
+                  value={customRef}
+                  onChange={(e) => setCustomRef(e.target.value)}
+                  className="text-xs p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-white w-full sm:w-48 text-gray-600 shadow-sm"
+                />
+              </div>
             </div>
             <Link
-              href="/login?view=signup"
-              className="w-full sm:w-auto text-center text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shrink-0"
+              href={isGuest ? '/' : '/dashboard'}
+              className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
             >
-              {profile?.country === 'FR' ? 'Créer un compte' : 'Create Account'}
+              {profile?.country === 'FR'
+                ? 'Annuler et Quitter'
+                : 'Cancel & Exit'}
             </Link>
           </div>
-        )}
 
-        {/* Business Settings Section - Only shown for guests or users without a business name */}
-        {(isGuest || !profile?.business_name) && (
-          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-4">
-              {profile?.country === 'FR' ? 'Votre Entreprise' : 'Your Business'}
-            </p>
-            <div className="group relative">
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                  B
+          {/* Global Pricing Strategy Block (Sleek Listbox) */}
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 shrink-0">
+                {profile?.country === 'FR'
+                  ? 'Stratégie de Marge:'
+                  : 'Margin Strategy:'}
+              </span>
+              <Listbox
+                value={marginMode}
+                onChange={(val: any) => setMarginMode(val)}
+              >
+                <div className="relative w-full sm:w-56">
+                  <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {marginMode === 'none'
+                        ? profile?.country === 'FR'
+                          ? 'Aucune'
+                          : 'None'
+                        : ''}
+                      {marginMode === 'global'
+                        ? profile?.country === 'FR'
+                          ? 'Marge Globale'
+                          : 'Global Margin'
+                        : ''}
+                      {marginMode === 'service'
+                        ? profile?.country === 'FR'
+                          ? 'Marge par Service'
+                          : 'Per Service Margin'
+                        : ''}
+                      {marginMode === 'granular'
+                        ? profile?.country === 'FR'
+                          ? 'Marge Granulaire'
+                          : 'Granular (Line Item)'
+                        : ''}
+                    </span>
+                    <span className="pointer-events-none text-gray-400">▼</span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                      <ListboxOption
+                        value="none"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR' ? 'Aucune' : 'None'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="global"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Marge Globale'
+                          : 'Global Margin'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="service"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Marge par Service'
+                          : 'Per Service Margin'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="granular"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Marge Granulaire'
+                          : 'Granular (Line Item)'}
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </Transition>
                 </div>
+              </Listbox>
+            </div>
+
+            {marginMode === 'global' && (
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
+                  {profile?.country === 'FR' ? 'Global (%):' : 'Global (%):'}
+                </span>
+                <div className="relative w-full sm:w-32">
+                  <input
+                    type="number"
+                    min="0"
+                    value={globalMargin === 0 ? '' : globalMargin}
+                    onChange={(e) =>
+                      setGlobalMargin(
+                        Math.max(0, parseFloat(e.target.value) || 0)
+                      )
+                    }
+                    className="w-full p-3.5 pr-8 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right"
+                    placeholder="0"
+                  />
+                  <span className="absolute right-3 top-3.5 text-[10px] font-black text-gray-400 pointer-events-none">
+                    %
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Guest Lock Context Overlay */}
+          {isGuest && (
+            <div className="bg-blue-50 p-6 sm:p-8 rounded-xl border border-blue-100 mb-8 flex flex-col gap-4">
+              <div>
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-1">
+                  {profile?.country === 'FR' ? 'Mode Invité' : 'Guest Mode'}
+                </p>
+                <p className="text-sm font-bold text-gray-700 leading-relaxed">
+                  {profile?.country === 'FR'
+                    ? 'Vous pouvez rédiger votre devis maintenant. Pour générer le PDF, nous vous demanderons de créer un compte gratuit.'
+                    : 'You can draft your estimate now. To generate the final PDF, we will ask you to create a free account.'}
+                </p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  {profile?.country === 'FR'
+                    ? 'Nom de votre entreprise'
+                    : 'Your Business Name'}
+                </label>
                 <input
+                  required
                   placeholder={
                     profile?.country === 'FR'
                       ? 'Nom de votre entreprise'
                       : 'Your Business Name'
                   }
-                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                  className="flex-1 p-2 bg-transparent outline-none font-bold text-sm text-gray-800"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                 />
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Client Contact Section */}
-        <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
-              {profile?.country === 'FR'
-                ? 'Coordonnées du Client'
-                : 'Customer Contact Details'}
-            </p>
-            {pastClients.length > 0 && (
-              <select
-                value={
-                  pastClients.some((c) => c.name === client.name)
-                    ? client.name
-                    : ''
-                }
-                onChange={handleClientSelect}
-                className="w-full sm:w-auto text-[10px] border border-gray-200 p-3 sm:p-2 rounded-lg font-bold uppercase tracking-widest text-gray-500 outline-none bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
-              >
-                <option value="" disabled hidden>
-                  {lang.selectClient}
-                </option>
-                {pastClients.map((c, i) => (
-                  <option key={i} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="col-span-1 sm:col-span-2 group relative">
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                  N
-                </div>
-                <input
-                  placeholder={lang.clientName}
-                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                  value={client.name}
-                  onChange={(e) =>
-                    setClient({ ...client, name: e.target.value })
+          {/* Client Contact Section */}
+          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
+                {profile?.country === 'FR'
+                  ? 'Coordonnées du Client'
+                  : 'Customer Contact Details'}
+              </p>
+              {pastClients.length > 0 && (
+                <Listbox
+                  value={
+                    pastClients.some((c) => c.name === client.name)
+                      ? client.name
+                      : ''
                   }
-                />
-              </div>
-            </div>
-            <div className="group relative">
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                  M
-                </div>
-                <input
-                  placeholder={lang.email}
-                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                  value={client.email}
-                  onChange={(e) =>
-                    setClient({ ...client, email: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <div className="group relative">
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                  T
-                </div>
-                <input
-                  placeholder={lang.phone}
-                  className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                  value={client.phone}
-                  onChange={(e) =>
-                    setClient({ ...client, phone: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <textarea
-              placeholder={lang.address}
-              className="col-span-1 sm:col-span-2 p-4 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-gray-50 font-bold text-sm resize-none h-24 text-gray-800 transition-all"
-              value={client.address}
-              onChange={(e) =>
-                setClient({ ...client, address: e.target.value })
-              }
-            />
-          </div>
-        </div>
-
-        {/* Sections Map */}
-        {sections.map((sec, sIdx) => (
-          <div
-            key={sIdx}
-            className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8 relative"
-          >
-            <button
-              onClick={() => setSections(sections.filter((_, i) => i !== sIdx))}
-              className="absolute top-8 right-8 text-gray-300 hover:text-red-500 text-[10px] font-black uppercase tracking-widest"
-            >
-              {profile?.country === 'FR' ? 'Supprimer' : 'Remove Step'}
-            </button>
-            <input
-              placeholder={lang.serviceStep}
-              className="text-xl font-black uppercase w-full mb-6 border-b-2 border-gray-50 outline-none focus:border-blue-500 pb-2 italic tracking-tight"
-              value={sec.title}
-              onChange={(e) => updateSection(sIdx, 'title', e.target.value)}
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 bg-slate-50 p-6 rounded-lg border border-slate-100">
-              <div className="col-span-1 sm:col-span-3 mb-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  {profile?.country === 'FR'
-                    ? "Paramètres de Main-d'œuvre"
-                    : 'Internal Labor Settings'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  {profile?.country === 'FR' ? 'Heures estimées' : 'Hours'}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
-                  value={sec.laborHours === 0 ? '' : sec.laborHours}
-                  onChange={(e) =>
-                    updateSection(
-                      sIdx,
-                      'laborHours',
-                      Math.max(0, parseFloat(e.target.value) || 0)
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  {lang.hourlyRate} ({profile?.currency === 'EUR' ? '€' : '$'})
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
-                  value={sec.hourlyRate === 0 ? '' : sec.hourlyRate}
-                  onChange={(e) =>
-                    updateSection(
-                      sIdx,
-                      'hourlyRate',
-                      Math.max(0, parseFloat(e.target.value) || 0)
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  {profile?.country === 'FR' ? 'Taxe (%)' : 'Tax Rate (%)'}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  className="w-full p-2 rounded border border-slate-200 font-mono font-bold"
-                  value={sec.laborTaxRate === 0 ? '' : sec.laborTaxRate}
-                  onChange={(e) =>
-                    updateSection(
-                      sIdx,
-                      'laborTaxRate',
-                      Math.max(0, parseFloat(e.target.value) || 0)
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">
-              {lang.materials}
-            </p>
-            <div className="space-y-4 sm:space-y-3">
-              {sec.items.map((item, iIdx) => (
-                <div
-                  key={iIdx}
-                  className="flex flex-wrap sm:flex-nowrap gap-3 sm:gap-4 items-center bg-gray-50 sm:bg-transparent p-3 sm:p-0 rounded-lg sm:rounded-none border border-gray-200 sm:border-none"
+                  onChange={(val) => {
+                    const selected = pastClients.find((c) => c.name === val);
+                    if (selected) {
+                      setClient({
+                        name: selected.name || '',
+                        email: selected.email || '',
+                        phone: selected.phone || '',
+                        address: selected.address || ''
+                      });
+                    }
+                  }}
                 >
-                  <div className="w-full sm:flex-[2] relative">
-                    {item.materialId ? (
-                      <div className="flex items-center justify-between w-full py-2 pl-3 pr-2 border border-gray-200 rounded-lg bg-gray-50 transition-colors">
-                        <span className="text-xs font-bold text-gray-900 truncate pr-4">
-                          {item.name}
-                        </span>
-                        <button
-                          onClick={() =>
-                            updateItem(sIdx, iIdx, 'materialId', '')
-                          }
-                          className="text-[10px] text-gray-400 hover:text-blue-600 font-black uppercase tracking-widest transition-colors shrink-0"
-                        >
-                          {profile?.country === 'FR' ? 'Modifier' : 'Edit'}
-                        </button>
-                      </div>
-                    ) : (
-                      <MaterialCombobox
-                        materials={materials}
-                        selectedId={item.materialId}
-                        placeholder={lang.selectMaterial}
-                        createLabel={
-                          profile?.country === 'FR' ? 'Créer :' : 'Create:'
-                        }
-                        emptyStateLabel={
-                          profile?.country === 'FR'
-                            ? 'Aucun matériau.'
-                            : 'No materials found.'
-                        }
-                        currencySymbol={profile?.currency === 'EUR' ? '€' : '$'}
-                        unitLabels={lang?.units || {}}
-                        onChange={(val) => {
-                          if (!val) {
-                            updateItem(sIdx, iIdx, 'materialId', '');
-                            updateItem(sIdx, iIdx, 'name', '');
-                            updateItem(sIdx, iIdx, 'cost_per_unit_cents', 0);
-                            updateItem(
-                              sIdx,
-                              iIdx,
-                              'unit',
-                              lang?.units ? Object.keys(lang.units)[0] : 'ea'
-                            );
-                            return;
-                          }
-                          updateItem(sIdx, iIdx, 'materialId', val.id);
-                          updateItem(sIdx, iIdx, 'name', val.name);
-                          updateItem(
-                            sIdx,
-                            iIdx,
-                            'cost_per_unit_cents',
-                            val.cost_per_unit_cents || 0
-                          );
-                          updateItem(
-                            sIdx,
-                            iIdx,
-                            'unit',
-                            val.unit ||
-                              (lang?.units ? Object.keys(lang.units)[0] : 'ea')
-                          );
-                        }}
-                        onCreateNew={(name) =>
-                          handleCreateMaterialOnTheFly(sIdx, iIdx, name)
-                        }
-                      />
-                    )}
-                  </div>
-                  <div className="w-24 relative shrink-0 group">
-                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
-                      {profile?.country === 'FR' ? 'Qté' : 'Qty'}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      className="w-full py-2 pl-9 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white"
-                      value={item.qty === 0 ? '' : item.qty}
-                      onChange={(e) =>
-                        updateItem(
-                          sIdx,
-                          iIdx,
-                          'qty',
-                          Math.max(0, parseFloat(e.target.value) || 0)
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="w-36 relative shrink-0 group">
-                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500 z-10">
-                      {profile?.country === 'FR' ? 'Unité' : 'Unit'}
-                    </span>
-                    <Listbox
-                      value={getResolvedUnitKey(item.unit)}
-                      onChange={(val) => updateItem(sIdx, iIdx, 'unit', val)}
+                  <div className="relative w-full sm:w-64">
+                    <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-600 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {client.name || lang.selectClient || 'Select Client'}
+                      </span>
+                      <span className="pointer-events-none text-gray-400">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
                     >
-                      <div className="relative">
-                        <ListboxButton className="w-full py-2 pl-12 pr-8 text-left text-xs font-bold text-gray-900 border border-gray-100 rounded outline-none focus:border-blue-500 transition-colors bg-white cursor-pointer flex items-center h-[34px]">
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-xs font-bold">
+                        {pastClients.map((c, i) => (
+                          <ListboxOption
+                            key={i}
+                            value={c.name}
+                            className={({ active }) =>
+                              `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                            }
+                          >
+                            {c.name}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="col-span-1 sm:col-span-2 group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    N
+                  </div>
+                  <input
+                    placeholder={lang.clientName || 'Client Name'}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.name}
+                    onChange={(e) =>
+                      setClient({ ...client, name: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    @
+                  </div>
+                  <input
+                    type="email"
+                    placeholder={lang.email || 'Email Address'}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.email}
+                    onChange={(e) =>
+                      setClient({ ...client, email: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    #
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder={lang.phone || 'Phone Number'}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.phone}
+                    onChange={(e) =>
+                      setClient({ ...client, phone: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="col-span-1 sm:col-span-2 group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    A
+                  </div>
+                  <input
+                    placeholder={lang.address || 'Project Address'}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.address}
+                    onChange={(e) =>
+                      setClient({ ...client, address: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Builder Sections */}
+          <div className="space-y-6">
+            {sections.map((sec, sIdx) => (
+              <div
+                key={sIdx}
+                className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 relative group/section"
+              >
+                {sections.length > 1 && (
+                  <button
+                    onClick={() =>
+                      setSections(sections.filter((_, i) => i !== sIdx))
+                    }
+                    className="absolute right-4 top-4 w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors font-black opacity-100 sm:opacity-0 sm:group-hover/section:opacity-100"
+                  >
+                    ×
+                  </button>
+                )}
+
+                {/* Service Step Header */}
+                <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-8">
+                  <input
+                    placeholder={
+                      profile?.country === 'FR'
+                        ? 'Catégorie / Étape de Service'
+                        : 'Service Category / Step'
+                    }
+                    className="text-2xl font-black text-gray-900 outline-none w-full sm:w-2/3 border-b-2 border-transparent focus:border-blue-500 pb-2 italic tracking-tight"
+                    value={sec.title}
+                    onChange={(e) =>
+                      updateSection(sIdx, 'title', e.target.value)
+                    }
+                  />
+
+                  {marginMode === 'service' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
+                        {profile?.country === 'FR'
+                          ? 'Marge Service:'
+                          : 'Service Margin:'}
+                      </span>
+                      <div className="relative w-24">
+                        <input
+                          type="number"
+                          min="0"
+                          value={
+                            sec.marginRate === 0 ? '' : sec.marginRate || ''
+                          }
+                          onChange={(e) =>
+                            updateSection(
+                              sIdx,
+                              'marginRate',
+                              Math.max(0, parseFloat(e.target.value) || 0)
+                            )
+                          }
+                          className="w-full p-2 pr-6 border border-blue-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right text-sm"
+                          placeholder="0"
+                        />
+                        <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Enhanced Labor Block (Sleek Listbox) */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
+                  <div className="col-span-1 sm:col-span-4 lg:col-span-5 mb-2 flex justify-between items-center border-b border-slate-200/50 pb-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      {profile?.country === 'FR'
+                        ? "Main-d'œuvre"
+                        : 'Labor Settings'}
+                    </p>
+
+                    <Listbox
+                      value={sec.laborType || 'hourly'}
+                      onChange={(val) => updateSection(sIdx, 'laborType', val)}
+                    >
+                      <div className="relative w-36 sm:w-40">
+                        <ListboxButton className="w-full p-2 border border-slate-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors shadow-sm text-[9px] uppercase tracking-widest text-slate-500 flex justify-between items-center cursor-pointer">
                           <span className="block truncate">
-                            {lang?.units
-                              ? lang.units[getResolvedUnitKey(item.unit)]
-                              : 'ea'}
+                            {sec.laborType === 'daily'
+                              ? profile?.country === 'FR'
+                                ? 'Taux Journalier'
+                                : 'Daily Rate'
+                              : profile?.country === 'FR'
+                                ? 'Taux Horaire'
+                                : 'Hourly Rate'}
                           </span>
-                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400">
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 9l6 6 6-6"
-                              />
-                            </svg>
+                          <span className="pointer-events-none text-slate-400 text-[10px]">
+                            ▼
                           </span>
                         </ListboxButton>
                         <Transition
@@ -887,178 +983,488 @@ function NewEstimateContent() {
                           leaveFrom="opacity-100"
                           leaveTo="opacity-0"
                         >
-                          <ListboxOptions className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white shadow-xl border border-gray-100">
-                            {Object.entries(lang?.units || { ea: 'ea' }).map(
-                              ([key, label]) => (
-                                <ListboxOption
-                                  key={key}
-                                  className={({ focus }) =>
-                                    `cursor-pointer select-none py-2 px-4 transition-colors ${
-                                      focus
-                                        ? 'bg-blue-50 text-blue-900'
-                                        : 'text-gray-900'
-                                    }`
-                                  }
-                                  value={key}
-                                >
-                                  {({ selected }) => (
-                                    <span
-                                      className={`block truncate text-xs ${
-                                        selected
-                                          ? 'font-black text-blue-600'
-                                          : 'font-bold'
-                                      }`}
-                                    >
-                                      {label as string}
-                                    </span>
-                                  )}
-                                </ListboxOption>
-                              )
-                            )}
+                          <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none">
+                            <ListboxOption
+                              value="hourly"
+                              className={({ active }) =>
+                                `cursor-pointer select-none relative p-2.5 text-[9px] uppercase tracking-widest font-bold ${active ? 'bg-blue-50 text-blue-900' : 'text-slate-600'}`
+                              }
+                            >
+                              {profile?.country === 'FR'
+                                ? 'Taux Horaire'
+                                : 'Hourly Rate'}
+                            </ListboxOption>
+                            <ListboxOption
+                              value="daily"
+                              className={({ active }) =>
+                                `cursor-pointer select-none relative p-2.5 text-[9px] uppercase tracking-widest font-bold ${active ? 'bg-blue-50 text-blue-900' : 'text-slate-600'}`
+                              }
+                            >
+                              {profile?.country === 'FR'
+                                ? 'Taux Journalier'
+                                : 'Daily Rate'}
+                            </ListboxOption>
                           </ListboxOptions>
                         </Transition>
                       </div>
                     </Listbox>
                   </div>
-                  <div className="w-32 relative shrink-0 group">
-                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
-                      {profile?.country === 'FR' ? 'Prix' : 'Cost'}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="0.00"
-                      className="w-full py-2 pl-12 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white"
-                      value={
-                        (item.cost_per_unit_cents || 0) === 0
-                          ? ''
-                          : item.cost_per_unit_cents! / 100
-                      }
-                      onChange={(e) =>
-                        updateItem(
-                          sIdx,
-                          iIdx,
-                          'cost_per_unit_cents',
-                          Math.max(0, parseFloat(e.target.value) || 0) * 100
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="w-28 relative shrink-0 group">
-                    <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
-                      Tax
-                    </span>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
+                      {sec.laborType === 'daily'
+                        ? profile?.country === 'FR'
+                          ? 'Jours estimées'
+                          : 'Est. Days'
+                        : profile?.country === 'FR'
+                          ? 'Heures estimées'
+                          : 'Est. Hours'}
+                    </label>
                     <input
                       type="number"
                       min="0"
                       placeholder="0"
-                      className="w-full py-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white"
-                      value={item.taxRate === 0 ? '' : item.taxRate}
+                      className="w-full p-3 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white"
+                      value={sec.laborHours === 0 ? '' : sec.laborHours}
                       onChange={(e) =>
-                        updateItem(
+                        updateSection(
                           sIdx,
-                          iIdx,
-                          'taxRate',
+                          'laborHours',
                           Math.max(0, parseFloat(e.target.value) || 0)
                         )
                       }
                     />
-                    <span className="absolute right-2 top-2.5 text-gray-400 text-[10px] font-bold pointer-events-none">
-                      %
-                    </span>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
+                      {sec.laborType === 'daily'
+                        ? profile?.country === 'FR'
+                          ? 'Taux/Jour'
+                          : 'Rate/Day'
+                        : profile?.country === 'FR'
+                          ? 'Taux/Heure'
+                          : 'Rate/Hour'}{' '}
+                      ({profile?.currency === 'EUR' ? '€' : '$'})
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      className="w-full p-3 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white"
+                      value={sec.hourlyRate === 0 ? '' : sec.hourlyRate}
+                      onChange={(e) =>
+                        updateSection(
+                          sIdx,
+                          'hourlyRate',
+                          Math.max(0, parseFloat(e.target.value) || 0)
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
+                      {profile?.country === 'FR' ? 'Taxe (%)' : 'Tax Rate (%)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        className="w-full p-3 pr-8 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white"
+                        value={sec.laborTaxRate === 0 ? '' : sec.laborTaxRate}
+                        onChange={(e) =>
+                          updateSection(
+                            sIdx,
+                            'laborTaxRate',
+                            Math.max(0, parseFloat(e.target.value) || 0)
+                          )
+                        }
+                      />
+                      <span className="absolute right-3 top-3.5 text-slate-400 text-[10px] font-bold pointer-events-none">
+                        %
+                      </span>
+                    </div>
+                  </div>
+
+                  {marginMode === 'granular' && (
+                    <div className="col-span-1 sm:col-span-1 lg:col-span-2">
+                      <label className="block text-[10px] font-black text-blue-500 uppercase mb-1.5 tracking-widest">
+                        {profile?.country === 'FR'
+                          ? 'Marge Travail'
+                          : 'Labor Margin'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          className="w-full p-3 pr-8 rounded-lg border border-blue-200 font-mono font-bold outline-none focus:border-blue-500 bg-blue-50/50 text-blue-900"
+                          value={
+                            sec.laborMarginRate === 0
+                              ? ''
+                              : sec.laborMarginRate || ''
+                          }
+                          onChange={(e) =>
+                            updateSection(
+                              sIdx,
+                              'laborMarginRate',
+                              Math.max(0, parseFloat(e.target.value) || 0)
+                            )
+                          }
+                        />
+                        <span className="absolute right-3 top-3.5 text-blue-400 text-[10px] font-bold pointer-events-none">
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Material Items Header & Loop */}
+                <div className="mb-4">
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-4">
+                    {lang.materials || 'Materials'}
+                  </p>
+
+                  <div className="flex flex-col gap-4">
+                    {sec.items.map((item, iIdx) => (
+                      <div
+                        key={iIdx}
+                        className="flex flex-col lg:flex-row gap-3 items-stretch bg-gray-50/50 p-3 rounded-lg border border-gray-100/50"
+                      >
+                        {/* Name & Material Box */}
+                        <div className="flex-1 relative min-w-[200px]">
+                          {item.materialId ? (
+                            <div className="flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded text-sm relative h-[34px]">
+                              <span className="font-bold text-gray-900 truncate pr-4 text-xs">
+                                {item.name}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  updateItem(sIdx, iIdx, 'materialId', '')
+                                }
+                                className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 bg-blue-50/50 px-2 py-1 rounded shrink-0 transition-colors"
+                              >
+                                {lang.edit || 'Edit'}
+                              </button>
+                            </div>
+                          ) : (
+                            <MaterialCombobox
+                              materials={materials}
+                              selectedId={item.materialId}
+                              onChange={(val: any) => {
+                                if (!val) return;
+                                updateItem(sIdx, iIdx, 'materialId', val.id);
+                                updateItem(sIdx, iIdx, 'name', val.name);
+                                updateItem(
+                                  sIdx,
+                                  iIdx,
+                                  'cost_per_unit_cents',
+                                  val.cost_per_unit_cents || 0
+                                );
+                                updateItem(
+                                  sIdx,
+                                  iIdx,
+                                  'unit',
+                                  val.unit ||
+                                    (lang?.units
+                                      ? Object.keys(lang.units)[0]
+                                      : 'ea')
+                                );
+                              }}
+                              onCreateNew={(name: string) =>
+                                handleCreateMaterialOnTheFly(sIdx, iIdx, name)
+                              }
+                              placeholder={
+                                lang.selectMaterial ||
+                                'Select or create material...'
+                              }
+                              createLabel={
+                                profile?.country === 'FR' ? 'Créer' : 'Create'
+                              }
+                              emptyStateLabel={
+                                profile?.country === 'FR'
+                                  ? 'Aucun résultat'
+                                  : 'No materials found.'
+                              }
+                              currencySymbol={
+                                profile?.currency === 'EUR' ? '€' : '$'
+                              }
+                              unitLabels={lang?.units || {}}
+                            />
+                          )}
+                        </div>
+
+                        {/* Inputs Grid (Wraps elegantly on mobile) */}
+                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                          {/* QTY */}
+                          <div className="flex-1 min-w-[80px] sm:w-20 sm:flex-none relative shrink-0 group">
+                            <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
+                              {profile?.country === 'FR' ? 'Qté' : 'Qty'}
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              className="w-full py-2 pl-9 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white text-xs"
+                              value={item.qty === 0 ? '' : item.qty}
+                              onChange={(e) =>
+                                updateItem(
+                                  sIdx,
+                                  iIdx,
+                                  'qty',
+                                  Math.max(0, parseFloat(e.target.value) || 0)
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* UNIT */}
+                          <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
+                            <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none z-10 transition-colors group-focus-within:text-blue-500">
+                              {profile?.country === 'FR' ? 'Unité' : 'Unit'}
+                            </span>
+                            <Listbox
+                              value={getResolvedUnitKey(item.unit)}
+                              onChange={(val) =>
+                                updateItem(sIdx, iIdx, 'unit', val)
+                              }
+                            >
+                              <div className="relative">
+                                <ListboxButton className="w-full py-2 pl-11 pr-6 text-left text-xs font-bold text-gray-900 border border-gray-100 rounded outline-none focus:border-blue-500 transition-colors bg-white cursor-pointer h-[34px]">
+                                  <span className="block truncate text-right">
+                                    {lang?.units
+                                      ? lang.units[
+                                          getResolvedUnitKey(item.unit)
+                                        ]
+                                      : 'ea'}
+                                  </span>
+                                </ListboxButton>
+                                <Transition
+                                  as={Fragment}
+                                  leave="transition ease-in duration-100"
+                                  leaveFrom="opacity-100"
+                                  leaveTo="opacity-0"
+                                >
+                                  <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded shadow-xl max-h-60 overflow-auto focus:outline-none text-xs">
+                                    {lang?.units &&
+                                      Object.keys(lang.units).map((key) => (
+                                        <ListboxOption
+                                          key={key}
+                                          value={key}
+                                          className={({ active }) =>
+                                            `cursor-pointer select-none relative py-2 pl-3 pr-4 font-bold ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                                          }
+                                        >
+                                          {lang.units[key]}
+                                        </ListboxOption>
+                                      ))}
+                                  </ListboxOptions>
+                                </Transition>
+                              </div>
+                            </Listbox>
+                          </div>
+
+                          {/* COST */}
+                          <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
+                            <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
+                              {profile?.country === 'FR' ? 'Prix' : 'Cost'}
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              className="w-full py-2 pl-10 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white text-xs"
+                              value={
+                                item.cost_per_unit_cents === 0
+                                  ? ''
+                                  : (item.cost_per_unit_cents || 0) / 100
+                              }
+                              onChange={(e) =>
+                                updateItem(
+                                  sIdx,
+                                  iIdx,
+                                  'cost_per_unit_cents',
+                                  Math.max(
+                                    0,
+                                    Math.round(
+                                      (parseFloat(e.target.value) || 0) * 100
+                                    )
+                                  )
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* TAX */}
+                          <div className="flex-1 min-w-[90px] sm:w-[100px] sm:flex-none relative shrink-0 group">
+                            <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
+                              {profile?.country === 'FR' ? 'Taxe' : 'Tax'}
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              className="w-full py-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white text-xs"
+                              value={item.taxRate === 0 ? '' : item.taxRate}
+                              onChange={(e) =>
+                                updateItem(
+                                  sIdx,
+                                  iIdx,
+                                  'taxRate',
+                                  Math.max(0, parseFloat(e.target.value) || 0)
+                                )
+                              }
+                            />
+                            <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
+                              %
+                            </span>
+                          </div>
+
+                          {/* MARGIN (Granular) */}
+                          {marginMode === 'granular' && (
+                            <div className="flex-1 min-w-[90px] sm:w-[100px] sm:flex-none relative shrink-0 group">
+                              <span className="absolute left-2 top-2.5 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-600">
+                                Mgn
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                className="w-full py-2 pl-10 pr-6 border border-blue-100 rounded text-right font-bold outline-none focus:border-blue-500 bg-blue-50/30 text-blue-900 text-xs"
+                                value={
+                                  item.marginRate === 0
+                                    ? ''
+                                    : item.marginRate || ''
+                                }
+                                onChange={(e) =>
+                                  updateItem(
+                                    sIdx,
+                                    iIdx,
+                                    'marginRate',
+                                    Math.max(0, parseFloat(e.target.value) || 0)
+                                  )
+                                }
+                              />
+                              <span className="absolute right-2 top-2 text-[10px] font-black text-blue-400 pointer-events-none">
+                                %
+                              </span>
+                            </div>
+                          )}
+
+                          {/* DELETE ROW */}
+                          <button
+                            onClick={() => {
+                              const n = [...sections];
+                              n[sIdx].items = n[sIdx].items.filter(
+                                (_, i) => i !== iIdx
+                              );
+                              setSections(n);
+                            }}
+                            className="text-gray-300 hover:text-red-500 w-8 h-[34px] flex items-center justify-center font-bold transition-colors shrink-0 bg-white border border-gray-100 rounded sm:border-none sm:bg-transparent"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   <button
                     onClick={() => {
                       const n = [...sections];
-                      n[sIdx].items = n[sIdx].items.filter(
-                        (_, i) => i !== iIdx
-                      );
+                      n[sIdx].items.push({
+                        materialId: '',
+                        qty: 0,
+                        taxRate: profile?.default_tax_rate || 0,
+                        marginRate: 0,
+                        cost_per_unit_cents: 0,
+                        unit: lang?.units ? Object.keys(lang.units)[0] : 'ea'
+                      });
                       setSections(n);
                     }}
-                    className="text-gray-200 hover:text-red-400 text-xl font-bold transition-colors pl-2"
+                    className="mt-4 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors"
                   >
-                    ×
+                    + {lang.addItem || 'Add Item'}
                   </button>
                 </div>
-              ))}
-            </div>
-            <button
-              onClick={() => {
-                const n = [...sections];
-                n[sIdx].items.push({
-                  materialId: '',
-                  qty: 0,
-                  taxRate: profile?.default_tax_rate || 0,
-                  cost_per_unit_cents: 0,
-                  unit: lang?.units ? Object.keys(lang.units)[0] : 'ea'
-                });
-                setSections(n);
-              }}
-              className="text-blue-600 font-black text-[10px] uppercase tracking-widest mt-6 hover:text-blue-800 transition-colors"
-            >
-              + {lang.materials}
-            </button>
+              </div>
+            ))}
           </div>
-        ))}
 
-        <button
-          onClick={() =>
-            setSections([
-              ...sections,
-              {
-                title: '',
-                laborHours: 0,
-                hourlyRate: profile?.default_hourly_rate || 50,
-                laborTaxRate: profile?.default_tax_rate || 0,
-                items: []
-              }
-            ])
-          }
-          className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 font-black uppercase tracking-widest hover:text-blue-500 hover:border-blue-500 transition-all mb-20"
-        >
-          + {lang.serviceStep}
-        </button>
+          {/* Full-Width Dashed Add Service Button */}
+          <button
+            onClick={() => {
+              setSections([
+                ...sections,
+                {
+                  title: '',
+                  laborHours: 0,
+                  hourlyRate: profile?.default_hourly_rate || 50,
+                  laborTaxRate: profile?.default_tax_rate || 0,
+                  laborType: 'hourly',
+                  items: []
+                }
+              ]);
+            }}
+            className="w-full mt-6 p-6 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase tracking-widest text-[10px] hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all"
+          >
+            + {profile?.country === 'FR' ? 'Ajouter un Service' : 'Add Service'}
+          </button>
+        </div>
+      </div>
 
-        {/* Totals Footer */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 p-4 sm:p-6 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] z-40">
-          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 sm:gap-0 justify-between items-center">
-            <div className="flex w-full sm:w-auto justify-between sm:justify-start gap-4 sm:gap-10">
-              <div>
-                <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">
-                  {lang.subtotal}
-                </p>
-                <p className="text-xl font-mono font-bold">
-                  {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(subtotalCents / 100).toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">
-                  {profile?.country === 'FR' ? 'TVA Totale' : 'Total Tax'}
-                </p>
-                <p className="text-xl font-mono font-bold">
-                  {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(tax / 100).toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">
-                  {lang.grandTotal}
-                </p>
-                <p className="text-3xl font-black text-blue-600 tracking-tighter">
-                  {profile?.currency === 'EUR' ? '€' : '$'}
-                  {(totalCents / 100).toFixed(2)}
-                </p>
-              </div>
+      {/* Synchronized Sticky Footer (Reveals Global Footer) */}
+      <div className="sticky bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] px-6 sm:px-8 py-5 z-40 transition-all print:hidden mt-auto">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
+          <div className="flex flex-wrap items-center gap-8 sm:gap-12 w-full sm:w-auto justify-between sm:justify-start">
+            <div>
+              <span className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
+                {lang.subtotal || 'Subtotal'}
+              </span>
+              <span className="font-mono font-bold text-lg text-gray-700">
+                {profile?.currency === 'EUR' ? '€' : '$'}
+                {(subtotalCents / 100)
+                  .toFixed(2)
+                  .replace('.', profile?.country === 'FR' ? ',' : '.')}
+              </span>
             </div>
+
+            <div>
+              <span className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
+                {lang.tax || 'Tax'}
+              </span>
+              <span className="font-mono font-bold text-lg text-gray-500">
+                {profile?.currency === 'EUR' ? '€' : '$'}
+                {(tax / 100)
+                  .toFixed(2)
+                  .replace('.', profile?.country === 'FR' ? ',' : '.')}
+              </span>
+            </div>
+
+            <div className="sm:border-l sm:border-gray-100 sm:pl-10">
+              <span className="block text-[10px] font-black uppercase tracking-widest text-blue-600 mb-0.5">
+                {lang.grandTotal || 'Grand Total'}
+              </span>
+              <span className="font-mono font-black text-2xl text-gray-950 tracking-tight">
+                {profile?.currency === 'EUR' ? '€' : '$'}
+                {(totalCents / 100)
+                  .toFixed(2)
+                  .replace('.', profile?.country === 'FR' ? ',' : '.')}
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-auto shrink-0">
             <button
               onClick={handleSave}
-              className="bg-blue-600 text-white px-12 py-4 rounded-xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-transform hover:scale-105 active:scale-95"
+              className="w-full sm:w-auto bg-blue-600 text-white px-10 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-blue-600/10 hover:bg-blue-700 hover:shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               {editId
-                ? profile?.country === 'FR'
-                  ? 'Mettre à jour'
-                  : 'Update Draft'
+                ? lang.save || 'Save'
                 : profile?.country === 'FR'
                   ? 'Générer le Devis'
                   : 'Generate Estimate'}
@@ -1067,22 +1473,21 @@ function NewEstimateContent() {
         </div>
       </div>
 
-      {/* Dialog Intercepts */}
       {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
-            <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
+            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
               {dialog.title ||
                 (profile?.country === 'FR' ? 'Notification' : 'Notice')}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mb-8">
+            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
               {dialog.message}
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-2 justify-end">
               {dialog.type === 'confirm' && (
                 <button
                   onClick={() => setDialog(null)}
-                  className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
                 >
                   {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
                 </button>
@@ -1092,9 +1497,9 @@ function NewEstimateContent() {
                   if (dialog.onConfirm) dialog.onConfirm();
                   else setDialog(null);
                 }}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
               >
-                OK
+                {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
               </button>
             </div>
           </div>
