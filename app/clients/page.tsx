@@ -164,9 +164,20 @@ export default function ClientsPage() {
             onClick={() =>
               setEditingClient({ name: '', email: '', phone: '', address: '' })
             }
-            className="w-full sm:w-auto bg-blue-600 text-white px-5 py-3.5 rounded-lg font-black uppercase tracking-[0.15em] text-[10px] shadow-sm hover:bg-blue-700 transition-all duration-200 active:scale-95"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white hover:bg-blue-600 px-5 py-3.5 rounded-lg font-black uppercase tracking-[0.14em] text-[10px] shadow-sm hover:shadow transition-all duration-200 active:scale-95 group"
           >
-            + {t.addBtn}
+            <svg
+              className="w-3.5 h-3.5 text-gray-400 group-hover:text-white transition-colors duration-200 stroke-[3]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>{t.addBtn}</span>
           </button>
         </div>
 
@@ -180,7 +191,7 @@ export default function ClientsPage() {
             {clients.map((c) => (
               <div
                 key={c.id}
-                className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 flex flex-col justify-between hover:border-blue-500/30 transition-all transform hover:-translate-y-0.5 duration-200 group"
+                className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 flex flex-col justify-between hover:shadow-md transition-all duration-200 group"
               >
                 <div>
                   <h3 className="font-black text-2xl text-gray-900 group-hover:text-blue-600 transition-colors mb-6 truncate tracking-tight">
@@ -222,28 +233,36 @@ export default function ClientsPage() {
                 </div>
 
                 {/* Grid Item Card Actions */}
-                <div className="mt-8 pt-4 border-t border-gray-100 space-y-2.5">
+                <div className="mt-8 pt-4 border-t border-gray-100 space-y-2">
                   <button
                     onClick={() =>
                       router.push(`/new-estimate?clientId=${c.id}`)
                     }
-                    className="w-full flex items-center justify-center gap-1.5 bg-blue-600 text-white hover:bg-blue-700 py-3 rounded-lg font-black text-[10px] uppercase tracking-[0.18em] transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.99]"
+                    className="w-full flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-blue-200 group/btn"
                   >
                     <span>{t.createEstimate}</span>
-                    <span className="text-xs transform translate-y-[-0.5px]">
-                      →
-                    </span>
+                    <svg
+                      className="w-3.5 h-3.5 transform transition-transform duration-200 group-hover/btn:translate-x-0.5 stroke-[2.5]"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                      <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
                   </button>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setEditingClient(c)}
-                      className="flex-1 flex items-center justify-center bg-gray-50 text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200"
+                      className="flex-1 flex items-center justify-center bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200"
                     >
                       {t.edit}
                     </button>
                     <button
                       onClick={() => triggerDeleteConfirm(c.id)}
-                      className="flex-1 flex items-center justify-center bg-white text-red-600 hover:bg-red-50 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200/60"
+                      className="flex-1 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200"
                     >
                       {t.delete}
                     </button>

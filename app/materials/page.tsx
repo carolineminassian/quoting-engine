@@ -1,9 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOptions,
+  ListboxOption,
+  Transition
+} from '@headlessui/react';
 
 const LoadingDots = () => (
   <div className="flex items-center justify-center space-x-2 p-12 mt-20">
@@ -170,7 +177,7 @@ export default function MaterialsPage() {
           </div>
           <Link
             href="/dashboard"
-            className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
+            className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors cursor-pointer"
           >
             ← {lang.dashboard}
           </Link>
@@ -190,7 +197,7 @@ export default function MaterialsPage() {
                 required
                 title={lang.itemNameTooltip}
                 placeholder={lang.exampleItem}
-                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
+                className="w-full p-3.5 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50 shadow-inner"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
@@ -200,24 +207,40 @@ export default function MaterialsPage() {
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                 {lang.unitLabel}
               </label>
-              <div className="relative">
-                <select
-                  required
-                  title={lang.unitTooltip}
-                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner appearance-none uppercase text-xs tracking-wider"
-                  value={newUnit}
-                  onChange={(e) => setNewUnit(e.target.value)}
-                >
-                  <option value="" disabled hidden>
-                    {lang.unitPlaceholder}
-                  </option>
-                  {Object.keys(lang.units).map((key) => (
-                    <option key={key} value={key}>
-                      {lang.units[key]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Listbox value={newUnit} onChange={setNewUnit}>
+                <div className="relative">
+                  <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {newUnit ? lang.units[newUnit] : lang.unitPlaceholder}
+                    </span>
+                    <span className="pointer-events-none text-gray-400">▼</span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full top-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                      {Object.keys(lang.units).map((key) => (
+                        <ListboxOption
+                          key={key}
+                          value={key}
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 transition-colors ${
+                              active
+                                ? 'bg-blue-50 text-blue-900'
+                                : 'text-gray-900'
+                            }`
+                          }
+                        >
+                          {lang.units[key]}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
             </div>
 
             <div className="col-span-12 sm:col-span-2">
@@ -232,7 +255,7 @@ export default function MaterialsPage() {
                   min="0"
                   step="0.01"
                   placeholder="0.00"
-                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold pr-8 transition-colors bg-gray-50/40 shadow-inner"
+                  className="w-full p-3.5 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold pr-8 transition-colors bg-gray-50 shadow-inner"
                   value={newName === '' && newPrice === '0' ? '' : newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
                 />
@@ -245,7 +268,7 @@ export default function MaterialsPage() {
             <div className="col-span-12 sm:col-span-2">
               <button
                 type="submit"
-                className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-blue-700 transition-transform active:scale-95"
+                className="w-full flex items-center justify-center bg-gray-900 text-white hover:bg-blue-600 px-5 py-3.5 rounded-lg font-black uppercase tracking-[0.14em] text-[10px] shadow-sm hover:shadow transition-all duration-200 active:scale-95 cursor-pointer"
               >
                 {lang.addItem}
               </button>
@@ -262,9 +285,11 @@ export default function MaterialsPage() {
         </div>
 
         {/* Master Data Grid Mapping List */}
-        <div className="flex flex-col gap-4 sm:gap-0 sm:bg-white sm:border-x sm:border-b sm:border-gray-200/60 sm:rounded-b-2xl sm:divide-y sm:divide-gray-100 overflow-hidden">
-          {materials.map((m) => {
+        <div className="flex flex-col gap-4 sm:gap-0 sm:bg-white sm:border-x sm:border-b sm:border-gray-200/60 sm:rounded-b-2xl sm:divide-y sm:divide-gray-100 overflow-visible">
+          {materials.map((m, index) => {
             const isOutOfRegion = !Object.keys(lang.units).includes(m.unit);
+            const isLastItem =
+              index === materials.length - 1 && materials.length > 1;
 
             return (
               <div
@@ -286,7 +311,7 @@ export default function MaterialsPage() {
                         title={lang.itemNameTooltip}
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="w-full p-3 border border-gray-200 rounded-xl font-bold outline-none focus:border-blue-500 bg-white"
+                        className="w-full p-3 border border-gray-200 rounded-lg font-bold outline-none focus:border-blue-500 bg-white shadow-inner"
                       />
                     </div>
 
@@ -294,21 +319,51 @@ export default function MaterialsPage() {
                       <label className="sm:hidden text-[9px] font-black uppercase text-gray-400 tracking-widest mb-1 block">
                         {lang.unitLabel}
                       </label>
-                      <select
-                        title={lang.unitTooltip}
-                        value={editUnit}
-                        onChange={(e) => setEditUnit(e.target.value)}
-                        className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold uppercase outline-none focus:border-blue-500 appearance-none"
-                      >
-                        <option value="" disabled hidden>
-                          {lang.unitPlaceholder}
-                        </option>
-                        {Object.keys(lang.units).map((key) => (
-                          <option key={key} value={key}>
-                            {lang.units[key]}
-                          </option>
-                        ))}
-                      </select>
+                      <Listbox value={editUnit} onChange={setEditUnit}>
+                        <div className="relative">
+                          <ListboxButton className="w-full p-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                            <span className="block truncate">
+                              {editUnit
+                                ? lang.units[editUnit]
+                                : lang.unitPlaceholder}
+                            </span>
+                            <span className="pointer-events-none text-gray-400">
+                              ▼
+                            </span>
+                          </ListboxButton>
+                          <Transition
+                            as={Fragment}
+                            leave="transition ease-in duration-100"
+                            leaveFrom="opacity-100"
+                            leaveTo="opacity-0"
+                          >
+                            {/* Dynamically shifts position context mapping anchor based on the isLastItem layout validation flag */}
+                            <ListboxOptions
+                              className={`absolute z-50 w-full ${
+                                isLastItem
+                                  ? 'bottom-full mb-1'
+                                  : 'top-full mt-1'
+                              } bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold`}
+                            >
+                              {Object.keys(lang.units).map((key) => (
+                                <ListboxOption
+                                  key={key}
+                                  value={key}
+                                  className={({ active }) =>
+                                    `cursor-pointer select-none relative p-3 transition-colors ${
+                                      active
+                                        ? 'bg-blue-50 text-blue-900'
+                                        : 'text-gray-900'
+                                    }`
+                                  }
+                                >
+                                  {lang.units[key]}
+                                </ListboxOption>
+                              ))}
+                            </ListboxOptions>
+                          </Transition>
+                        </div>
+                      </Listbox>
                     </div>
 
                     <div className="w-full sm:col-span-2">
@@ -324,7 +379,7 @@ export default function MaterialsPage() {
                           placeholder="0.00"
                           value={editPrice === '0' ? '' : editPrice}
                           onChange={(e) => setEditPrice(e.target.value)}
-                          className="w-full p-3 border border-gray-200 rounded-xl sm:text-right font-mono font-bold outline-none focus:border-blue-500 bg-white pr-6"
+                          className="w-full p-3 border border-gray-200 rounded-lg sm:text-right font-mono font-bold outline-none focus:border-blue-500 bg-white pr-6 shadow-inner"
                         />
                         <span className="absolute right-3 top-3.5 text-gray-400 font-bold text-xs font-mono">
                           {currencySymbol}
@@ -335,13 +390,13 @@ export default function MaterialsPage() {
                     <div className="w-full sm:col-span-4 flex sm:justify-end gap-2 mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-gray-100 sm:border-0">
                       <button
                         onClick={() => setEditingId(null)}
-                        className="flex-1 sm:flex-none bg-white hover:bg-gray-100 text-gray-500 border border-gray-200 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
+                        className="flex-1 sm:flex-none flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] hover:bg-gray-100 hover:text-gray-700 transition-all duration-200 cursor-pointer"
                       >
                         {lang.cancel}
                       </button>
                       <button
                         onClick={() => handleUpdate(m.id)}
-                        className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-sm"
+                        className="flex-1 sm:flex-none flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
                       >
                         {lang.save}
                       </button>
@@ -382,7 +437,7 @@ export default function MaterialsPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-3 pt-4 border-t border-gray-100">
+                      <div className="flex gap-2 pt-4 border-t border-gray-100">
                         <button
                           onClick={() => {
                             setEditingId(m.id);
@@ -392,13 +447,13 @@ export default function MaterialsPage() {
                             );
                             setEditUnit(isOutOfRegion ? '' : m.unit);
                           }}
-                          className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors border border-gray-100"
+                          className="flex-1 flex items-center justify-center bg-gray-50 text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200 cursor-pointer"
                         >
                           {lang.edit}
                         </button>
                         <button
                           onClick={() => handleDelete(m.id)}
-                          className="flex-1 bg-red-50 hover:bg-red-100/70 text-red-600 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
+                          className="flex-1 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200 cursor-pointer"
                         >
                           {lang.delete}
                         </button>
@@ -440,13 +495,13 @@ export default function MaterialsPage() {
                           );
                           setEditUnit(isOutOfRegion ? '' : m.unit);
                         }}
-                        className="bg-gray-50 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors border border-gray-100"
+                        className="bg-gray-50 text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 px-3 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200 cursor-pointer"
                       >
                         {lang.edit}
                       </button>
                       <button
                         onClick={() => handleDelete(m.id)}
-                        className="bg-red-50 hover:bg-red-100/70 text-red-600 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors"
+                        className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200 cursor-pointer"
                       >
                         {lang.delete}
                       </button>
@@ -474,7 +529,7 @@ export default function MaterialsPage() {
               {dialog.type === 'confirm' && (
                 <button
                   onClick={() => setDialog(null)}
-                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
+                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 hover:text-gray-700 rounded-md transition-all duration-200 border border-gray-200 cursor-pointer"
                 >
                   {lang.cancel}
                 </button>
@@ -484,7 +539,7 @@ export default function MaterialsPage() {
                   if (dialog.onConfirm) dialog.onConfirm();
                   else setDialog(null);
                 }}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition-all duration-200 cursor-pointer"
               >
                 OK
               </button>
