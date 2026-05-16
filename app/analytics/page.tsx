@@ -10,11 +10,28 @@ const dict = {
     title: 'Analytics',
     subtitle: 'Insights based on your finalized estimates.',
     lockedOnly: 'Pro Feature',
-    totalRev: 'Projected Value',
+    totalRev: 'Projected Revenue',
     totalProj: 'Finalized Projects',
     avgValue: 'Avg Estimate Value',
-    last6Months: 'Projected (Last 6 Months)',
-    upgradeAlert: 'Analytics are exclusively available on the Pro Plan.'
+    last6Months: 'Revenue Trend',
+    upgradeAlert: 'Analytics are exclusively available on the Pro Plan.',
+    timeFilter: 'Time Period',
+    currencySelect: 'Display Currency',
+    allTime: 'All Time',
+    thisYear: 'This Year',
+    thisMonth: 'This Month',
+    last6MonthsFilter: 'Last 6 Months',
+    revenueVsMargin: 'Gross Revenue vs Net Margin',
+    grossRevenue: 'Gross Rev (Excl. Tax)',
+    netMargin: 'Net Margin',
+    laborMaterialRatio: 'Labor / Material Ratio',
+    labor: 'Labor',
+    materials: 'Materials',
+    profitableServices: 'Most Profitable Services',
+    topClients: 'Top Customers & Retention',
+    retentionRate: 'Customer Retention Rate',
+    repeatCustomers: 'Repeat Customers',
+    noData: 'No data available for this selection.'
   },
   FR: {
     title: 'Analytique',
@@ -23,9 +40,26 @@ const dict = {
     totalRev: 'Revenus Projetés',
     totalProj: 'Projets Finalisés',
     avgValue: 'Valeur Moyenne',
-    last6Months: 'Projections (6 Derniers Mois)',
+    last6Months: 'Évolution des Revenus',
     upgradeAlert:
-      'Les analyses sont exclusivement disponibles avec le Plan Pro.'
+      'Les analyses sont exclusivement disponibles avec le Plan Pro.',
+    timeFilter: 'Période',
+    currencySelect: 'Devise d’Affichage',
+    allTime: 'Tout le temps',
+    thisYear: 'Cette Année',
+    thisMonth: 'Ce Mois',
+    last6MonthsFilter: '6 Derniers Mois',
+    revenueVsMargin: 'CA Brut vs. Marge Nette',
+    grossRevenue: 'CA Brut (HT)',
+    netMargin: 'Marge Nette',
+    laborMaterialRatio: 'Ratio Main-d’œuvre / Matériaux',
+    labor: 'Main-d’œuvre',
+    materials: 'Matériaux',
+    profitableServices: 'Services les plus Rentables',
+    topClients: 'Top Clients & Fidélisation',
+    retentionRate: 'Taux de Fidélisation',
+    repeatCustomers: 'Clients Récurrents',
+    noData: 'Aucune donnée disponible pour cette sélection.'
   }
 };
 
@@ -37,14 +71,24 @@ const LoadingDots = () => (
   </div>
 );
 
+// Taux de conversion fixe pour homogénéiser les calculs multi-devises
+const EXCHANGE_RATE_EUR_TO_USD = 1.1;
+
+type TimeFilterType = 'ALL' | 'YEAR' | 'MONTH' | '6MOS';
+type CurrencyType = 'EUR' | 'USD';
+
 export default function AnalyticsPage() {
   const router = useRouter();
   const [lang, setLang] = useState<'EN' | 'FR'>('EN');
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({ totalRev: 0, count: 0, avg: 0 });
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [isPro, setIsPro] = useState(true);
-  const [currency, setCurrency] = useState('$');
+
+  // États des filtres utilisateur
+  const [timeFilter, setTimeFilter] = useState<TimeFilterType>('ALL');
+  const [targetCurrency, setTargetCurrency] = useState<CurrencyType>('USD');
+
+  // Source brute des devis finalisés
+  const [rawEstimates, setRawEstimates] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -65,7 +109,7 @@ export default function AnalyticsPage() {
 
       if (prof) {
         setLang(prof.country === 'FR' ? 'FR' : 'EN');
-        setCurrency(prof.currency === 'EUR' ? '€' : '$');
+        setTargetCurrency(prof.currency === 'EUR' ? 'EUR' : 'USD');
         if (prof.subscription_tier !== 'pro') {
           setIsPro(false);
           setLoading(false);
@@ -73,24 +117,18 @@ export default function AnalyticsPage() {
         }
       }
 
+      // Récupération complète des nœuds de calculs pour reconstruire coûts/marges/services
       const { data: ests } = await supabase
         .from('estimates')
-        .select('total_amount_cents, created_at')
+        .select(
+          'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot'
+        )
         .eq('user_id', user.id)
         .eq('is_locked', true)
         .order('created_at', { ascending: false });
 
       if (ests) {
-        const total = ests.reduce(
-          (acc, e) => acc + (e.total_amount_cents || 0),
-          0
-        );
-        setMetrics({
-          totalRev: total,
-          count: ests.length,
-          avg: ests.length > 0 ? Math.round(total / ests.length) : 0
-        });
-        setMonthlyData(ests);
+        setRawEstimates(ests);
       }
 
       setLoading(false);
@@ -98,22 +136,37 @@ export default function AnalyticsPage() {
     fetchData();
   }, [router]);
 
+  // Fonction de normalisation monétaire à la volée
+  const getAmountInTargetCurrency = (cents: number, fromCurrency: string) => {
+    const from = (fromCurrency || 'USD').toUpperCase();
+    if (from === targetCurrency) return cents;
+    if (from === 'EUR' && targetCurrency === 'USD')
+      return Math.round(cents * EXCHANGE_RATE_EUR_TO_USD);
+    if (from === 'USD' && targetCurrency === 'EUR')
+      return Math.round(cents / EXCHANGE_RATE_EUR_TO_USD);
+    return cents;
+  };
+
   const formatMoney = (cents: number) => {
-    return (cents / 100).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    const symbol = targetCurrency === 'EUR' ? '€' : '$';
+    const formattedValue = (cents / 100).toLocaleString(
+      lang === 'FR' ? 'fr-FR' : 'en-US',
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }
+    );
+    return `${symbol}${formattedValue}`;
   };
 
   const t = dict[lang];
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <LoadingDots />
       </div>
     );
-  }
 
   if (!isPro) {
     return (
@@ -137,94 +190,493 @@ export default function AnalyticsPage() {
     );
   }
 
+  // 1. Filtrage temporel des données sources
+  const now = new Date();
+  const filteredEstimates = rawEstimates.filter((e) => {
+    const date = new Date(e.created_at);
+    if (timeFilter === 'YEAR') return date.getFullYear() === now.getFullYear();
+    if (timeFilter === 'MONTH')
+      return (
+        date.getMonth() === now.getMonth() &&
+        date.getFullYear() === now.getFullYear()
+      );
+    if (timeFilter === '6MOS') {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      return date >= sixMonthsAgo;
+    }
+    return true; // ALL
+  });
+
+  // 2. Calculs des Métriques Principales et Avancées
+  let totalRevenueCents = 0;
+  let totalTaxCents = 0;
+  let totalLaborCostCents = 0;
+  let totalMaterialCostCents = 0;
+
+  const serviceMap: { [key: string]: number } = {};
+  const clientMap: { [key: string]: { total: number; count: number } } = {};
+
+  filteredEstimates.forEach((est) => {
+    const estCurrency = est.currency_snapshot || 'USD';
+    const grossTotal = getAmountInTargetCurrency(
+      est.total_amount_cents || 0,
+      estCurrency
+    );
+    const taxTotal = getAmountInTargetCurrency(
+      est.tax_amount_cents || 0,
+      estCurrency
+    );
+
+    totalRevenueCents += grossTotal;
+    totalTaxCents += taxTotal;
+
+    // Analyse par client
+    const cName =
+      est.client_name?.trim() ||
+      (lang === 'FR' ? 'Client Anonyme' : 'Anonymous Client');
+    if (!clientMap[cName]) clientMap[cName] = { total: 0, count: 0 };
+    clientMap[cName].total += grossTotal;
+    clientMap[cName].count += 1;
+
+    // Décomposition structurelle des sections du devis
+    if (Array.isArray(est.sections)) {
+      est.sections.forEach((sec: any) => {
+        const title =
+          sec.title?.trim().toUpperCase() ||
+          (lang === 'FR' ? 'INDÉTERMINÉ' : 'UNSPECIFIED');
+
+        // Reconstruction des coûts de main-d'œuvre
+        const laborRaw = Math.round(
+          (sec.laborHours || 0) * (sec.hourlyRate || 0) * 100
+        );
+        const laborNormalized = getAmountInTargetCurrency(
+          laborRaw,
+          estCurrency
+        );
+        totalLaborCostCents += laborNormalized;
+
+        // Reconstruction des coûts de matériaux
+        let materialsNormalized = 0;
+        if (Array.isArray(sec.items)) {
+          sec.items.forEach((item: any) => {
+            const itemCost = Math.round(
+              (item.cost_per_unit_cents || 0) * (item.qty || 0)
+            );
+            materialsNormalized += getAmountInTargetCurrency(
+              itemCost,
+              estCurrency
+            );
+          });
+        }
+        totalMaterialCostCents += materialsNormalized;
+
+        // Allocation de la rentabilité par catégorie (CA de la section)
+        const sectionTotalRaw =
+          laborRaw +
+          (Array.isArray(sec.items)
+            ? sec.items.reduce(
+                (acc: number, item: any) =>
+                  acc +
+                  Math.round((item.cost_per_unit_cents || 0) * (item.qty || 0)),
+                0
+              )
+            : 0);
+        const sectionTotalNormalized = getAmountInTargetCurrency(
+          sectionTotalRaw,
+          estCurrency
+        );
+        serviceMap[title] = (serviceMap[title] || 0) + sectionTotalNormalized;
+      });
+    }
+  });
+
+  const count = filteredEstimates.length;
+  const avgValue = count > 0 ? Math.round(totalRevenueCents / count) : 0;
+
+  // CA Net (HT) & Calcul précis de la marge nette générée
+  const netRevenueHT = totalRevenueCents - totalTaxCents;
+  const totalCostBasis = totalLaborCostCents + totalMaterialCostCents;
+  const netMarginCents = Math.max(0, netRevenueHT - totalCostBasis);
+
+  // Traitement du ratio Labor vs Materials
+  const totalCombinedStructure = totalLaborCostCents + totalMaterialCostCents;
+  const laborPercentage =
+    totalCombinedStructure > 0
+      ? Math.round((totalLaborCostCents / totalCombinedStructure) * 100)
+      : 50;
+  const materialPercentage =
+    totalCombinedStructure > 0
+      ? Math.round((totalMaterialCostCents / totalCombinedStructure) * 100)
+      : 50;
+
+  // Traitement top services
+  const sortedServices = Object.entries(serviceMap)
+    .map(([name, val]) => ({ name, val }))
+    .sort((a, b) => b.val - a.val)
+    .slice(0, 4);
+
+  // Traitement top clients et taux de fidélisation
+  const clientList = Object.entries(clientMap)
+    .map(([name, data]) => ({ name, total: data.total, count: data.count }))
+    .sort((a, b) => b.total - a.total);
+
+  const topClients = clientList.slice(0, 3);
+  const totalUniqueClients = clientList.length;
+  const repeatClientsCount = clientList.filter((c) => c.count > 1).length;
+  const retentionRate =
+    totalUniqueClients > 0
+      ? Math.round((repeatClientsCount / totalUniqueClients) * 100)
+      : 0;
+
+  // Génération historique courbe des 6 derniers mois (Trend)
   const chartData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - (5 - i));
-    const month = d.getMonth();
-    const year = d.getFullYear();
+    const m = d.getMonth();
+    const y = d.getFullYear();
     const label = d.toLocaleString(lang === 'FR' ? 'fr-FR' : 'en-US', {
       month: 'short'
     });
-    const val = monthlyData
+
+    const val = rawEstimates
       .filter((e) => {
         const ed = new Date(e.created_at);
-        return ed.getMonth() === month && ed.getFullYear() === year;
+        return ed.getMonth() === m && ed.getFullYear() === y;
       })
-      .reduce((acc, e) => acc + (e.total_amount_cents || 0), 0);
+      .reduce(
+        (acc, e) =>
+          acc +
+          getAmountInTargetCurrency(
+            e.total_amount_cents || 0,
+            e.currency_snapshot
+          ),
+        0
+      );
     return { label, val };
   });
-
-  const maxVal = Math.max(...chartData.map((d) => d.val), 10000) * 1.15;
+  const maxChartVal = Math.max(...chartData.map((d) => d.val), 10000) * 1.15;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans pb-20">
+    <main className="min-h-screen bg-gray-50 p-6 sm:p-8 text-black font-sans pb-24">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-12">
-          <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight mb-2">
-            {t.title}
-          </h1>
-          <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
-            {t.subtitle}
-          </p>
+        {/* En-tête et Zone de Configuration des Filtres */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-gray-200 pb-8">
+          <div>
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight mb-2">
+              {t.title}
+            </h1>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
+              {t.subtitle}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-4 w-full md:w-auto">
+            {/* Filtre Temporel */}
+            <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
+              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                {t.timeFilter}
+              </span>
+              <select
+                value={timeFilter}
+                onChange={(e) =>
+                  setTimeFilter(e.target.value as TimeFilterType)
+                }
+                className="p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-blue-500 shadow-sm uppercase tracking-wider"
+              >
+                <option value="ALL">{t.allTime}</option>
+                <option value="YEAR">{t.thisYear}</option>
+                <option value="6MOS">{t.last6MonthsFilter}</option>
+                <option value="MONTH">{t.thisMonth}</option>
+              </select>
+            </div>
+
+            {/* Sélecteur Dynamique de Devises */}
+            <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
+              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                {t.currencySelect}
+              </span>
+              <select
+                value={targetCurrency}
+                onChange={(e) =>
+                  setTargetCurrency(e.target.value as CurrencyType)
+                }
+                className="p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-blue-500 shadow-sm uppercase tracking-wider"
+              >
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+              </select>
+            </div>
+          </div>
         </div>
 
+        {/* Bloc KPIs Principaux */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
               {t.totalRev}
             </p>
-            <p className="text-2xl font-black text-blue-600">
-              {currency}
-              {formatMoney(metrics.totalRev)}
+            <p className="text-2xl font-black text-blue-600 font-mono">
+              {formatMoney(totalRevenueCents)}
             </p>
           </div>
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
               {t.totalProj}
             </p>
-            <p className="text-2xl font-black">{metrics.count}</p>
+            <p className="text-2xl font-black font-mono">{count}</p>
           </div>
           <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
               {t.avgValue}
             </p>
-            <p className="text-2xl font-black">
-              {currency}
-              {formatMoney(metrics.avg)}
+            <p className="text-2xl font-black font-mono">
+              {formatMoney(avgValue)}
             </p>
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-8 border-b border-gray-100 pb-4">
-            {t.last6Months}
-          </p>
-
-          <div className="h-64 flex items-end justify-between gap-2 sm:gap-4">
-            {chartData.map((d, i) => (
-              <div
-                key={i}
-                className="flex-1 h-full flex flex-col justify-end items-center gap-3 group"
-              >
-                <div
-                  className="w-full bg-blue-100 rounded-t-sm border-t-4 border-blue-600 transition-all duration-500 hover:bg-blue-200 relative flex justify-center"
-                  style={{
-                    height: `${(d.val / maxVal) * 100}%`,
-                    minHeight: '4px'
-                  }}
-                >
-                  <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
-                    {currency}
-                    {formatMoney(d.val)}
+        {count === 0 ? (
+          <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400 font-bold text-sm uppercase tracking-wider">
+            {t.noData}
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* GRAPHIQUE 1: CA Brut vs Marge Nette */}
+            <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
+                {t.revenueVsMargin}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center">
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-1">
+                      {t.grossRevenue}
+                    </span>
+                    <span className="text-xl font-bold font-mono text-gray-700">
+                      {formatMoney(netRevenueHT)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-emerald-500 uppercase block mb-1">
+                      {t.netMargin}
+                    </span>
+                    <span className="text-3xl font-black font-mono text-emerald-600">
+                      {formatMoney(netMarginCents)}
+                    </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-tighter text-gray-400 group-hover:text-black transition-colors">
-                  {d.label}
-                </span>
+                {/* Visualisation Barre de Progression de Performance de la Marge */}
+                <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-wider mb-2">
+                    <span>Rentabilité</span>
+                    <span className="text-emerald-600 font-mono">
+                      {netRevenueHT > 0
+                        ? Math.round((netMarginCents / netRevenueHT) * 100)
+                        : 0}
+                      %
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full transition-all duration-1000"
+                      style={{
+                        width: `${netRevenueHT > 0 ? Math.min(100, (netMarginCents / netRevenueHT) * 100) : 0}%`
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
+
+            {/* GRAPHIQUE 2 & 3: Ratio Opérationnel & Services les plus rentables */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Ratio Main-d'œuvre vs Matériaux */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
+                    {t.laborMaterialRatio}
+                  </p>
+                  <div className="flex h-8 rounded-lg overflow-hidden mb-6 shadow-inner">
+                    <div
+                      className="bg-blue-600 flex items-center justify-center text-white text-[10px] font-black font-mono"
+                      style={{ width: `${laborPercentage}%` }}
+                    >
+                      {laborPercentage > 15 && `${laborPercentage}%`}
+                    </div>
+                    <div
+                      className="bg-orange-400 flex items-center justify-center text-white text-[10px] font-black font-mono"
+                      style={{ width: `${materialPercentage}%` }}
+                    >
+                      {materialPercentage > 15 && `${materialPercentage}%`}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 bg-blue-600 rounded-sm shrink-0" />
+                    <div>
+                      <span className="block text-[9px] font-black text-gray-400 uppercase">
+                        {t.labor}
+                      </span>
+                      <span className="text-xs font-bold font-mono text-gray-800">
+                        {formatMoney(totalLaborCostCents)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 bg-orange-400 rounded-sm shrink-0" />
+                    <div>
+                      <span className="block text-[9px] font-black text-gray-400 uppercase">
+                        {t.materials}
+                      </span>
+                      <span className="text-xs font-bold font-mono text-gray-800">
+                        {formatMoney(totalMaterialCostCents)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Services Répétés et Rentables */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
+                  {t.profitableServices}
+                </p>
+                <div className="space-y-3.5">
+                  {sortedServices.map((service, idx) => (
+                    <div key={idx} className="flex flex-col gap-1">
+                      <div className="flex justify-between text-xs font-bold text-gray-800">
+                        <span className="truncate max-w-[70%] tracking-tight uppercase text-[10px]">
+                          {service.name}
+                        </span>
+                        <span className="font-mono text-[11px] text-blue-600">
+                          {formatMoney(service.val)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-full"
+                          style={{
+                            width: `${(service.val / (sortedServices[0]?.val || 1)) * 100}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* GRAPHIQUE 4: Analyse Clients & Rétention */}
+            <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
+                {t.topClients}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                {/* Jauge Taux de Fidélisation */}
+                <div className="sm:col-span-1 bg-gray-50 p-6 rounded-xl border border-gray-100 flex flex-col items-center justify-center text-center">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-3">
+                    {t.retentionRate}
+                  </span>
+                  <div className="relative w-24 h-24 flex items-center justify-center">
+                    <svg
+                      className="w-full h-full transform -rotate-90"
+                      viewBox="0 0 36 36"
+                    >
+                      <path
+                        className="text-gray-200"
+                        strokeWidth="3"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path
+                        className="text-blue-600"
+                        strokeDasharray={`${retentionRate}, 100`}
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <span className="absolute font-mono font-black text-xl text-gray-900">
+                      {retentionRate}%
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-400 mt-2">
+                    {repeatClientsCount} {t.repeatCustomers}
+                  </span>
+                </div>
+
+                {/* Liste Top Spend Customers */}
+                <div className="sm:col-span-2 space-y-4 flex flex-col justify-center">
+                  {topClients.map((client, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-none last:pb-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-gray-900 text-white font-black text-[10px] flex items-center justify-center font-mono">
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <p className="text-xs font-black uppercase text-gray-800 tracking-tight">
+                            {client.name}
+                          </p>
+                          <p className="text-[10px] text-gray-400 font-bold">
+                            {client.count}{' '}
+                            {client.count > 1
+                              ? lang === 'FR'
+                                ? 'devis validés'
+                                : 'finalized estimates'
+                              : lang === 'FR'
+                                ? 'devis validé'
+                                : 'finalized estimate'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-gray-950">
+                        {formatMoney(client.total)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Graphique Historique Linéaire Temporel (Volume) */}
+            <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-8 border-b border-gray-100 pb-4">
+                {t.last6Months}
+              </p>
+              <div className="h-48 flex items-end justify-between gap-2 sm:gap-4">
+                {chartData.map((d, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 h-full flex flex-col justify-end items-center gap-3 group"
+                  >
+                    <div
+                      className="w-full bg-blue-100 rounded-t-sm border-t-4 border-blue-600 transition-all duration-500 hover:bg-blue-200 relative flex justify-center"
+                      style={{
+                        height: `${(d.val / maxChartVal) * 100}%`,
+                        minHeight: '4px'
+                      }}
+                    >
+                      <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                        {formatMoney(d.val)}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-tighter text-gray-400 group-hover:text-black transition-colors">
+                      {d.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </main>
   );
