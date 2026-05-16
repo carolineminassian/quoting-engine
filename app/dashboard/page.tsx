@@ -177,8 +177,8 @@ export default function DashboardPage() {
       });
     } else {
       const headers = isFr
-        ? "ID Devis,Date,Nom du Client,Email du Client,Téléphone du Client,Adresse du Client,Statut,Catégorie de Service,Catégorie de Coût,Nom de l'Article/Main d'œuvre,Quantité,Unité,Coût de Base,Montant de Base,% Marge,Montant Marge,Prix Client (HT),% TVA,Montant TVA,Prix Client (TTC),Devise\n"
-        : 'Estimate ID,Date,Client Name,Client Email,Client Phone,Client Address,Status,Service Category,Cost Category,Item/Labor Name,Quantity,Unit,Base Cost,Base Amount,Margin %,Margin Amount,Client Price (Before Tax),Tax %,Tax Amount,Client Price (Including Tax),Currency\n';
+        ? "ID Devis,Date,Nom du Client,Email du Client,Téléphone du Client,Adresse du Client,Statut,Catégorie de Service,Description du Service,Catégorie de Coût,Nom de l'Article/Main d'œuvre,Quantité,Unité,Coût de Base,Montant de Base,% Marge,Montant Marge,Prix Client (HT),% TVA,Montant TVA,Prix Client (TTC),Devise\n"
+        : 'Estimate ID,Date,Client Name,Client Email,Client Phone,Client Address,Status,Service Category,Service Description,Cost Category,Item/Labor Name,Quantity,Unit,Base Cost,Base Amount,Margin %,Margin Amount,Client Price (Before Tax),Tax %,Tax Amount,Client Price (Including Tax),Currency\n';
 
       csv = headers;
 
@@ -224,6 +224,7 @@ export default function DashboardPage() {
           const serviceTitle = escapeCsv(
             sec.title || (isFr ? 'Service' : 'Service')
           );
+          const serviceDesc = escapeCsv(sec.description || '');
 
           // Process Labor
           if (sec.laborHours > 0) {
@@ -258,7 +259,7 @@ export default function DashboardPage() {
                   : 'Hourly Labor';
             const costCategory = isFr ? '"Main-d\'œuvre"' : '"Labor"';
 
-            csv += `${baseInfo},${serviceTitle},${costCategory},${escapeCsv(laborName)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
+            csv += `${baseInfo},${serviceTitle},${serviceDesc},${costCategory},${escapeCsv(laborName)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
           }
 
           // Process Materials
@@ -292,7 +293,7 @@ export default function DashboardPage() {
             }
             const costCategory = isFr ? '"Matériel"' : '"Material"';
 
-            csv += `${baseInfo},${serviceTitle},${costCategory},${escapeCsv(name)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
+            csv += `${baseInfo},${serviceTitle},${serviceDesc},${costCategory},${escapeCsv(name)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
           });
         });
       });
