@@ -98,7 +98,10 @@ function NewEstimateContent() {
       items: []
     }
   ]);
-
+  const [savedSteps, setSavedSteps] = useState<string[]>([]);
+  const [activeDropdownIdx, setActiveDropdownIdx] = useState<number | null>(
+    null
+  );
   useEffect(() => {
     async function fetchData() {
       let cachedBusinessName = '';
@@ -154,7 +157,7 @@ function NewEstimateContent() {
           .order('name'),
         supabase
           .from('estimates')
-          .select('client_name, created_at')
+          .select('client_name, created_at, sections')
           .eq('user_id', user.id),
         supabase.from('clients').select('*').eq('user_id', user.id)
       ]);
@@ -190,6 +193,17 @@ function NewEstimateContent() {
 
       setMaterials(mats.data || []);
       if (clientsRes?.data) setPastClients(clientsRes.data);
+
+      // Extraction des catégories/étapes uniques enregistrées
+      const stepSet = new Set<string>();
+      ests.data?.forEach((est: any) => {
+        if (Array.isArray(est.sections)) {
+          est.sections.forEach((s: any) => {
+            if (s.title) stepSet.add(s.title);
+          });
+        }
+      });
+      setSavedSteps(Array.from(stepSet));
       // Sélection automatique du client via l'URL
       if (targetClientId && clientsRes?.data && !editId && !pendingRaw) {
         const foundClient = clientsRes.data.find(
@@ -914,22 +928,108 @@ function NewEstimateContent() {
                     ×
                   </button>
                 )}
-
                 {/* Service Step Header */}
-                <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-8">
-                  <input
-                    placeholder={
-                      profile?.country === 'FR'
+                <div className="flex flex-col sm:flex-row gap-4 sm:items-end justify-between mb-8 items-stretch">
+                  <div className="relative flex-1 w-full flex flex-col">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1 pointer-events-none">
+                      {profile?.country === 'FR'
                         ? 'Catégorie / Étape de Service'
-                        : 'Service Category / Step'
-                    }
-                    className="text-2xl font-black text-gray-900 outline-none w-full sm:w-2/3 border-b-2 border-transparent focus:border-blue-500 pb-2 italic tracking-tight"
-                    value={sec.title}
-                    onChange={(e) =>
-                      updateSection(sIdx, 'title', e.target.value)
-                    }
-                  />
+                        : 'Service Category / Step'}
+                    </label>
+                    <div className="relative flex items-center border-b-2 border-gray-100 focus-within:border-blue-500 transition-colors w-full">
+                      <input
+                        placeholder={
+                          profile?.country === 'FR'
+                            ? 'Ex: Démolition, Peinture...'
+                            : 'e.g. Demolition, Painting...'
+                        }
+                        className="text-2xl font-black text-gray-900 outline-none w-full pb-2 italic tracking-tight bg-transparent pr-8 uppercase placeholder:normal-case placeholder:not-italic placeholder:text-gray-300 select-text"
+                        value={sec.title}
+                        onFocus={() => setActiveDropdownIdx(sIdx)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            setActiveDropdownIdx(null);
+                          }
+                        }}
+                        onChange={(e) => {
+                          updateSection(sIdx, 'title', e.target.value);
+                          setActiveDropdownIdx(sIdx);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActiveDropdownIdx(
+                            activeDropdownIdx === sIdx ? null : sIdx
+                          )
+                        }
+                        className="absolute right-1 bottom-3 text-gray-400 hover:text-black transition-colors text-[10px] p-1 cursor-pointer"
+                      >
+                        ▼
+                      </button>
+                    </div>
 
+                    {activeDropdownIdx === sIdx && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setActiveDropdownIdx(null)}
+                        />
+                        <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto p-1 text-black normal-case not-italic font-sans">
+                          {savedSteps.filter((step) =>
+                            step
+                              .toLowerCase()
+                              .includes((sec.title || '').toLowerCase())
+                          ).length > 0 ? (
+                            savedSteps
+                              .filter((step) =>
+                                step
+                                  .toLowerCase()
+                                  .includes((sec.title || '').toLowerCase())
+                              )
+                              .map((step, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => {
+                                    updateSection(sIdx, 'title', step);
+                                    setActiveDropdownIdx(null);
+                                  }}
+                                  className="w-full text-left p-3 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors cursor-pointer block"
+                                >
+                                  {step}
+                                </button>
+                              ))
+                          ) : sec.title ? (
+                            <button
+                              type="button"
+                              onClick={() => setActiveDropdownIdx(null)}
+                              className="w-full text-left p-3 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg uppercase tracking-wider italic cursor-pointer block"
+                            >
+                              {profile?.country === 'FR'
+                                ? '✨ Raccourci : Entrée pour valider la nouvelle catégorie'
+                                : '✨ Shortcut: Press Enter to save new category'}
+                            </button>
+                          ) : (
+                            savedSteps.map((step, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  updateSection(sIdx, 'title', step);
+                                  setActiveDropdownIdx(null);
+                                }}
+                                className="w-full text-left p-3 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors cursor-pointer block"
+                              >
+                                {step}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                   {marginMode === 'service' && (
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
@@ -961,7 +1061,6 @@ function NewEstimateContent() {
                     </div>
                   )}
                 </div>
-
                 {/* Enhanced Labor Block (Sleek Listbox) */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
                   <div className="col-span-1 sm:col-span-4 lg:col-span-5 mb-2 flex justify-between items-center border-b border-slate-200/50 pb-4">
@@ -1134,7 +1233,6 @@ function NewEstimateContent() {
                     </div>
                   )}
                 </div>
-
                 {/* Material Items Header & Loop */}
                 <div className="mb-4">
                   <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-4">
