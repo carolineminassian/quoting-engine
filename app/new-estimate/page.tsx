@@ -616,7 +616,6 @@ function NewEstimateContent() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-black font-sans relative flex flex-col">
-      {/* Padded inner wrapper */}
       <div className="flex-1 p-6 sm:p-8 pb-32 w-full">
         <div className="max-w-4xl mx-auto">
           {/* Header Area */}
@@ -641,6 +640,7 @@ function NewEstimateContent() {
               <div className="flex gap-3 items-center">
                 <input
                   type="text"
+                  maxLength={30}
                   placeholder={lang.customRef || 'Custom Ref #'}
                   value={customRef}
                   onChange={(e) => setCustomRef(e.target.value)}
@@ -658,7 +658,7 @@ function NewEstimateContent() {
             </Link>
           </div>
 
-          {/* Global Pricing Strategy Block (Sleek Listbox) */}
+          {/* Global Pricing Strategy Block */}
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 shrink-0">
@@ -794,6 +794,7 @@ function NewEstimateContent() {
                 </label>
                 <input
                   required
+                  maxLength={60}
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   className="flex-1 p-2 bg-transparent outline-none font-bold text-black border-t border-gray-100 pt-3"
@@ -871,6 +872,7 @@ function NewEstimateContent() {
                   </div>
                   <input
                     placeholder={lang.clientName || 'Client Name'}
+                    maxLength={80}
                     className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
                     value={client.name}
                     onChange={(e) =>
@@ -921,6 +923,7 @@ function NewEstimateContent() {
                   </div>
                   <input
                     placeholder={lang.address || 'Project Address'}
+                    maxLength={250}
                     className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
                     value={client.address}
                     onChange={(e) =>
@@ -950,13 +953,14 @@ function NewEstimateContent() {
                   </button>
                 )}
                 {/* Service Step Header */}
-                <div className="flex flex-col sm:flex-row gap-4 sm:items-end justify-between mb-8 items-stretch">
+                <div className="flex flex-col gap-4 mb-6 items-stretch">
                   <div className="relative flex-1 w-full flex flex-col">
                     <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1 pointer-events-none">
                       {profile?.country === 'FR'
                         ? 'Catégorie / Étape de Service'
                         : 'Service Category / Step'}
                     </label>
+
                     <div className="relative flex items-center border-b-2 border-gray-100 focus-within:border-blue-500 transition-colors w-full">
                       <input
                         placeholder={
@@ -964,6 +968,7 @@ function NewEstimateContent() {
                             ? 'Ex: Démolition, Peinture...'
                             : 'e.g. Demolition, Painting...'
                         }
+                        maxLength={50}
                         className="text-2xl font-black text-gray-900 outline-none w-full pb-2 italic tracking-tight bg-transparent pr-8 uppercase placeholder:normal-case placeholder:not-italic placeholder:text-gray-300 select-text"
                         value={sec.title}
                         onFocus={() => setActiveDropdownIdx(sIdx)}
@@ -978,6 +983,7 @@ function NewEstimateContent() {
                           setActiveDropdownIdx(sIdx);
                         }}
                       />
+
                       <button
                         type="button"
                         onClick={() =>
@@ -991,7 +997,6 @@ function NewEstimateContent() {
                       </button>
                     </div>
 
-                    {/* Discrete inline layout contextual toggle button link */}
                     <div className="mt-2 flex justify-start">
                       <button
                         type="button"
@@ -1001,6 +1006,7 @@ function NewEstimateContent() {
                         <span className="text-xs font-mono leading-none">
                           {isDescVisible(sec, sIdx) ? '−' : '＋'}
                         </span>
+
                         <span>
                           {isDescVisible(sec, sIdx)
                             ? profile?.country === 'FR'
@@ -1019,6 +1025,7 @@ function NewEstimateContent() {
                           className="fixed inset-0 z-40"
                           onClick={() => setActiveDropdownIdx(null)}
                         />
+
                         <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto p-1 text-black normal-case not-italic font-sans">
                           {savedSteps.filter((step) =>
                             step
@@ -1073,39 +1080,39 @@ function NewEstimateContent() {
                       </>
                     )}
                   </div>
-                  {marginMode === 'service' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
-                        {profile?.country === 'FR'
-                          ? 'Marge Service:'
-                          : 'Service Margin:'}
-                      </span>
-                      <div className="relative w-24">
-                        <input
-                          type="number"
-                          min="0"
-                          value={
-                            sec.marginRate === 0 ? '' : sec.marginRate || ''
-                          }
-                          onChange={(e) =>
-                            updateSection(
-                              sIdx,
-                              'marginRate',
-                              Math.max(0, parseFloat(e.target.value) || 0)
-                            )
-                          }
-                          className="w-full p-2 pr-6 border border-blue-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right text-sm"
-                          placeholder="0"
-                        />
-                        <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
-                          %
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Service Description Field (Conditionally Rendered via Discrete Toggle) */}
+                {marginMode === 'service' && !isDescVisible(sec, sIdx) && (
+                  <div className="flex items-center gap-2 mb-6 animate-fade-in">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
+                      {profile?.country === 'FR'
+                        ? 'Marge Service:'
+                        : 'Service Margin:'}
+                    </span>
+
+                    <div className="relative w-24">
+                      <input
+                        type="number"
+                        min="0"
+                        value={sec.marginRate === 0 ? '' : sec.marginRate || ''}
+                        onChange={(e) =>
+                          updateSection(
+                            sIdx,
+                            'marginRate',
+                            Math.max(0, parseFloat(e.target.value) || 0)
+                          )
+                        }
+                        className="w-full p-2 pr-6 border border-blue-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right text-sm"
+                        placeholder="0"
+                      />
+
+                      <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
+                        %
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {/* Service Description Field */}
                 {isDescVisible(sec, sIdx) && (
                   <div className="mb-6 transition-all animate-fade-in">
                     <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1 pointer-events-none">
@@ -1115,6 +1122,7 @@ function NewEstimateContent() {
                     </label>
                     <input
                       type="text"
+                      maxLength={500}
                       placeholder={
                         profile?.country === 'FR'
                           ? 'Détails ou description des travaux pour ce service...'
@@ -1126,10 +1134,40 @@ function NewEstimateContent() {
                         updateSection(sIdx, 'description', e.target.value)
                       }
                     />
+
+                    {marginMode === 'service' && (
+                      <div className="flex items-center gap-2 mt-4 animate-fade-in">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
+                          {profile?.country === 'FR'
+                            ? 'Marge Service:'
+                            : 'Service Margin:'}
+                        </span>
+                        <div className="relative w-24">
+                          <input
+                            type="number"
+                            min="0"
+                            value={
+                              sec.marginRate === 0 ? '' : sec.marginRate || ''
+                            }
+                            onChange={(e) =>
+                              updateSection(
+                                sIdx,
+                                'marginRate',
+                                Math.max(0, parseFloat(e.target.value) || 0)
+                              )
+                            }
+                            className="w-full p-2 pr-6 border border-blue-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right text-sm"
+                            placeholder="0"
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-
-                {/* Enhanced Labor Block (Sleek Listbox) */}
+                {/* Enhanced Labor Block */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
                   <div className="col-span-1 sm:col-span-4 lg:col-span-5 mb-2 flex justify-between items-center border-b border-slate-200/50 pb-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -1224,7 +1262,7 @@ function NewEstimateContent() {
                           : 'Rate/Day'
                         : profile?.country === 'FR'
                           ? 'Taux/Heure'
-                          : 'Rate/Hour'}{' '}
+                          : 'Rate/Hour'}
                       ({profile?.currency === 'EUR' ? '€' : '$'})
                     </label>
                     <input
@@ -1376,7 +1414,7 @@ function NewEstimateContent() {
                           )}
                         </div>
 
-                        {/* Inputs Grid (Wraps elegantly on mobile) */}
+                        {/* Inputs Grid */}
                         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                           {/* QTY */}
                           <div className="flex-1 min-w-[80px] sm:w-20 sm:flex-none relative shrink-0 group">
@@ -1597,7 +1635,7 @@ function NewEstimateContent() {
         </div>
       </div>
 
-      {/* Synchronized Sticky Footer (Reveals Global Footer) */}
+      {/* Sticky Footer */}
       <div className="sticky bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] px-6 sm:px-8 py-5 z-40 transition-all print:hidden mt-auto">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="flex flex-wrap items-center gap-8 sm:gap-12 w-full sm:w-auto justify-between sm:justify-start">

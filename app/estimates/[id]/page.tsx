@@ -156,7 +156,6 @@ export default function EstimateView() {
   };
 
   const generateDescription = (sec: any) => {
-    // Priority given to custom text input values saved inside the database object
     if (sec.description && sec.description.trim() !== '') {
       return sec.description;
     }
@@ -346,7 +345,7 @@ export default function EstimateView() {
                 href="/dashboard"
                 className="text-center bg-white border border-gray-200 px-4 py-2 rounded font-bold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                ← Dashboard
+                &larr; Dashboard
               </Link>
 
               {!estimate.is_locked && (
@@ -430,33 +429,33 @@ export default function EstimateView() {
         </div>
 
         <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none min-h-[1056px]">
-          <div className="flex flex-col-reverse sm:flex-row justify-between mb-16 gap-8">
-            <div>
-              <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter mb-6">
+          <div className="flex flex-col-reverse sm:flex-row justify-between mb-16 gap-8 items-start">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter mb-6 break-words">
                 {profile.country === 'FR' ? 'Devis' : 'Estimate'}
               </h1>
               <div className="space-y-1">
-                <p className="text-lg font-black text-gray-800">
+                <p className="text-lg font-black text-gray-800 break-words max-w-md sm:max-w-xl">
                   {estimate.client_name}
                 </p>
                 {estimate.client_address && (
-                  <p className="text-sm text-gray-400 whitespace-pre-wrap max-w-sm">
+                  <p className="text-sm text-gray-400 whitespace-pre-wrap max-w-sm sm:max-w-xl break-words leading-relaxed">
                     {estimate.client_address}
                   </p>
                 )}
                 {estimate.client_phone && (
-                  <p className="text-xs text-gray-400 font-medium">
+                  <p className="text-xs text-gray-400 font-medium break-words max-w-xs sm:max-w-md">
                     {estimate.client_phone}
                   </p>
                 )}
                 {estimate.client_email && (
-                  <p className="text-xs text-gray-400 font-medium">
+                  <p className="text-xs text-gray-400 font-medium break-words max-w-xs sm:max-w-md">
                     {estimate.client_email}
                   </p>
                 )}
               </div>
             </div>
-            <div className="text-left sm:text-right flex flex-col sm:items-end">
+            <div className="text-left sm:text-right flex flex-col sm:items-end w-full sm:w-auto min-w-0 shrink-0">
               {profile.subscription_tier === 'pro' && profile.logo_url && (
                 <img
                   src={profile.logo_url}
@@ -465,7 +464,7 @@ export default function EstimateView() {
                 />
               )}
 
-              <h2 className="text-2xl sm:text-3xl font-black italic text-blue-600 uppercase tracking-tighter mb-2">
+              <h2 className="text-2xl sm:text-3xl font-black italic text-blue-600 uppercase tracking-tighter mb-2 break-words max-w-xs sm:max-w-md">
                 {profile.business_name}
               </h2>
               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
@@ -474,22 +473,22 @@ export default function EstimateView() {
                   profile.country === 'FR' ? 'fr-FR' : 'en-US'
                 )}
               </p>
-              <p className="text-xs text-gray-300 font-mono mt-1">
+              <p className="text-xs text-gray-300 font-mono mt-1 break-all max-w-xs sm:max-w-md">
                 {profile.country === 'FR' ? 'Réf :' : 'Ref:'}{' '}
                 {estimate.custom_id || estimate.id.slice(0, 8)}
               </p>
             </div>
           </div>
 
-          <table className="w-full mb-20">
+          <table className="w-full mb-20 table-fixed">
             <thead className="border-b-4 border-black text-[10px] uppercase font-black tracking-[0.3em] text-gray-300">
               <tr>
-                <th className="py-4 text-left">
+                <th className="py-4 text-left w-3/4">
                   {profile.country === 'FR'
                     ? 'Etape du Service / Catégorie'
                     : 'Service Category / Step'}
                 </th>
-                <th className="py-4 text-right">
+                <th className="py-4 text-right w-1/4">
                   {profile.country === 'FR' ? 'Montant' : 'Amount'}
                 </th>
               </tr>
@@ -497,22 +496,22 @@ export default function EstimateView() {
             <tbody className="divide-y divide-gray-50">
               {estimate.sections.map((sec: any, idx: number) => (
                 <tr key={idx}>
-                  <td className="py-8 pr-4 sm:pr-12">
-                    <p className="font-bold text-xl text-gray-800 mb-1">
+                  <td className="py-8 pr-4 sm:pr-12 min-w-0 alignment-safe">
+                    <p className="font-bold text-xl text-gray-800 mb-1 break-words">
                       {sec.title ||
                         (profile.country === 'FR'
                           ? 'Services Professionnels'
                           : 'Professional Services')}
                     </p>
-                    <p className="text-xs text-gray-400 font-medium leading-relaxed mb-3 whitespace-pre-wrap">
+                    <p className="text-xs text-gray-400 font-medium leading-relaxed mb-3 whitespace-pre-wrap break-words max-w-2xl">
                       {generateDescription(sec)}
                     </p>
 
                     {isShowingDetails ? (
-                      <div className="text-[10px] text-gray-500 font-mono space-y-1 bg-gray-50 p-3 rounded border border-gray-100">
+                      <div className="text-[10px] text-gray-500 font-mono bg-gray-50 p-3 rounded border border-gray-100 space-y-1.5 max-w-2xl">
                         {sec.laborHours > 0 && (
-                          <p>
-                            ↳{' '}
+                          <p className="break-words">
+                            &rarr;{' '}
                             {profile.country === 'FR'
                               ? "Main-d'œuvre"
                               : 'Labor'}
@@ -556,27 +555,41 @@ export default function EstimateView() {
                           const displayUnit = lang?.units?.[rawUnit] || rawUnit;
 
                           return (
-                            <p key={i}>
-                              ↳ {displayName}: {item.qty}
-                              {displayUnit ? ` ${displayUnit}` : ''} @{' '}
-                              {(displayCostCents / 100)
-                                .toFixed(2)
-                                .replace(
-                                  '.',
-                                  profile.currency === 'EUR' ? ',' : '.'
-                                )}
-                              {profile.currency === 'EUR' ? '€' : '$'} (Tax:{' '}
-                              {item.taxRate !== undefined
-                                ? item.taxRate
-                                : profile.tax_rate}
-                              %)
-                            </p>
+                            <div
+                              key={i}
+                              className="flex flex-wrap items-baseline gap-x-1 break-words"
+                            >
+                              <span>&rarr;</span>
+                              <span className="font-semibold text-gray-700 truncate max-w-[200px] sm:max-w-sm">
+                                {displayName}
+                              </span>
+                              <span className="shrink-0">
+                                : {item.qty}
+                                {displayUnit ? ` ${displayUnit}` : ''} @
+                              </span>
+                              <span className="shrink-0">
+                                {(displayCostCents / 100)
+                                  .toFixed(2)
+                                  .replace(
+                                    '.',
+                                    profile.currency === 'EUR' ? ',' : '.'
+                                  )}
+                                {profile.currency === 'EUR' ? '€' : '$'}
+                              </span>
+                              <span className="text-gray-400 shrink-0">
+                                (Tax:{' '}
+                                {item.taxRate !== undefined
+                                  ? item.taxRate
+                                  : profile.tax_rate}
+                                %)
+                              </span>
+                            </div>
                           );
                         })}
                       </div>
                     ) : (
                       sec.items.length > 0 && (
-                        <div className="text-[10px] text-gray-400 font-mono space-y-1 mt-2">
+                        <div className="text-[10px] text-gray-400 font-mono mt-2 space-y-1 max-w-2xl">
                           {sec.items.map((item: any, i: number) => {
                             const m = materials.find(
                               (mat) => mat.id === item.materialId
@@ -588,17 +601,26 @@ export default function EstimateView() {
                               lang?.units?.[rawUnit] || rawUnit;
 
                             return (
-                              <p key={i}>
-                                • {displayName} ({item.qty}
-                                {displayUnit ? ` ${displayUnit}` : ''})
-                              </p>
+                              <div
+                                key={i}
+                                className="flex items-baseline gap-1 break-words"
+                              >
+                                <span>&bull;</span>
+                                <span className="truncate max-w-[220px] sm:max-w-md font-medium">
+                                  {displayName}
+                                </span>
+                                <span className="shrink-0">
+                                  ({item.qty}
+                                  {displayUnit ? ` ${displayUnit}` : ''})
+                                </span>
+                              </div>
                             );
                           })}
                         </div>
                       )
                     )}
                   </td>
-                  <td className="py-8 text-right font-mono font-black text-xl text-gray-700 align-top">
+                  <td className="py-8 text-right font-mono font-black text-xl text-gray-700 align-top shrink-0 whitespace-nowrap">
                     {profile.currency === 'EUR' ? '€' : '$'}
                     {getSectionTotal(sec)
                       .toFixed(2)
@@ -615,7 +637,7 @@ export default function EstimateView() {
                 <span>
                   {profile.country === 'FR' ? 'Sous-total HT' : 'Subtotal'}
                 </span>
-                <span className="text-gray-600 font-mono">
+                <span className="text-gray-600 font-mono whitespace-nowrap">
                   {profile.currency === 'EUR' ? '€' : '$'}
                   {(subtotal / 100)
                     .toFixed(2)
@@ -632,7 +654,7 @@ export default function EstimateView() {
                     <span>
                       {profile.country === 'FR' ? 'TVA' : 'Tax'} ({rate}%)
                     </span>
-                    <span className="text-gray-600 font-mono">
+                    <span className="text-gray-600 font-mono whitespace-nowrap">
                       {profile.currency === 'EUR' ? '€' : '$'}
                       {(amt / 100)
                         .toFixed(2)
@@ -640,11 +662,11 @@ export default function EstimateView() {
                     </span>
                   </div>
                 ))}
-              <div className="flex justify-between border-t-4 border-black pt-6">
+              <div className="flex justify-between border-t-4 border-black pt-6 items-baseline">
                 <span className="text-2xl font-black uppercase tracking-tighter">
                   {profile.country === 'FR' ? 'Total TTC' : 'Grand Total'}
                 </span>
-                <span className="text-3xl font-black font-mono text-blue-600">
+                <span className="text-3xl font-black font-mono text-blue-600 whitespace-nowrap">
                   {profile.currency === 'EUR' ? '€' : '$'}
                   {(estimate.total_amount_cents / 100)
                     .toFixed(2)
@@ -656,25 +678,25 @@ export default function EstimateView() {
 
           <div className="mt-40 pt-12 border-t border-gray-100">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
                   {profile.country === 'FR'
                     ? 'Conformité & Mentions Légales'
                     : 'Compliance & Legal'}
                 </p>
-                <p className="text-[10px] text-gray-400 leading-relaxed italic">
+                <p className="text-[10px] text-gray-400 leading-relaxed italic break-words">
                   {profile.country === 'FR'
                     ? "Document généré conformément à l'article 286 du code général des impôts (Loi Anti-Fraude TVA). Ce document est inaltérable une fois finalisé."
                     : 'Standard business estimate. Certified digital record. Valid for 30 days from issuance.'}
                 </p>
               </div>
-              <div className="text-left sm:text-right">
+              <div className="text-left sm:text-right min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
                   {profile.country === 'FR'
                     ? 'Conditions de Paiement'
                     : 'Terms'}
                 </p>
-                <p className="text-[10px] text-gray-400 leading-relaxed font-bold">
+                <p className="text-[10px] text-gray-400 leading-relaxed font-bold break-words">
                   {profile.country === 'FR'
                     ? 'Règlement sous 30 jours.'
                     : 'Payment due upon receipt.'}
@@ -688,11 +710,11 @@ export default function EstimateView() {
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
-            <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900">
+            <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900 break-words">
               {dialog.title ||
                 (profile?.country === 'FR' ? 'Notification' : 'Notice')}
             </h3>
-            <p className="text-sm text-gray-500 font-medium mb-8">
+            <p className="text-sm text-gray-500 font-medium mb-8 break-words">
               {dialog.message}
             </p>
             <div className="flex gap-3 justify-end">

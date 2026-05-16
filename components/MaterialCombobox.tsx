@@ -57,7 +57,6 @@ export default function MaterialCombobox({
     (material) => material.name.toLowerCase() === query.toLowerCase()
   );
 
-  // Normalizes legacy DB strings ('each', 'unit') to the 'ea' translation key
   const getUnitLabel = (u: string) => {
     if (!u) return unitLabels?.['ea'] || 'unit';
     const normalized = u.toLowerCase().trim();
@@ -76,7 +75,7 @@ export default function MaterialCombobox({
           return;
         }
         if (val.isNew) {
-          onCreateNew(query);
+          onCreateNew(query.trim().slice(0, 80));
           setQuery('');
         } else {
           onChange(val);
@@ -86,13 +85,13 @@ export default function MaterialCombobox({
       <div className="relative w-full">
         {/* SLEEK INNER-SHADOW WRAPPER */}
         <div className="relative w-full cursor-default overflow-hidden rounded-xl bg-gray-50/40 border border-gray-200 focus-within:border-blue-500 transition-colors shadow-inner">
-          {/* Removed the 'uppercase tracking-widest text-[10px]' here to allow normal typing */}
           <ComboboxInput
             className="w-full border-none bg-transparent py-3.5 pl-4 pr-10 text-xs font-bold text-gray-700 outline-none placeholder-gray-400"
             displayValue={(material: Material) => material?.name || ''}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
             autoComplete="off"
+            maxLength={80}
           />
           <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-4">
             <span className="pointer-events-none text-gray-400 text-[10px]">
@@ -138,11 +137,7 @@ export default function MaterialCombobox({
                       </span>
                     </span>
                     {selected ? (
-                      <span
-                        className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
-                          focus ? 'text-blue-600' : 'text-blue-600'
-                        }`}
-                      >
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
                         <svg
                           className="h-4 w-4"
                           viewBox="0 0 20 20"
@@ -164,7 +159,11 @@ export default function MaterialCombobox({
             {/* SLEEK "CREATE NEW" OPTION */}
             {query.length > 0 && !exactMatchExists && (
               <ComboboxOption
-                value={{ id: 'NEW', isNew: true, name: query }}
+                value={{
+                  id: 'NEW',
+                  isNew: true,
+                  name: query.trim().slice(0, 80)
+                }}
                 className={({ focus }) =>
                   `relative cursor-pointer select-none p-3 px-4 border-t border-gray-50 transition-colors ${
                     focus ? 'bg-green-50 text-green-900' : 'text-green-700'
@@ -177,7 +176,9 @@ export default function MaterialCombobox({
                   </span>
                   <span className="text-xs font-black">
                     {createLabel}{' '}
-                    <span className="text-green-500">"{query}"</span>
+                    <span className="text-green-500">
+                      "{query.trim().slice(0, 80)}"
+                    </span>
                   </span>
                 </div>
               </ComboboxOption>
