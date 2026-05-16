@@ -17,6 +17,7 @@ const dict = {
     title: 'Client Roster',
     subtitle: 'Manage and reference your saved client records.',
     addBtn: 'Add New Client',
+    createEstimate: 'Create New Estimate',
     edit: 'Edit Profile',
     delete: 'Delete',
     name: 'Client Name',
@@ -32,8 +33,9 @@ const dict = {
   },
   FR: {
     title: 'Répertoire Clients',
-    subtitle: 'Gérez et référencez les coordonnées de vos clients.',
+    subtitle: 'Gerez et référencez les coordonnées de vos clients.',
     addBtn: 'Ajouter un Client',
+    createEstimate: 'Créer un Devis',
     edit: 'Modifier',
     delete: 'Supprimer',
     name: 'Nom du Client',
@@ -162,7 +164,7 @@ export default function ClientsPage() {
             onClick={() =>
               setEditingClient({ name: '', email: '', phone: '', address: '' })
             }
-            className="w-full sm:w-auto bg-blue-600 text-white px-6 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-transform active:scale-95"
+            className="w-full sm:w-auto bg-blue-600 text-white px-5 py-3.5 rounded-lg font-black uppercase tracking-[0.15em] text-[10px] shadow-sm hover:bg-blue-700 transition-all duration-200 active:scale-95"
           >
             + {t.addBtn}
           </button>
@@ -220,19 +222,32 @@ export default function ClientsPage() {
                 </div>
 
                 {/* Grid Item Card Actions */}
-                <div className="flex gap-3 mt-8 pt-4 border-t border-gray-100">
+                <div className="mt-8 pt-4 border-t border-gray-100 space-y-2.5">
                   <button
-                    onClick={() => setEditingClient(c)}
-                    className="flex-1 bg-gray-50 text-gray-700 hover:bg-gray-100 py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors border border-gray-100"
+                    onClick={() =>
+                      router.push(`/new-estimate?clientId=${c.id}`)
+                    }
+                    className="w-full flex items-center justify-center gap-1.5 bg-blue-600 text-white hover:bg-blue-700 py-3 rounded-lg font-black text-[10px] uppercase tracking-[0.18em] transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.99]"
                   >
-                    {t.edit}
+                    <span>{t.createEstimate}</span>
+                    <span className="text-xs transform translate-y-[-0.5px]">
+                      →
+                    </span>
                   </button>
-                  <button
-                    onClick={() => triggerDeleteConfirm(c.id)}
-                    className="flex-1 bg-red-50 text-red-600 hover:bg-red-100/70 py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors"
-                  >
-                    {t.delete}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingClient(c)}
+                      className="flex-1 flex items-center justify-center bg-gray-50 text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200"
+                    >
+                      {t.edit}
+                    </button>
+                    <button
+                      onClick={() => triggerDeleteConfirm(c.id)}
+                      className="flex-1 flex items-center justify-center bg-white text-red-600 hover:bg-red-50 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200/60"
+                    >
+                      {t.delete}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -315,13 +330,13 @@ export default function ClientsPage() {
                 <button
                   type="button"
                   onClick={() => setEditingClient(null)}
-                  className="flex-1 bg-gray-100 text-gray-600 px-4 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-colors"
+                  className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 hover:text-gray-700 transition-all duration-200"
                 >
                   {t.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 text-white px-4 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-blue-700 transition-transform active:scale-95"
+                  className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-blue-700 transition-all duration-200 active:scale-95"
                 >
                   {t.save}
                 </button>
@@ -344,13 +359,13 @@ export default function ClientsPage() {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setDialog(null)}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 hover:text-gray-700 rounded-md transition-all duration-200 border border-gray-200"
               >
                 {t.cancel}
               </button>
               <button
                 onClick={dialog.onConfirm}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700 transition-colors"
+                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white rounded-md shadow-sm hover:bg-red-700 transition-all duration-200"
               >
                 {t.delete}
               </button>

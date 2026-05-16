@@ -55,6 +55,7 @@ function NewEstimateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
+  const targetClientId = searchParams.get('clientId');
 
   const [profile, setProfile] = useState<any>(null);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -189,7 +190,20 @@ function NewEstimateContent() {
 
       setMaterials(mats.data || []);
       if (clientsRes?.data) setPastClients(clientsRes.data);
-
+      // Sélection automatique du client via l'URL
+      if (targetClientId && clientsRes?.data && !editId && !pendingRaw) {
+        const foundClient = clientsRes.data.find(
+          (c: any) => c.id === targetClientId
+        );
+        if (foundClient) {
+          setClient({
+            name: foundClient.name || '',
+            email: foundClient.email || '',
+            phone: foundClient.phone || '',
+            address: foundClient.address || ''
+          });
+        }
+      }
       if (editId && !pendingRaw) {
         const { data: est } = await supabase
           .from('estimates')
@@ -225,15 +239,19 @@ function NewEstimateContent() {
           setSections(loadedSections);
         }
       } else if (prof.data && !pendingRaw) {
-        const n = [...sections];
-        n[0].hourlyRate = prof.data.default_hourly_rate || 50;
-        n[0].laborTaxRate = prof.data.default_tax_rate || 0;
-        setSections(n);
+        setSections((prevSections) => {
+          const n = [...prevSections];
+          if (n[0]) {
+            n[0].hourlyRate = prof.data.default_hourly_rate || 50;
+            n[0].laborTaxRate = prof.data.default_tax_rate || 0;
+          }
+          return n;
+        });
       }
       setLoading(false);
     }
     fetchData();
-  }, [editId, router]);
+  }, [editId, router, targetClientId]);
 
   const updateSection = (
     sIdx: number,
