@@ -43,52 +43,38 @@ export default function MaterialsPage() {
   const [editUnit, setEditUnit] = useState('');
 
   useEffect(() => {
-    async function fetchInitialData() {
-      try {
-        const {
-          data: { user }
-        } = await supabase.auth.getUser();
-
-        if (!user) return;
-
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (prof) {
-          setProfile(prof);
-          setLang(prof.country === 'FR' ? translations.FR : translations.US);
-        }
-
-        const { data } = await supabase
-          .from('materials')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('name', { ascending: true });
-
-        setMaterials(data || []);
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchInitialData();
   }, []);
+
+  async function fetchInitialData() {
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (prof) {
+      setProfile(prof);
+      setLang(prof.country === 'FR' ? translations.FR : translations.US);
+    }
+
+    await fetchMaterials();
+    setLoading(false);
+  }
 
   async function fetchMaterials() {
     const {
       data: { user }
     } = await supabase.auth.getUser();
-    if (!user) return;
 
     const { data } = await supabase
       .from('materials')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', user?.id)
       .order('name', { ascending: true });
 
     setMaterials(data || []);
@@ -351,6 +337,7 @@ export default function MaterialsPage() {
                             leaveFrom="opacity-100"
                             leaveTo="opacity-0"
                           >
+                            {/* Dynamically shifts position context mapping anchor based on the isLastItem layout validation flag */}
                             <ListboxOptions
                               className={`absolute z-50 w-full ${
                                 isLastItem
