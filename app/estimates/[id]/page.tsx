@@ -155,7 +155,12 @@ export default function EstimateView() {
     return { subtotal, groups };
   };
 
-  const generateDynamicDescription = (sec: any) => {
+  const generateDescription = (sec: any) => {
+    // Priority given to custom text input values saved inside the database object
+    if (sec.description && sec.description.trim() !== '') {
+      return sec.description;
+    }
+
     const isFr = profile.country === 'FR';
     let baseText = isFr
       ? "Prestation complète incluant la main-d'œuvre professionnelle, la logistique et les matériaux nécessaires à cette phase du projet."
@@ -499,8 +504,8 @@ export default function EstimateView() {
                           ? 'Services Professionnels'
                           : 'Professional Services')}
                     </p>
-                    <p className="text-xs text-gray-400 font-medium leading-relaxed mb-3">
-                      {generateDynamicDescription(sec)}
+                    <p className="text-xs text-gray-400 font-medium leading-relaxed mb-3 whitespace-pre-wrap">
+                      {generateDescription(sec)}
                     </p>
 
                     {isShowingDetails ? (
