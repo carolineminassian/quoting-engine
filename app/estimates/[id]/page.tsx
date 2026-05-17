@@ -202,6 +202,55 @@ export default function EstimateView() {
 
   // --- ACTIONS ---
 
+  const handleCreateRevision = async () => {
+    setLoading(true);
+
+    const baseCustomId = estimate.custom_id
+      ? estimate.custom_id.split('-V')[0]
+      : estimate.id.slice(0, 8);
+    const nextVersion = (estimate.version || 1) + 1;
+    const newCustomId = `${baseCustomId}-V${nextVersion}`;
+
+    const newEstimatePayload = {
+      user_id: estimate.user_id,
+      client_name: estimate.client_name,
+      client_email: estimate.client_email,
+      client_phone: estimate.client_phone,
+      client_address: estimate.client_address,
+      sections: estimate.sections,
+      total_amount_cents: estimate.total_amount_cents,
+      margin_mode_snapshot: estimate.margin_mode_snapshot,
+      global_margin_snapshot: estimate.global_margin_snapshot,
+      currency_snapshot: estimate.currency_snapshot,
+      country_snapshot: estimate.country_snapshot,
+      tax_rate_snapshot: estimate.tax_rate_snapshot,
+      business_name_snapshot: estimate.business_name_snapshot,
+      is_locked: false,
+      parent_estimate_id: estimate.parent_estimate_id || estimate.id,
+      version: nextVersion,
+      custom_id: newCustomId
+    };
+
+    const { data, error } = await supabase
+      .from('estimates')
+      .insert([newEstimatePayload])
+      .select()
+      .single();
+
+    if (error) {
+      setDialog({
+        type: 'alert',
+        message:
+          profile.country === 'FR'
+            ? 'Erreur lors de la création de la révision.'
+            : 'Error creating estimate revision.'
+      });
+      setLoading(false);
+    } else if (data) {
+      router.push(`/new-estimate?edit=${data.id}`);
+    }
+  };
+
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentInput.trim() || submittingComment) return;
@@ -243,18 +292,17 @@ export default function EstimateView() {
       setComments([...comments, data]);
       setCommentInput('');
 
-      // Send automatic email notification if the client comments on a finalized estimate
       if (!currentIsOwner && estimate?.is_locked) {
         try {
           await fetch('/api/send-comment-notification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              estimateId: id,
-              customId: estimate.custom_id || id.slice(0, 8),
+              estimateId: estimate.id,
+              customId: estimate.custom_id || estimate.id.slice(0, 8),
               clientName: payload.author_name,
               commentContent: cleanCommentText,
-              ownerEmail: profile?.email, // Assumes email is stored in the profiles table
+              ownerEmail: profile?.email,
               estimateUrl: window.location.href,
               country: profile?.country
             })
@@ -451,6 +499,16 @@ export default function EstimateView() {
           <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
             {estimate.is_locked ? (
               <>
+                {isOwner && (
+                  <button
+                    onClick={handleCreateRevision}
+                    className="flex-1 bg-white text-gray-800 border border-gray-200 px-4 py-3 rounded font-bold text-sm hover:bg-gray-50 transition-colors"
+                  >
+                    {profile.country === 'FR'
+                      ? 'Créer Révision'
+                      : 'Create Revision'}
+                  </button>
+                )}
                 {isOwner && (
                   <button
                     onClick={handleNativeShare}
