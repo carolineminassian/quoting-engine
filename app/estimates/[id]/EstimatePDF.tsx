@@ -187,6 +187,39 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     lineHeight: 1.4,
     fontStyle: 'italic'
+  },
+  depositDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    borderTopStyle: 'dashed',
+    marginTop: 8,
+    paddingTop: 8
+  },
+  depositRowBg: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#eff6ff',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 2,
+    marginBottom: 4
+  },
+  depositLabelBlue: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    color: '#2563eb'
+  },
+  depositValueBlue: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1e3a8a'
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    marginTop: 2
   }
 });
 
@@ -332,6 +365,37 @@ export default function EstimatePDF({
                 {formatPrice(grandTotal)}
               </Text>
             </View>
+
+            {/* Section Acompte & Solde */}
+            {estimate.deposit_enabled && (
+              <View style={styles.depositDivider}>
+                <View style={styles.depositRowBg}>
+                  <Text style={styles.depositLabelBlue}>
+                    {isFr
+                      ? `Acompte (${estimate.deposit_percentage || 20}%)`
+                      : `Deposit (${estimate.deposit_percentage || 20}%)`}
+                  </Text>
+                  <Text style={styles.depositValueBlue}>
+                    {formatPrice(
+                      (grandTotal * (estimate.deposit_percentage || 20)) / 100
+                    )}
+                  </Text>
+                </View>
+
+                <View style={styles.balanceRow}>
+                  <Text style={styles.totalLabel}>
+                    {isFr ? 'Solde Restant' : 'Balance Due'}
+                  </Text>
+                  <Text style={styles.totalValue}>
+                    {formatPrice(
+                      (grandTotal *
+                        (100 - (estimate.deposit_percentage || 20))) /
+                        100
+                    )}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 

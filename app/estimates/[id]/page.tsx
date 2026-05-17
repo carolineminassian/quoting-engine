@@ -1092,6 +1092,46 @@ export default function EstimateView() {
                       .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                   </span>
                 </div>
+
+                {/* Conditional Deposit Breakdown */}
+                {estimate.deposit_enabled && (
+                  <div className="pt-4 border-t border-dashed border-gray-200 space-y-3">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50/50 p-2 rounded">
+                      <span>
+                        {profile.country === 'FR'
+                          ? `Acompte (${estimate.deposit_percentage}%)`
+                          : `Deposit (${estimate.deposit_percentage}%)`}
+                      </span>
+                      <span className="font-mono font-bold whitespace-nowrap">
+                        {profile.currency === 'EUR' ? '€' : '$'}
+                        {(
+                          (estimate.total_amount_cents *
+                            (estimate.deposit_percentage || 20)) /
+                          10000
+                        )
+                          .toFixed(2)
+                          .replace('.', profile.currency === 'EUR' ? ',' : '.')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">
+                      <span>
+                        {profile.country === 'FR'
+                          ? 'Solde Restant'
+                          : 'Balance Due'}
+                      </span>
+                      <span className="font-mono text-gray-700 whitespace-nowrap">
+                        {profile.currency === 'EUR' ? '€' : '$'}
+                        {(
+                          (estimate.total_amount_cents *
+                            (100 - (estimate.deposit_percentage || 20))) /
+                          10000
+                        )
+                          .toFixed(2)
+                          .replace('.', profile.currency === 'EUR' ? ',' : '.')}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

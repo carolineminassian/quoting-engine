@@ -999,7 +999,6 @@ function NewEstimateContent() {
                         maxLength={50}
                         className="text-2xl font-black text-gray-900 outline-none w-full pb-2 italic tracking-tight bg-transparent pr-8 uppercase placeholder:normal-case placeholder:not-italic placeholder:text-gray-300 select-text"
                         value={sec.title}
-                        onFocus={() => setActiveDropdownIdx(sIdx)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -1008,7 +1007,12 @@ function NewEstimateContent() {
                         }}
                         onChange={(e) => {
                           updateSection(sIdx, 'title', e.target.value);
-                          setActiveDropdownIdx(sIdx);
+                          // Only reveal the dropdown if the user has typed actual characters
+                          if (e.target.value.trim() !== '') {
+                            setActiveDropdownIdx(sIdx);
+                          } else {
+                            setActiveDropdownIdx(null);
+                          }
                         }}
                       />
 
@@ -1732,7 +1736,8 @@ function NewEstimateContent() {
               <div
                 className={`flex items-center gap-2.5 flex-1 justify-end transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
               >
-                <div className="relative w-8 shrink-0">
+                {/* Flex layout container completely eliminates any text overlapping */}
+                <div className="flex items-center border-b border-gray-200 focus-within:border-blue-500 transition-colors pb-0.5 shrink-0">
                   <input
                     type="number"
                     min="1"
@@ -1747,9 +1752,9 @@ function NewEstimateContent() {
                         )
                       )
                     }
-                    className="w-full pb-0.5 border-b border-gray-200 focus:border-blue-500 font-mono font-bold text-right text-xs text-blue-900 bg-transparent outline-none transition-colors"
+                    className="w-8 font-mono font-bold text-right text-xs text-blue-900 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="absolute right-0 bottom-0.5 text-[8px] font-black text-blue-400 pointer-events-none">
+                  <span className="text-[9px] font-black text-blue-400 select-none pl-0.5 pr-0.5">
                     %
                   </span>
                 </div>
