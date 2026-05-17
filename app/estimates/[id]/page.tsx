@@ -217,7 +217,11 @@ export default function EstimateView() {
           await fetch('/api/update-estimate-status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ estimateId: id, status: newStatus })
+            body: JSON.stringify({
+              estimateId: id,
+              status: newStatus,
+              estimateUrl: window.location.href // Added for the email links
+            })
           });
           setEstimate({ ...estimate, client_status: newStatus });
         } catch (e) {
