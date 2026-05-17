@@ -532,7 +532,7 @@ export default function EstimateView() {
     <div className="min-h-screen bg-gray-100 text-black font-sans print:bg-white flex flex-col">
       {/* --- GUEST NAVBAR --- */}
       {!isOwner && (
-        <nav className="w-full bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center print:hidden shadow-sm">
+        <nav className="w-full bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center print:hidden shadow-sm sticky top-0 z-50">
           <Link href="/" className="flex items-center outline-none">
             <BrandLogo country={profile?.country === 'FR' ? 'FR' : 'US'} />
           </Link>
