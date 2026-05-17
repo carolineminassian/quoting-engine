@@ -396,7 +396,10 @@ export default function EstimateView() {
     if (method === 'email' && !currentUserEmail) {
       setDialog({
         type: 'alert',
-        message: 'Could not identify your sender email. Please log in.'
+        message:
+          profile.country === 'FR'
+            ? "Impossible d'identifier votre e-mail d'expéditeur. Veuillez vous reconnecter."
+            : 'Could not identify your sender email. Please log in.'
       });
       setSending(false);
       return;
@@ -431,19 +434,28 @@ export default function EstimateView() {
       if (res.ok) {
         setDialog({
           type: 'alert',
-          message: `${method === 'email' ? 'Email' : 'SMS'} sent successfully to ${method === 'email' ? estimate.client_email : estimate.client_phone}`
+          message:
+            profile.country === 'FR'
+              ? `${method === 'email' ? 'E-mail' : 'SMS'} envoyé avec succès à ${method === 'email' ? estimate.client_email : estimate.client_phone}`
+              : `${method === 'email' ? 'Email' : 'SMS'} sent successfully to ${method === 'email' ? estimate.client_email : estimate.client_phone}`
         });
       } else {
         const errData = await res.json();
         setDialog({
           type: 'alert',
-          message: `Error: ${errData.error?.message || 'Failed to send'}`
+          message:
+            profile.country === 'FR'
+              ? `Erreur : ${errData.error?.message || "L'envoi a échoué"}`
+              : `Error: ${errData.error?.message || 'Failed to send'}`
         });
       }
     } catch (err) {
       setDialog({
         type: 'alert',
-        message: 'Connection error. Check your internet or API settings.'
+        message:
+          profile.country === 'FR'
+            ? 'Erreur de connexion. Vérifiez votre connexion internet.'
+            : 'Connection error. Check your internet or API settings.'
       });
     } finally {
       setSending(false);
@@ -536,12 +548,6 @@ export default function EstimateView() {
           <Link href="/" className="flex items-center outline-none">
             <BrandLogo country={profile?.country === 'FR' ? 'FR' : 'US'} />
           </Link>
-          {/* <Link
-            href="/"
-            className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-600 transition-colors"
-          >
-            {profile?.country === 'FR' ? 'Créer un compte' : 'Sign Up'}
-          </Link> */}
         </nav>
       )}
 
