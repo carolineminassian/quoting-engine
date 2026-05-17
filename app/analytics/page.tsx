@@ -515,7 +515,7 @@ export default function AnalyticsPage() {
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 {t.approvedProj}
               </span>
-              <span className="text-lg font-black font-mono text-emerald-600 bg-emerald-50 px-3 py-1 rounded-md">
+              <span className="text-lg font-black font-mono text-green-600 bg-green-50 px-3 py-1 rounded-md">
                 {countApproved}
               </span>
             </div>
@@ -543,7 +543,7 @@ export default function AnalyticsPage() {
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 {t.totalRev}
               </p>
-              <p className="text-3xl font-black text-emerald-600 font-mono">
+              <p className="text-3xl font-black text-green-600 font-mono">
                 {formatMoney(totalRevenueCents)}
               </p>
             </div>
