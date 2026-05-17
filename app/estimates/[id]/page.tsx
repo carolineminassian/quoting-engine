@@ -567,7 +567,7 @@ export default function EstimateView() {
         </div>
 
         {/* --- MAIN ESTIMATE BOX --- */}
-        <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none min-h-[1056px]">
+        <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none min-h-[1056px] flex flex-col">
           <div className="grid grid-cols-2 gap-4 sm:gap-8 mb-16 items-start">
             <div className="min-w-0 space-y-6 sm:space-y-12 flex flex-col text-left">
               <div>
@@ -822,7 +822,7 @@ export default function EstimateView() {
             </div>
           </div>
 
-          <div className="mt-40 pt-12 border-t border-gray-100">
+          <div className="mt-auto pt-8 print:pt-6 border-t border-gray-100 print:mt-12 print:break-inside-avoid">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
