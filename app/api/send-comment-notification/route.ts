@@ -44,8 +44,8 @@ export async function POST(request: Request) {
 
     // 2. Format the email content
     const subject = isFr
-      ? `[Nouveau Message] Modif. demandée sur le Devis #${customId}`
-      : `[New Message] Modification requested on Estimate #${customId}`;
+      ? `[Nouveau Message] Commentaire de ${clientName} sur le Devis #${customId}`
+      : `[New Message] Comment from ${clientName} on Estimate #${customId}`;
 
     const textContent = isFr
       ? `Bonjour,\n\nVotre client ${clientName} a laissé un nouveau commentaire concernant le devis #${customId} :\n\n"${commentContent}"\n\nVous pouvez voir le fil de discussion et modifier le document ici : ${estimateUrl}`
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
     // 3. Send the notification via Resend
     await resend.emails.send({
-      from: 'Estimates App <onboarding@resend.dev>', // Update this to your verified domain when ready
+      from: 'Pactestim <noreply@pactestim.com>', // Update this to your verified domain when ready
       to: ownerEmail,
       subject: subject,
       text: textContent
