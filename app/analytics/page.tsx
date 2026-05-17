@@ -86,8 +86,6 @@ const LoadingDots = () => (
   </div>
 );
 
-const EXCHANGE_RATE_EUR_TO_USD = 1.1;
-
 type TimeFilterType = 'ALL' | 'YEAR' | 'MONTH' | '6MOS';
 type CurrencyType = 'EUR' | 'USD';
 
@@ -100,12 +98,29 @@ export default function AnalyticsPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilterType>('ALL');
   const [targetCurrency, setTargetCurrency] = useState<CurrencyType>('USD');
   const [rawEstimates, setRawEstimates] = useState<any[]>([]);
+  const [exchangeRate, setExchangeRate] = useState<number>(1.1); // Taux de repli par défaut
 
   useEffect(() => {
     async function fetchData() {
       const {
         data: { user }
       } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      // Appel de l'API pour récupérer le taux réel du jour EUR -> USD
+      try {
+        const rateRes = await fetch('https://open.er-api.com/v6/latest/EUR');
+        const rateData = await rateRes.json();
+        if (rateData?.rates?.USD) {
+          setExchangeRate(rateData.rates.USD);
+        }
+      } catch (rateErr) {
+        console.error('Failed to fetch live exchange rates:', rateErr);
+      }
 
       if (!user) {
         router.push('/login');
@@ -150,9 +165,9 @@ export default function AnalyticsPage() {
     const from = (fromCurrency || 'USD').toUpperCase();
     if (from === targetCurrency) return cents;
     if (from === 'EUR' && targetCurrency === 'USD')
-      return Math.round(cents * EXCHANGE_RATE_EUR_TO_USD);
+      return Math.round(cents * exchangeRate);
     if (from === 'USD' && targetCurrency === 'EUR')
-      return Math.round(cents / EXCHANGE_RATE_EUR_TO_USD);
+      return Math.round(cents / exchangeRate);
     return cents;
   };
 
