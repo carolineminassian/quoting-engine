@@ -132,6 +132,35 @@ export default function EstimateView() {
     fetchData();
   }, [id]);
 
+  // --- REALTIME SUBSCRIPTION FOR COMMENTS ---
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`realtime-comments-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'estimate_comments',
+          filter: `estimate_id=eq.${id}`
+        },
+        (payload) => {
+          // Évite les doublons visuels si l'auteur a déjà ajouté son message localement
+          setComments((prev) => {
+            if (prev.some((c) => c.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
   // --- MARGIN ENGINE & MATH HELPERS ---
 
   const getMultiplier = (
