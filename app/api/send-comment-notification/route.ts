@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import svg from 'react-inlinesvg';
+import image from 'next/image';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 

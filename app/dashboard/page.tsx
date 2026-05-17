@@ -31,7 +31,7 @@ export default function DashboardPage() {
 
   // Filter & Sort State
   const [filterStatus, setFilterStatus] = useState<
-    'all' | 'draft' | 'finalized'
+    'all' | 'draft' | 'pending' | 'approved' | 'rejected'
   >('all');
   const [sortBy, setSortBy] = useState<
     'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
@@ -102,7 +102,15 @@ export default function DashboardPage() {
   const processedEstimates = [...estimates]
     .filter((est) => {
       if (filterStatus === 'draft') return !est.is_locked;
-      if (filterStatus === 'finalized') return est.is_locked;
+      if (filterStatus === 'pending')
+        return (
+          est.is_locked &&
+          (!est.client_status || est.client_status === 'pending')
+        );
+      if (filterStatus === 'approved')
+        return est.is_locked && est.client_status === 'approved';
+      if (filterStatus === 'rejected')
+        return est.is_locked && est.client_status === 'rejected';
       return true;
     })
     .sort((a, b) => {
@@ -160,10 +168,18 @@ export default function DashboardPage() {
         const cAddr = escapeCsv(e.client_address);
         const statusText = isFr
           ? e.is_locked
-            ? 'Finalisé'
+            ? e.client_status === 'approved'
+              ? 'Approuvé'
+              : e.client_status === 'rejected'
+                ? 'Refusé'
+                : 'En Attente'
             : 'Brouillon'
           : e.is_locked
-            ? 'Finalized'
+            ? e.client_status === 'approved'
+              ? 'Approved'
+              : e.client_status === 'rejected'
+                ? 'Rejected'
+                : 'Pending'
             : 'Draft';
         const status = escapeCsv(statusText);
         const marginMode = escapeCsv(e.margin_mode_snapshot || 'none');
@@ -192,10 +208,18 @@ export default function DashboardPage() {
         const cAddr = escapeCsv(e.client_address);
         const statusText = isFr
           ? e.is_locked
-            ? 'Finalisé'
+            ? e.client_status === 'approved'
+              ? 'Approuvé'
+              : e.client_status === 'rejected'
+                ? 'Refusé'
+                : 'En Attente'
             : 'Brouillon'
           : e.is_locked
-            ? 'Finalized'
+            ? e.client_status === 'approved'
+              ? 'Approved'
+              : e.client_status === 'rejected'
+                ? 'Rejected'
+                : 'Pending'
             : 'Draft';
         const status = escapeCsv(statusText);
         const currency = escapeCsv(
@@ -418,10 +442,18 @@ export default function DashboardPage() {
                         (profile?.country === 'FR'
                           ? 'Brouillons'
                           : 'Drafts Only')}
-                      {filterStatus === 'finalized' &&
+                      {filterStatus === 'pending' &&
                         (profile?.country === 'FR'
-                          ? 'Finalisés'
-                          : 'Finalized Only')}
+                          ? 'En Attente'
+                          : 'Pending Only')}
+                      {filterStatus === 'approved' &&
+                        (profile?.country === 'FR'
+                          ? 'Approuvés'
+                          : 'Approved Only')}
+                      {filterStatus === 'rejected' &&
+                        (profile?.country === 'FR'
+                          ? 'Refusés'
+                          : 'Rejected Only')}
                     </span>
                     <span className="pointer-events-none text-gray-400 text-[8px]">
                       ▼
@@ -455,14 +487,34 @@ export default function DashboardPage() {
                           : 'Drafts Only'}
                       </ListboxOption>
                       <ListboxOption
-                        value="finalized"
+                        value="pending"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'En Attente'
+                          : 'Pending Only'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="approved"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {profile?.country === 'FR'
+                          ? 'Approuvés'
+                          : 'Approved Only'}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="rejected"
                         className={({ active }) =>
                           `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
                         {profile?.country === 'FR'
-                          ? 'Finalisés'
-                          : 'Finalized Only'}
+                          ? 'Refusés'
+                          : 'Rejected Only'}
                       </ListboxOption>
                     </ListboxOptions>
                   </Transition>
@@ -587,9 +639,29 @@ export default function DashboardPage() {
                             : 'Untitled Project')}
                       </h3>
                       <span
-                        className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${est.is_locked ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}`}
+                        className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${
+                          !est.is_locked
+                            ? 'bg-yellow-50 text-yellow-600'
+                            : est.client_status === 'approved'
+                              ? 'bg-green-100 text-green-700'
+                              : est.client_status === 'rejected'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-blue-50 text-blue-600'
+                        }`}
                       >
-                        {est.is_locked ? lang.finalized : lang.draft}
+                        {!est.is_locked
+                          ? lang.draft
+                          : est.client_status === 'approved'
+                            ? profile.country === 'FR'
+                              ? 'Approuvé'
+                              : 'Approved'
+                            : est.client_status === 'rejected'
+                              ? profile.country === 'FR'
+                                ? 'Refusé'
+                                : 'Rejected'
+                              : profile.country === 'FR'
+                                ? 'En Attente'
+                                : 'Pending'}
                       </span>
                     </div>
                     {/* Mobile Price */}
@@ -613,7 +685,8 @@ export default function DashboardPage() {
                           ? 'Aucun contact'
                           : 'No contact email')}
                     </span>
-                    <span className="sm:hidden font-mono bg-gray-100 px-2 py-0.5 rounded text-[10px] text-gray-500">
+                    <span className="hidden sm:inline">•</span>
+                    <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-[10px] text-gray-500">
                       {est.custom_id || est.id.slice(0, 8)}
                     </span>
                   </div>
@@ -622,9 +695,29 @@ export default function DashboardPage() {
                 <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-6 mt-4 pt-4 border-t border-gray-100 sm:mt-0 sm:pt-0 sm:border-0">
                   {/* Mobile Status Badge */}
                   <span
-                    className={`sm:hidden text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${est.is_locked ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}`}
+                    className={`sm:hidden text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${
+                      !est.is_locked
+                        ? 'bg-yellow-50 text-yellow-600'
+                        : est.client_status === 'approved'
+                          ? 'bg-green-100 text-green-700'
+                          : est.client_status === 'rejected'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-blue-50 text-blue-600'
+                    }`}
                   >
-                    {est.is_locked ? lang.finalized : lang.draft}
+                    {!est.is_locked
+                      ? lang.draft
+                      : est.client_status === 'approved'
+                        ? profile.country === 'FR'
+                          ? 'Approuvé'
+                          : 'Approved'
+                        : est.client_status === 'rejected'
+                          ? profile.country === 'FR'
+                            ? 'Refusé'
+                            : 'Rejected'
+                          : profile.country === 'FR'
+                            ? 'En Attente'
+                            : 'Pending'}
                   </span>
 
                   {/* Desktop Price */}

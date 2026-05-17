@@ -15,10 +15,14 @@ import {
 const dict = {
   EN: {
     title: 'Analytics',
-    subtitle: 'Insights based on your finalized estimates.',
+    subtitle: 'Insights based on your pipeline and approved estimates.',
     lockedOnly: 'Pro Feature',
-    totalRev: 'Projected Revenue',
-    totalProj: 'Finalized Projects',
+    totalRev: 'Confirmed Revenue',
+    approvedProj: 'Approved Projects',
+    pipelineValue: 'Pending Pipeline',
+    conversionRate: 'Win Rate',
+    pendingProj: 'Pending Projects',
+    rejectedProj: 'Rejected Projects',
     avgValue: 'Avg Estimate Value',
     last6Months: 'Revenue Trend',
     upgradeAlert: 'Analytics are exclusively available on the Pro Plan.',
@@ -42,10 +46,14 @@ const dict = {
   },
   FR: {
     title: 'Analytique',
-    subtitle: 'Données basées sur vos devis finalisés.',
+    subtitle: 'Données basées sur vos devis en attente et approuvés.',
     lockedOnly: 'Fonctionnalité Pro',
-    totalRev: 'Revenus Projetés',
-    totalProj: 'Projets Finalisés',
+    totalRev: 'Revenus Confirmés',
+    approvedProj: 'Projets Approuvés',
+    pipelineValue: 'Valeur en Attente',
+    conversionRate: 'Taux de Conversion',
+    pendingProj: 'Projets en Attente',
+    rejectedProj: 'Projets Refusés',
     avgValue: 'Valeur Moyenne',
     last6Months: 'Évolution des Revenus',
     upgradeAlert:
@@ -123,7 +131,7 @@ export default function AnalyticsPage() {
       const { data: ests } = await supabase
         .from('estimates')
         .select(
-          'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot'
+          'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot, client_status'
         )
         .eq('user_id', user.id)
         .eq('is_locked', true)
@@ -208,6 +216,31 @@ export default function AnalyticsPage() {
     return true;
   });
 
+  const approvedEstimates = filteredEstimates.filter(
+    (e) => e.client_status === 'approved'
+  );
+  const pendingEstimates = filteredEstimates.filter(
+    (e) => !e.client_status || e.client_status === 'pending'
+  );
+  const rejectedEstimates = filteredEstimates.filter(
+    (e) => e.client_status === 'rejected'
+  );
+
+  const countApproved = approvedEstimates.length;
+  const countPending = pendingEstimates.length;
+  const countRejected = rejectedEstimates.length;
+  const totalDecided = countApproved + countRejected;
+  const conversionRate =
+    totalDecided > 0 ? Math.round((countApproved / totalDecided) * 100) : 0;
+
+  let pendingRevenueCents = 0;
+  pendingEstimates.forEach((est) => {
+    pendingRevenueCents += getAmountInTargetCurrency(
+      est.total_amount_cents || 0,
+      est.currency_snapshot || 'USD'
+    );
+  });
+
   let totalRevenueCents = 0;
   let totalTaxCents = 0;
   let totalLaborCostCents = 0;
@@ -216,7 +249,7 @@ export default function AnalyticsPage() {
   const serviceMap: { [key: string]: number } = {};
   const clientMap: { [key: string]: { total: number; count: number } } = {};
 
-  filteredEstimates.forEach((est) => {
+  approvedEstimates.forEach((est) => {
     const estCurrency = est.currency_snapshot || 'USD';
     const grossTotal = getAmountInTargetCurrency(
       est.total_amount_cents || 0,
@@ -285,7 +318,7 @@ export default function AnalyticsPage() {
     }
   });
 
-  const count = filteredEstimates.length;
+  const count = countApproved; // Maps to existing downstream UI logic
   const avgValue = count > 0 ? Math.round(totalRevenueCents / count) : 0;
 
   const netRevenueHT = totalRevenueCents - totalTaxCents;
@@ -331,7 +364,11 @@ export default function AnalyticsPage() {
     const val = rawEstimates
       .filter((e) => {
         const ed = new Date(e.created_at);
-        return ed.getMonth() === m && ed.getFullYear() === y;
+        return (
+          ed.getMonth() === m &&
+          ed.getFullYear() === y &&
+          e.client_status === 'approved'
+        );
       })
       .reduce(
         (acc, e) =>
@@ -471,28 +508,61 @@ export default function AnalyticsPage() {
         </div>
 
         {/* KPIs Cards Block */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              {t.totalRev}
-            </p>
-            <p className="text-2xl font-black text-blue-600 font-mono">
-              {formatMoney(totalRevenueCents)}
-            </p>
+        <div className="flex flex-col gap-4 sm:gap-6 mb-8">
+          {/* Row 1: Consolidated Status Counts */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+            <div className="flex-1 p-5 flex justify-between items-center">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                {t.approvedProj}
+              </span>
+              <span className="text-lg font-black font-mono text-emerald-600 bg-emerald-50 px-3 py-1 rounded-md">
+                {countApproved}
+              </span>
+            </div>
+            <div className="flex-1 p-5 flex justify-between items-center">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                {t.pendingProj}
+              </span>
+              <span className="text-lg font-black font-mono text-blue-600 bg-blue-50 px-3 py-1 rounded-md">
+                {countPending}
+              </span>
+            </div>
+            <div className="flex-1 p-5 flex justify-between items-center">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                {t.rejectedProj}
+              </span>
+              <span className="text-lg font-black font-mono text-red-500 bg-red-50 px-3 py-1 rounded-md">
+                {countRejected}
+              </span>
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              {t.totalProj}
-            </p>
-            <p className="text-2xl font-black font-mono">{count}</p>
-          </div>
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              {t.avgValue}
-            </p>
-            <p className="text-2xl font-black font-mono">
-              {formatMoney(avgValue)}
-            </p>
+
+          {/* Row 2: Financials & Rates Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                {t.totalRev}
+              </p>
+              <p className="text-3xl font-black text-emerald-600 font-mono">
+                {formatMoney(totalRevenueCents)}
+              </p>
+            </div>
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                {t.pipelineValue}
+              </p>
+              <p className="text-3xl font-black text-blue-600 font-mono">
+                {formatMoney(pendingRevenueCents)}
+              </p>
+            </div>
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                {t.conversionRate}
+              </p>
+              <p className="text-3xl font-black text-gray-800 font-mono">
+                {conversionRate}%
+              </p>
+            </div>
           </div>
         </div>
 

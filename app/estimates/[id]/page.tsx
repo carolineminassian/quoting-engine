@@ -202,6 +202,33 @@ export default function EstimateView() {
 
   // --- ACTIONS ---
 
+  const handleStatusChange = async (newStatus: 'approved' | 'rejected') => {
+    setDialog({
+      type: 'confirm',
+      title: profile.country === 'FR' ? 'Confirmer' : 'Confirm',
+      message:
+        profile.country === 'FR'
+          ? `Êtes-vous sûr de vouloir ${newStatus === 'approved' ? 'accepter' : 'refuser'} ce devis ?`
+          : `Are you sure you want to ${newStatus} this estimate?`,
+      onConfirm: async () => {
+        setDialog(null);
+        setLoading(true);
+        try {
+          await fetch('/api/update-estimate-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estimateId: id, status: newStatus })
+          });
+          setEstimate({ ...estimate, client_status: newStatus });
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
   const handleCreateRevision = async () => {
     setLoading(true);
 
@@ -565,6 +592,68 @@ export default function EstimateView() {
             )}
           </div>
         </div>
+
+        {/* --- CLIENT APPROVAL BANNER --- */}
+        {estimate.is_locked && (
+          <div
+            className={`mb-8 p-4 sm:p-6 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden ${
+              estimate.client_status === 'approved'
+                ? 'bg-green-50 border-green-200'
+                : estimate.client_status === 'rejected'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-blue-50 border-blue-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {estimate.client_status === 'approved' && (
+                <span className="text-green-700 font-black uppercase tracking-widest text-sm">
+                  ✓{' '}
+                  {profile.country === 'FR'
+                    ? 'Devis Approuvé'
+                    : 'Estimate Approved'}
+                </span>
+              )}
+              {estimate.client_status === 'rejected' && (
+                <span className="text-red-700 font-black uppercase tracking-widest text-sm">
+                  ✕{' '}
+                  {profile.country === 'FR'
+                    ? 'Devis Refusé'
+                    : 'Estimate Rejected'}
+                </span>
+              )}
+              {(estimate.client_status === 'pending' ||
+                !estimate.client_status) && (
+                <span className="text-blue-700 font-black uppercase tracking-widest text-sm">
+                  ⏳{' '}
+                  {profile.country === 'FR'
+                    ? 'En attente de validation'
+                    : 'Pending Client Approval'}
+                </span>
+              )}
+            </div>
+
+            {!isOwner &&
+              (estimate.client_status === 'pending' ||
+                !estimate.client_status) && (
+                <div className="flex w-full sm:w-auto gap-3">
+                  <button
+                    onClick={() => handleStatusChange('rejected')}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-white text-red-600 border border-red-200 hover:bg-red-50 font-bold rounded text-sm transition-colors"
+                  >
+                    {profile.country === 'FR' ? 'Refuser' : 'Reject'}
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange('approved')}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-green-600 text-white hover:bg-green-700 font-bold rounded shadow-md text-sm transition-colors"
+                  >
+                    {profile.country === 'FR'
+                      ? 'Approuver le Devis'
+                      : 'Approve Estimate'}
+                  </button>
+                </div>
+              )}
+          </div>
+        )}
 
         {/* --- MAIN ESTIMATE BOX --- */}
         <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none print:p-12 min-h-[1056px] print:min-h-0 print:block flex flex-col">
