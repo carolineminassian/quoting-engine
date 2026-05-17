@@ -462,8 +462,8 @@ export default function EstimateView() {
     : showDetails;
 
   return (
-    <main className="min-h-screen bg-gray-100 p-4 sm:p-8 text-black font-sans relative">
-      <div className="max-w-4xl mx-auto">
+    <main className="min-h-screen bg-gray-100 p-4 sm:p-8 text-black font-sans relative print:p-0 print:bg-white">
+      <div className="max-w-4xl mx-auto print:max-w-none print:w-full">
         <div
           className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-8 print:hidden ${isOwner ? 'justify-between' : 'justify-end'}`}
         >
@@ -567,7 +567,7 @@ export default function EstimateView() {
         </div>
 
         {/* --- MAIN ESTIMATE BOX --- */}
-        <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none min-h-[1056px] flex flex-col">
+        <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none print:p-12 min-h-[1056px] print:min-h-0 print:block flex flex-col">
           <div className="grid grid-cols-2 gap-4 sm:gap-8 mb-16 items-start">
             <div className="min-w-0 space-y-6 sm:space-y-12 flex flex-col text-left">
               <div>
@@ -822,7 +822,7 @@ export default function EstimateView() {
             </div>
           </div>
 
-          <div className="mt-auto pt-8 print:pt-6 border-t border-gray-100 print:mt-12 print:break-inside-avoid">
+          <div className="mt-16 pt-8 border-t border-gray-100 print:mt-16 print:break-inside-avoid">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
