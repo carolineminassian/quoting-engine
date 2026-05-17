@@ -302,7 +302,7 @@ export default function EstimateView() {
               customId: estimate.custom_id || estimate.id.slice(0, 8),
               clientName: payload.author_name,
               commentContent: cleanCommentText,
-              ownerEmail: profile?.email,
+              ownerId: estimate.user_id, // Pass the ID instead of the email
               estimateUrl: window.location.href,
               country: profile?.country
             })
