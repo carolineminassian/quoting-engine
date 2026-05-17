@@ -51,11 +51,10 @@ export async function POST(request: Request) {
     }
 
     const isFr = profile.country === 'FR';
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL || 'https://yourdomain.com';
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pactestim.com';
 
     // Logos
-    const logoFile = isFr ? 'favicon-fr.svg' : 'favicon-us.svg';
+    const logoFile = isFr ? 'favicon-fr.png' : 'favicon-us.png';
     const pactEstimLogoHtml = `<img src="${baseUrl}/${logoFile}" alt="PactEstim" style="max-height: 40px; margin-bottom: 24px; display: block;" />`;
     const ownerLogoHtml = profile.logo_url
       ? `<img src="${profile.logo_url}" alt="${profile.business_name}" style="max-height: 50px; margin-bottom: 24px; display: block;" />`
@@ -65,8 +64,8 @@ export async function POST(request: Request) {
 
     // 3. Email 1: Notification to Business Owner (PactEstim Branding)
     const ownerSubject = isFr
-      ? `[PactEstim] Devis ${status === 'approved' ? 'Approuvé' : 'Refusé'} par ${estimate.client_name}`
-      : `[PactEstim] Estimate ${status === 'approved' ? 'Approved' : 'Rejected'} by ${estimate.client_name}`;
+      ? `Devis ${status === 'approved' ? 'Approuvé' : 'Refusé'} par ${estimate.client_name}`
+      : `Estimate ${status === 'approved' ? 'Approved' : 'Rejected'} by ${estimate.client_name}`;
 
     const ownerHtml = isFr
       ? `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">

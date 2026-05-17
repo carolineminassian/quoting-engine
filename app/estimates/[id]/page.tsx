@@ -536,12 +536,12 @@ export default function EstimateView() {
           <Link href="/" className="flex items-center outline-none">
             <BrandLogo country={profile?.country === 'FR' ? 'FR' : 'US'} />
           </Link>
-          <Link
+          {/* <Link
             href="/"
             className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-600 transition-colors"
           >
             {profile?.country === 'FR' ? 'Créer un compte' : 'Sign Up'}
-          </Link>
+          </Link> */}
         </nav>
       )}
 
