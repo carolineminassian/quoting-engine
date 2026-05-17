@@ -177,8 +177,23 @@ function NewEstimateContent() {
       ]);
 
       if (prof.data) {
+        let resolvedCountry = prof.data.country;
+
+        // Si l'utilisateur vient de s'inscrire en FR mais que son profil DB est par défaut sur US ou vide
+        if (isFrChoice && (!prof.data.country || prof.data.country === 'US')) {
+          resolvedCountry = 'FR';
+          prof.data.country = 'FR';
+          prof.data.currency = 'EUR';
+
+          // Persister le choix de langue de l'inscription dans la base de données
+          await supabase
+            .from('profiles')
+            .update({ country: 'FR', currency: 'EUR' })
+            .eq('id', user.id);
+        }
+
         setProfile(prof.data);
-        setLang(prof.data.country === 'FR' ? translations.FR : translations.US);
+        setLang(resolvedCountry === 'FR' ? translations.FR : translations.US);
 
         if (cachedBusinessName) {
           setBusinessName(cachedBusinessName);
