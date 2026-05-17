@@ -211,15 +211,18 @@ export default function EstimateView() {
       data: { user }
     } = await supabase.auth.getUser();
 
+    const currentIsOwner = user?.id === estimate?.user_id;
+    const cleanCommentText = commentInput.trim();
+
     const payload = {
       estimate_id: id,
       user_id: user?.id || null,
-      author_name: isOwner
-        ? profile.business_name
-        : estimate.client_name ||
-          (profile.country === 'FR' ? 'Client' : 'Client'),
-      content: commentInput.trim(),
-      is_owner: isOwner
+      author_name: currentIsOwner
+        ? profile?.business_name || 'Business'
+        : estimate?.client_name ||
+          (profile?.country === 'FR' ? 'Client' : 'Client'),
+      content: cleanCommentText,
+      is_owner: currentIsOwner
     };
 
     const { data, error } = await supabase
@@ -239,6 +242,30 @@ export default function EstimateView() {
     } else if (data) {
       setComments([...comments, data]);
       setCommentInput('');
+
+      // Send automatic email notification if the client comments on a finalized estimate
+      if (!currentIsOwner && estimate?.is_locked) {
+        try {
+          await fetch('/api/send-comment-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              estimateId: id,
+              customId: estimate.custom_id || id.slice(0, 8),
+              clientName: payload.author_name,
+              commentContent: cleanCommentText,
+              ownerEmail: profile?.email, // Assumes email is stored in the profiles table
+              estimateUrl: window.location.href,
+              country: profile?.country
+            })
+          });
+        } catch (notificationError) {
+          console.error(
+            'Notification email failed to dispatch:',
+            notificationError
+          );
+        }
+      }
     }
     setSubmittingComment(false);
   };
