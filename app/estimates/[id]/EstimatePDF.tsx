@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 40,
-    alignItems: 'start'
+    alignItems: 'flex-start'
   },
   title: {
     fontSize: 32,
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
     paddingVertical: 14,
-    alignItems: 'start'
+    alignItems: 'flex-start'
   },
   colDescription: {
     width: '75%',
