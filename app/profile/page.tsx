@@ -45,6 +45,10 @@ export default function ProfilePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
 
+  // Automatic Down Payment Defaults
+  const [depositEnabled, setDepositEnabled] = useState(false);
+  const [depositPercentage, setDepositPercentage] = useState<number>(20);
+
   // Security Profile State
   const [authEmail, setAuthEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -72,6 +76,8 @@ export default function ProfilePage() {
         setHourlyRate(prof.default_hourly_rate || 0);
         setDailyRate(prof.default_daily_rate || 0);
         setCountry(prof.country || 'US');
+        setDepositEnabled(prof.default_deposit_enabled ?? false);
+        setDepositPercentage(prof.default_deposit_percentage ?? 20);
         if (prof.logo_url) {
           setSelectedFileName('Uploaded Logo');
         }
@@ -123,7 +129,9 @@ export default function ProfilePage() {
         default_daily_rate: dailyRate,
         country: country,
         currency: currency,
-        logo_url: finalLogoUrl
+        logo_url: finalLogoUrl,
+        default_deposit_enabled: depositEnabled,
+        default_deposit_percentage: depositPercentage
       })
       .eq('id', profile.id);
 
@@ -422,6 +430,65 @@ export default function ProfilePage() {
                   />
                   <span className="absolute right-4 top-4 text-gray-400 font-bold text-xs font-mono">
                     {currencySymbol}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+              <div className="flex flex-col justify-center">
+                <span className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {country === 'FR'
+                    ? 'Acompte Automatique (Défaut)'
+                    : 'Default Down Payment'}
+                </span>
+                <div className="flex items-center gap-3 h-full pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setDepositEnabled(!depositEnabled)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
+                    />
+                  </button>
+                  <span className="text-xs font-black text-gray-700 uppercase tracking-wider select-none">
+                    {depositEnabled
+                      ? country === 'FR'
+                        ? 'Activé'
+                        : 'Enabled'
+                      : country === 'FR'
+                        ? 'Désactivé'
+                        : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {country === 'FR'
+                    ? "Pourcentage d'acompte (%)"
+                    : 'Deposit Percentage (%)'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    disabled={!depositEnabled}
+                    className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold pr-10 transition-colors bg-white shadow-inner disabled:opacity-40 disabled:bg-gray-100"
+                    value={depositPercentage}
+                    onChange={(e) =>
+                      setDepositPercentage(
+                        Math.min(
+                          100,
+                          Math.max(1, parseInt(e.target.value) || 0)
+                        )
+                      )
+                    }
+                  />
+                  <span className="absolute right-4 top-4 text-gray-400 font-bold text-xs font-mono">
+                    %
                   </span>
                 </div>
               </div>

@@ -89,6 +89,10 @@ function NewEstimateContent() {
   >('none');
   const [globalMargin, setGlobalMargin] = useState<number>(0);
 
+  // Per-estimate deposit adjustments
+  const [depositEnabled, setDepositEnabled] = useState(false);
+  const [depositPercentage, setDepositPercentage] = useState<number>(20);
+
   const [sections, setSections] = useState<EstimateSection[]>([
     {
       title: '',
@@ -121,6 +125,10 @@ function NewEstimateContent() {
           if (pending.customRef) setCustomRef(pending.customRef);
           if (pending.marginMode) setMarginMode(pending.marginMode);
           if (pending.globalMargin) setGlobalMargin(pending.globalMargin);
+          if (pending.depositEnabled !== undefined)
+            setDepositEnabled(pending.depositEnabled);
+          if (pending.depositPercentage !== undefined)
+            setDepositPercentage(pending.depositPercentage);
           if (pending.businessName) {
             cachedBusinessName = pending.businessName;
             setBusinessName(pending.businessName);
@@ -240,6 +248,8 @@ function NewEstimateContent() {
           setCustomRef(est.custom_id || '');
           setMarginMode(est.margin_mode_snapshot || 'none');
           setGlobalMargin(est.global_margin_snapshot || 0);
+          setDepositEnabled(est.deposit_enabled ?? false);
+          setDepositPercentage(est.deposit_percentage ?? 20);
 
           const loadedSections = (est.sections || []).map((sec: any) => ({
             ...sec,
@@ -260,6 +270,8 @@ function NewEstimateContent() {
           setSections(loadedSections);
         }
       } else if (prof.data && !pendingRaw) {
+        setDepositEnabled(prof.data.default_deposit_enabled ?? false);
+        setDepositPercentage(prof.data.default_deposit_percentage ?? 20);
         setSections((prevSections) => {
           const n = [...prevSections];
           if (n[0]) {
@@ -444,7 +456,9 @@ function NewEstimateContent() {
         customRef,
         businessName,
         marginMode,
-        globalMargin
+        globalMargin,
+        depositEnabled,
+        depositPercentage
       };
       localStorage.setItem(
         'pactestim_pending_estimate',
@@ -522,7 +536,9 @@ function NewEstimateContent() {
       country_snapshot: profile.country,
       currency_snapshot: profile.currency,
       margin_mode_snapshot: marginMode,
-      global_margin_snapshot: globalMargin
+      global_margin_snapshot: globalMargin,
+      deposit_enabled: depositEnabled,
+      deposit_percentage: depositPercentage
     };
 
     const res = editId
@@ -658,20 +674,20 @@ function NewEstimateContent() {
             </Link>
           </div>
 
-          {/* Global Pricing Strategy Block */}
-          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 shrink-0">
-                {profile?.country === 'FR'
-                  ? 'Stratégie de Marge:'
-                  : 'Margin Strategy:'}
-              </span>
+          {/* Separate Configuration Blocks Container */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col gap-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+              {profile?.country === 'FR'
+                ? 'Stratégie de Marge'
+                : 'Margin Strategy'}
+            </label>
+            <div className="flex flex-row gap-3 items-center w-full">
               <Listbox
                 value={marginMode}
                 onChange={(val: any) => setMarginMode(val)}
               >
-                <div className="relative w-full sm:w-56">
-                  <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                <div className="relative flex-1">
+                  <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer h-[44px]">
                     <span className="block truncate">
                       {marginMode === 'none'
                         ? profile?.country === 'FR'
@@ -694,7 +710,9 @@ function NewEstimateContent() {
                           : 'Granular (Line Item)'
                         : ''}
                     </span>
-                    <span className="pointer-events-none text-gray-400">▼</span>
+                    <span className="pointer-events-none text-gray-400 text-[10px]">
+                      ▼
+                    </span>
                   </ListboxButton>
                   <Transition
                     as={Fragment}
@@ -745,14 +763,9 @@ function NewEstimateContent() {
                   </Transition>
                 </div>
               </Listbox>
-            </div>
 
-            {marginMode === 'global' && (
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
-                  {profile?.country === 'FR' ? 'Global (%):' : 'Global (%):'}
-                </span>
-                <div className="relative w-full sm:w-32">
+              {marginMode === 'global' && (
+                <div className="relative w-24 sm:w-28 animate-fade-in shrink-0">
                   <input
                     type="number"
                     min="0"
@@ -762,15 +775,15 @@ function NewEstimateContent() {
                         Math.max(0, parseFloat(e.target.value) || 0)
                       )
                     }
-                    className="w-full p-3.5 pr-8 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right"
+                    className="w-full p-3 pr-8 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right h-[44px] text-sm text-blue-900 shadow-inner"
                     placeholder="0"
                   />
-                  <span className="absolute right-3 top-3.5 text-[10px] font-black text-gray-400 pointer-events-none">
+                  <span className="absolute right-3 top-3.5 text-[10px] font-black text-blue-400 pointer-events-none">
                     %
                   </span>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Guest Lock Context Overlay */}
@@ -1168,8 +1181,8 @@ function NewEstimateContent() {
                   </div>
                 )}
                 {/* Enhanced Labor Block */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
-                  <div className="col-span-1 sm:col-span-4 lg:col-span-5 mb-2 flex justify-between items-center border-b border-slate-200/50 pb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
+                  <div className="col-span-2 sm:col-span-4 lg:col-span-5 mb-2 flex justify-between items-center border-b border-slate-200/50 pb-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       {profile?.country === 'FR'
                         ? "Main-d'œuvre"
@@ -1228,11 +1241,11 @@ function NewEstimateContent() {
                     </Listbox>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
                       {sec.laborType === 'daily'
                         ? profile?.country === 'FR'
-                          ? 'Jours estimées'
+                          ? 'Jours estimés'
                           : 'Est. Days'
                         : profile?.country === 'FR'
                           ? 'Heures estimées'
@@ -1242,7 +1255,7 @@ function NewEstimateContent() {
                       type="number"
                       min="0"
                       placeholder="0"
-                      className="w-full p-3 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white"
+                      className="w-full p-3 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white text-sm h-[44px]"
                       value={sec.laborHours === 0 ? '' : sec.laborHours}
                       onChange={(e) =>
                         updateSection(
@@ -1254,8 +1267,8 @@ function NewEstimateContent() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
                       {sec.laborType === 'daily'
                         ? profile?.country === 'FR'
                           ? 'Taux/Jour'
@@ -1269,7 +1282,7 @@ function NewEstimateContent() {
                       type="number"
                       min="0"
                       placeholder="0"
-                      className="w-full p-3 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white"
+                      className="w-full p-3 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white text-sm h-[44px]"
                       value={sec.hourlyRate === 0 ? '' : sec.hourlyRate}
                       onChange={(e) =>
                         updateSection(
@@ -1281,8 +1294,8 @@ function NewEstimateContent() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
                       {profile?.country === 'FR' ? 'Taxe (%)' : 'Tax Rate (%)'}
                     </label>
                     <div className="relative">
@@ -1290,7 +1303,7 @@ function NewEstimateContent() {
                         type="number"
                         min="0"
                         placeholder="0"
-                        className="w-full p-3 pr-8 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white"
+                        className="w-full p-3 pr-8 rounded-lg border border-slate-200 font-mono font-bold outline-none focus:border-blue-500 bg-white text-sm h-[44px]"
                         value={sec.laborTaxRate === 0 ? '' : sec.laborTaxRate}
                         onChange={(e) =>
                           updateSection(
@@ -1308,7 +1321,7 @@ function NewEstimateContent() {
 
                   {marginMode === 'granular' && (
                     <div className="col-span-1 sm:col-span-1 lg:col-span-2">
-                      <label className="block text-[10px] font-black text-blue-500 uppercase mb-1.5 tracking-widest">
+                      <label className="block text-[10px] font-black text-blue-500 uppercase mb-1.5 tracking-widest truncate">
                         {profile?.country === 'FR'
                           ? 'Marge Travail'
                           : 'Labor Margin'}
@@ -1318,7 +1331,7 @@ function NewEstimateContent() {
                           type="number"
                           min="0"
                           placeholder="0"
-                          className="w-full p-3 pr-8 rounded-lg border border-blue-200 font-mono font-bold outline-none focus:border-blue-500 bg-blue-50/50 text-blue-900"
+                          className="w-full p-3 pr-8 rounded-lg border border-blue-200 font-mono font-bold outline-none focus:border-blue-500 bg-blue-50/50 text-blue-900 text-sm h-[44px]"
                           value={
                             sec.laborMarginRate === 0
                               ? ''
@@ -1636,14 +1649,15 @@ function NewEstimateContent() {
       </div>
 
       {/* Sticky Footer */}
-      <div className="sticky bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] px-6 sm:px-8 py-5 z-40 transition-all print:hidden mt-auto">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
-          <div className="flex flex-wrap items-center gap-8 sm:gap-12 w-full sm:w-auto justify-between sm:justify-start">
+      <div className="sticky bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] px-6 sm:px-8 py-4 z-40 transition-all print:hidden mt-auto">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          {/* Left Block: Pure Financial Data Displays */}
+          <div className="flex items-center justify-between md:justify-start gap-6 sm:gap-10 w-full md:w-auto">
             <div>
               <span className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
                 {lang.subtotal || 'Subtotal'}
               </span>
-              <span className="font-mono font-bold text-lg text-gray-700">
+              <span className="font-mono font-bold text-base text-gray-700">
                 {profile?.currency === 'EUR' ? '€' : '$'}
                 {(subtotalCents / 100)
                   .toFixed(2)
@@ -1655,7 +1669,7 @@ function NewEstimateContent() {
               <span className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
                 {lang.tax || 'Tax'}
               </span>
-              <span className="font-mono font-bold text-lg text-gray-500">
+              <span className="font-mono font-bold text-base text-gray-500">
                 {profile?.currency === 'EUR' ? '€' : '$'}
                 {(tax / 100)
                   .toFixed(2)
@@ -1663,11 +1677,11 @@ function NewEstimateContent() {
               </span>
             </div>
 
-            <div className="sm:border-l sm:border-gray-100 sm:pl-10">
+            <div className="border-l border-gray-100 pl-6 sm:pl-8">
               <span className="block text-[10px] font-black uppercase tracking-widest text-blue-600 mb-0.5">
                 {lang.grandTotal || 'Grand Total'}
               </span>
-              <span className="font-mono font-black text-2xl text-gray-950 tracking-tight">
+              <span className="font-mono font-black text-xl sm:text-2xl text-gray-950 tracking-tight">
                 {profile?.currency === 'EUR' ? '€' : '$'}
                 {(totalCents / 100)
                   .toFixed(2)
@@ -1676,17 +1690,79 @@ function NewEstimateContent() {
             </div>
           </div>
 
-          <div className="w-full sm:w-auto shrink-0">
-            <button
-              onClick={handleSave}
-              className="w-full sm:w-auto bg-blue-600 text-white px-10 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-blue-600/10 hover:bg-blue-700 hover:shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              {editId
-                ? lang.save || 'Save'
-                : profile?.country === 'FR'
-                  ? 'Générer le Devis'
-                  : 'Generate Estimate'}
-            </button>
+          {/* Right Block: Modifiers & Primary Actions */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto justify-end">
+            {/* Ultra-Compact Stationary Deposit Capsule */}
+            <div className="w-full sm:w-[250px] h-10 bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 shadow-sm select-none shrink-0">
+              {/* Left Section: Strict layout tree node with invariant dimensions */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">
+                  {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDepositEnabled(!depositEnabled)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
+                  />
+                </button>
+              </div>
+
+              {/* Central Divider: Persistent baseline separation line */}
+              <div className="h-4 border-l border-gray-200/80 mx-2.5 shrink-0" />
+
+              {/* Right Section: Invariant layout geometry. State changes manipulate opacity only to prevent layout shifts */}
+              <div
+                className={`flex items-center gap-2.5 flex-1 justify-end transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              >
+                <div className="relative w-8 shrink-0">
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    disabled={!depositEnabled}
+                    value={depositPercentage}
+                    onChange={(e) =>
+                      setDepositPercentage(
+                        Math.min(
+                          100,
+                          Math.max(1, parseInt(e.target.value) || 0)
+                        )
+                      )
+                    }
+                    className="w-full pb-0.5 border-b border-gray-200 focus:border-blue-500 font-mono font-bold text-right text-xs text-blue-900 bg-transparent outline-none transition-colors"
+                  />
+                  <span className="absolute right-0 bottom-0.5 text-[8px] font-black text-blue-400 pointer-events-none">
+                    %
+                  </span>
+                </div>
+
+                <div className="text-right min-w-[60px] max-w-[75px] truncate">
+                  <span className="font-mono font-bold text-xs text-gray-900 tracking-tight">
+                    {profile?.currency === 'EUR' ? '€' : '$'}
+                    {((totalCents * depositPercentage) / 10000)
+                      .toFixed(2)
+                      .replace('.', profile?.country === 'FR' ? ',' : '.')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Action Button */}
+            <div className="w-full sm:w-auto shrink-0">
+              <button
+                onClick={handleSave}
+                className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-blue-600/10 hover:bg-blue-700 hover:shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] h-[40px] flex items-center justify-center"
+              >
+                {editId
+                  ? lang.save || 'Save'
+                  : profile?.country === 'FR'
+                    ? 'Générer le Devis'
+                    : 'Generate Estimate'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
