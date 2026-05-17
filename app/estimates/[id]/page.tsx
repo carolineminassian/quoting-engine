@@ -660,7 +660,8 @@ export default function EstimateView() {
                   href="/dashboard"
                   className="text-center bg-white border border-gray-200 px-4 py-2 rounded font-bold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  &larr; Dashboard
+                  &larr;{' '}
+                  {profile.country === 'FR' ? 'Tableau de bord' : 'Dashboard'}
                 </Link>
 
                 {!estimate.is_locked && (
