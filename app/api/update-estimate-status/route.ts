@@ -62,25 +62,27 @@ export async function POST(request: Request) {
 
     const emailPromises = [];
 
+    // Format a safe fallback ID using the estimateId from the request payload
+    const displayId = estimate.custom_id || estimateId.slice(0, 8);
+
     // 3. Email 1: Notification to Business Owner (PactEstim Branding)
     const ownerSubject = isFr
-      ? `Devis ${status === 'approved' ? 'Approuvé' : 'Refusé'} par ${estimate.client_name}`
-      : `Estimate ${status === 'approved' ? 'Approved' : 'Rejected'} by ${estimate.client_name}`;
+      ? `[PactEstim] Devis ${status === 'approved' ? 'Approuvé' : 'Refusé'} par ${estimate.client_name}`
+      : `[PactEstim] Estimate ${status === 'approved' ? 'Approved' : 'Rejected'} by ${estimate.client_name}`;
 
     const ownerHtml = isFr
       ? `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
           ${pactEstimLogoHtml}
           <p style="font-size: 16px;">Bonjour,</p>
-          <p style="font-size: 16px; line-height: 1.5;">Votre client <strong>${estimate.client_name}</strong> a <strong>${status === 'approved' ? 'approuvé' : 'refusé'}</strong> le devis #${estimate.custom_id}.</p>
+          <p style="font-size: 16px; line-height: 1.5;">Votre client <strong>${estimate.client_name}</strong> a <strong>${status === 'approved' ? 'approuvé' : 'refusé'}</strong> le devis #${displayId}.</p>
           <a href="${estimateUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: bold; font-size: 14px;">Voir le devis</a>
         </div>`
       : `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
           ${pactEstimLogoHtml}
           <p style="font-size: 16px;">Hello,</p>
-          <p style="font-size: 16px; line-height: 1.5;">Your client <strong>${estimate.client_name}</strong> has <strong>${status}</strong> estimate #${estimate.custom_id}.</p>
+          <p style="font-size: 16px; line-height: 1.5;">Your client <strong>${estimate.client_name}</strong> has <strong>${status}</strong> estimate #${displayId}.</p>
           <a href="${estimateUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: bold; font-size: 14px;">View Estimate</a>
         </div>`;
-
     emailPromises.push(
       resend.emails.send({
         from: 'PactEstim <noreply@pactestim.com>',
@@ -93,21 +95,21 @@ export async function POST(request: Request) {
     // 4. Email 2: Confirmation to Client (Business Owner Branding - ONLY if approved)
     if (status === 'approved' && estimate.client_email) {
       const clientSubject = isFr
-        ? `Confirmation d'accord : Devis #${estimate.custom_id}`
-        : `Agreement Confirmation: Estimate #${estimate.custom_id}`;
+        ? `Confirmation d'accord : Devis #${displayId}`
+        : `Agreement Confirmation: Estimate #${displayId}`;
 
       const clientHtml = isFr
         ? `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
             ${ownerLogoHtml}
             <p style="font-size: 16px;">Bonjour ${estimate.client_name},</p>
-            <p style="font-size: 16px; line-height: 1.5;">Nous confirmons la validation de votre devis <strong>#${estimate.custom_id}</strong> avec <strong>${profile.business_name}</strong>.</p>
+            <p style="font-size: 16px; line-height: 1.5;">Nous confirmons la validation de votre devis <strong>#${displayId}</strong> avec <strong>${profile.business_name}</strong>.</p>
             <p style="font-size: 16px; line-height: 1.5;">Vous pouvez consulter le document finalisé à tout moment via le lien ci-dessous.</p>
             <a href="${estimateUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: bold; font-size: 14px;">Consulter le devis</a>
           </div>`
         : `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
             ${ownerLogoHtml}
             <p style="font-size: 16px;">Hello ${estimate.client_name},</p>
-            <p style="font-size: 16px; line-height: 1.5;">We confirm your approval of estimate <strong>#${estimate.custom_id}</strong> with <strong>${profile.business_name}</strong>.</p>
+            <p style="font-size: 16px; line-height: 1.5;">We confirm your approval of estimate <strong>#${displayId}</strong> with <strong>${profile.business_name}</strong>.</p>
             <p style="font-size: 16px; line-height: 1.5;">You can view the finalized document at any time using the link below.</p>
             <a href="${estimateUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: bold; font-size: 14px;">View Estimate</a>
           </div>`;
