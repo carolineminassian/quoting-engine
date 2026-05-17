@@ -516,6 +516,75 @@ export default function EstimateView() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    setLoading(true);
+    try {
+      const { pdf } = await import('@react-pdf/renderer');
+      const EstimatePDF = (await import('./EstimatePDF')).default;
+
+      const { subtotal, groups } = getTaxSummary();
+      const isShowingDetails = estimate.is_locked
+        ? estimate.show_details_snapshot === true
+        : showDetails;
+
+      const preparedSections = estimate.sections.map((sec: any) => ({
+        title:
+          sec.title ||
+          (profile.country === 'FR'
+            ? 'Services Professionnels'
+            : 'Professional Services'),
+        description: generateDescription(sec),
+        total: getSectionTotal(sec),
+        hasDetails: isShowingDetails,
+        laborHours: sec.laborHours || 0,
+        laborType: sec.laborType,
+        laborRate: getEffectiveLaborRateCents(sec) / 100,
+        laborTaxRate:
+          sec.laborTaxRate !== undefined ? sec.laborTaxRate : profile.tax_rate,
+        items: (sec.items || []).map((item: any) => {
+          const m = materials.find((mat) => mat.id === item.materialId);
+          return {
+            name: item.name || m?.name || 'Material Item',
+            qty: item.qty || 0,
+            unit:
+              lang?.units?.[item.unit || m?.unit || ''] ||
+              item.unit ||
+              m?.unit ||
+              '',
+            cost: getEffectiveItemCostCents(sec, item) / 100,
+            taxRate:
+              item.taxRate !== undefined ? item.taxRate : profile.tax_rate
+          };
+        })
+      }));
+
+      const blob = await pdf(
+        <EstimatePDF
+          estimate={estimate}
+          profile={profile}
+          lang={lang}
+          subtotal={subtotal / 100}
+          taxGroups={Object.entries(groups) as any}
+          grandTotal={estimate.total_amount_cents / 100}
+          sections={preparedSections}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${profile.country === 'FR' ? 'Devis' : 'Estimate'}-${estimate.custom_id || estimate.id.slice(0, 8)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (pdfError) {
+      console.error('Failed to compile native vector PDF layout:', pdfError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFinalize = () => {
     setDialog({
       type: 'confirm',
@@ -651,12 +720,17 @@ export default function EstimateView() {
                     </button>
                   )}
                   <button
-                    onClick={() => window.print()}
-                    className="flex-1 sm:flex-none bg-blue-600 text-white px-6 py-3 rounded font-bold text-sm shadow-md"
+                    disabled={loading}
+                    onClick={handleDownloadPDF}
+                    className="flex-1 sm:flex-none bg-blue-600 text-white px-6 py-3 rounded font-bold text-sm shadow-md disabled:opacity-50"
                   >
-                    {profile.country === 'FR'
-                      ? 'Imprimer / PDF'
-                      : 'Save / Print'}
+                    {loading
+                      ? profile.country === 'FR'
+                        ? 'Génération...'
+                        : 'Generating...'
+                      : profile.country === 'FR'
+                        ? 'Télécharger PDF'
+                        : 'Download PDF'}
                   </button>
                 </>
               ) : (
@@ -1036,12 +1110,14 @@ export default function EstimateView() {
           </div>
 
           {/* --- INTERACTIVE SECURE COMMENT THREAD --- */}
-          <div className="mt-8 bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:hidden">
-            <h3 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-900 border-b-2 border-black pb-2">
-              {profile.country === 'FR'
-                ? 'Discussions & Modifications'
-                : 'Discussion & Modifications'}
-            </h3>
+          {estimate.is_locked && (
+            <div className="mt-8 bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:hidden">
+              <h3 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-900 border-b-2 border-black pb-2">
+                {profile.country === 'FR'
+                  ? 'Discussions & Modifications'
+                  : 'Discussion & Modifications'}
+              </h3>
+          )}
 
             {/* Messages Wrapper */}
             <div className="space-y-4 max-h-96 overflow-y-auto mb-6 pr-2">
@@ -1120,6 +1196,7 @@ export default function EstimateView() {
               </div>
             </form>
           </div>
+        )}
         </div>
 
         {/* --- POPUP DIALOGS --- */}
