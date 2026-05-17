@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   totalsContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 20
+    marginTop: 40
   },
   totalsBox: {
     width: 240

@@ -1117,86 +1117,85 @@ export default function EstimateView() {
                   ? 'Discussions & Modifications'
                   : 'Discussion & Modifications'}
               </h3>
-          )}
 
-            {/* Messages Wrapper */}
-            <div className="space-y-4 max-h-96 overflow-y-auto mb-6 pr-2">
-              {comments.length === 0 ? (
-                <p className="text-xs text-gray-400 font-medium italic">
-                  {profile.country === 'FR'
-                    ? 'Aucun message pour le moment. Utilisez le formulaire ci-dessous pour demander des ajustements.'
-                    : 'No messages yet. Use the field below to request adjustment notes.'}
-                </p>
-              ) : (
-                comments.map((comm) => (
-                  <div
-                    key={comm.id}
-                    className={`flex flex-col max-w-[85%] rounded p-4 border ${
-                      comm.is_owner
-                        ? 'ml-auto bg-blue-50/50 border-blue-100 items-end'
-                        : 'mr-auto bg-gray-50 border-gray-100 items-start'
-                    }`}
-                  >
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span
-                        className={`text-[10px] font-black uppercase tracking-wider ${comm.is_owner ? 'text-blue-600' : 'text-gray-500'}`}
-                      >
-                        {comm.author_name}
-                      </span>
-                      <span className="text-[9px] text-gray-300 font-mono">
-                        {new Date(comm.created_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
+              {/* Messages Wrapper */}
+              <div className="space-y-4 max-h-96 overflow-y-auto mb-6 pr-2">
+                {comments.length === 0 ? (
+                  <p className="text-xs text-gray-400 font-medium italic">
+                    {profile.country === 'FR'
+                      ? 'Aucun message pour le moment. Utilisez le formulaire ci-dessous pour demander des ajustements.'
+                      : 'No messages yet. Use the field below to request adjustment notes.'}
+                  </p>
+                ) : (
+                  comments.map((comm) => (
+                    <div
+                      key={comm.id}
+                      className={`flex flex-col max-w-[85%] rounded p-4 border ${
+                        comm.is_owner
+                          ? 'ml-auto bg-blue-50/50 border-blue-100 items-end'
+                          : 'mr-auto bg-gray-50 border-gray-100 items-start'
+                      }`}
+                    >
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span
+                          className={`text-[10px] font-black uppercase tracking-wider ${comm.is_owner ? 'text-blue-600' : 'text-gray-500'}`}
+                        >
+                          {comm.author_name}
+                        </span>
+                        <span className="text-[9px] text-gray-300 font-mono">
+                          {new Date(comm.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
+                        {comm.content}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
-                      {comm.content}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Submission Input Block */}
-            <form
-              onSubmit={handlePostComment}
-              className="mt-4 border-t border-gray-100 pt-4"
-            >
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                {profile.country === 'FR'
-                  ? 'Ajouter un message'
-                  : 'Add a message'}
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2 items-stretch">
-                <textarea
-                  rows={2}
-                  value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  placeholder={
-                    profile.country === 'FR'
-                      ? "Demandez des modifications sur les quantités, la main-d'œuvre ou les matériaux..."
-                      : 'Request revisions regarding service quantities, labor rates, or material phases...'
-                  }
-                  className="flex-1 p-3 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-600 resize-none text-black placeholder-gray-300 bg-white"
-                />
-                <button
-                  type="submit"
-                  disabled={submittingComment || !commentInput.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-3 rounded tracking-wide transition-colors disabled:opacity-40 self-end sm:self-stretch flex items-center justify-center w-full sm:w-auto min-w-[120px]"
-                >
-                  {submittingComment
-                    ? profile.country === 'FR'
-                      ? 'Envoi...'
-                      : 'Sending...'
-                    : profile.country === 'FR'
-                      ? 'Envoyer'
-                      : 'Send'}
-                </button>
+                  ))
+                )}
               </div>
-            </form>
-          </div>
-        )}
+
+              {/* Submission Input Block */}
+              <form
+                onSubmit={handlePostComment}
+                className="mt-4 border-t border-gray-100 pt-4"
+              >
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                  {profile.country === 'FR'
+                    ? 'Ajouter un message'
+                    : 'Add a message'}
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                  <textarea
+                    rows={2}
+                    value={commentInput}
+                    onChange={(e) => setCommentInput(e.target.value)}
+                    placeholder={
+                      profile.country === 'FR'
+                        ? "Demandez des modifications sur les quantités, la main-d'œuvre ou les matériaux..."
+                        : 'Request revisions regarding service quantities, labor rates, or material phases...'
+                    }
+                    className="flex-1 p-3 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-600 resize-none text-black placeholder-gray-300 bg-white"
+                  />
+                  <button
+                    type="submit"
+                    disabled={submittingComment || !commentInput.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-3 rounded tracking-wide transition-colors disabled:opacity-40 self-end sm:self-stretch flex items-center justify-center w-full sm:w-auto min-w-[120px]"
+                  >
+                    {submittingComment
+                      ? profile.country === 'FR'
+                        ? 'Envoi...'
+                        : 'Sending...'
+                      : profile.country === 'FR'
+                        ? 'Envoyer'
+                        : 'Send'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* --- POPUP DIALOGS --- */}
