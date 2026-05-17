@@ -643,9 +643,9 @@ export default function DashboardPage() {
                           !est.is_locked
                             ? 'bg-yellow-50 text-yellow-600'
                             : est.client_status === 'approved'
-                              ? 'bg-green-100 text-green-700'
+                              ? 'bg-green-50 text-green-600'
                               : est.client_status === 'rejected'
-                                ? 'bg-red-100 text-red-700'
+                                ? 'bg-red-50 text-red-600'
                                 : 'bg-blue-50 text-blue-600'
                         }`}
                       >
@@ -699,9 +699,9 @@ export default function DashboardPage() {
                       !est.is_locked
                         ? 'bg-yellow-50 text-yellow-600'
                         : est.client_status === 'approved'
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-green-50 text-green-600'
                           : est.client_status === 'rejected'
-                            ? 'bg-red-100 text-red-700'
+                            ? 'bg-red-50 text-red-600'
                             : 'bg-blue-50 text-blue-600'
                     }`}
                   >

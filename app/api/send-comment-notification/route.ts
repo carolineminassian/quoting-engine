@@ -42,10 +42,9 @@ export async function POST(request: Request) {
     const ownerEmail = user.email;
     const isFr = country === 'FR';
 
-    // Reference your hosted SVG dynamically based on the user's country
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL || 'https://yourdomain.com';
-    const logoFile = isFr ? 'favicon-fr.svg' : 'favicon-us.svg';
+    // Reference your hosted PNG dynamically based on the user's country
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pactestim.com';
+    const logoFile = isFr ? 'favicon-fr.png' : 'favicon-us.png';
     const pactEstimLogoHtml = `<img src="${baseUrl}/${logoFile}" alt="PactEstim" style="max-height: 40px; margin-bottom: 24px; display: block;" />`;
 
     // 2. Format the email content
