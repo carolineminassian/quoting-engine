@@ -321,6 +321,9 @@ export default function EstimateView() {
       country_snapshot: estimate.country_snapshot,
       tax_rate_snapshot: estimate.tax_rate_snapshot,
       business_name_snapshot: estimate.business_name_snapshot,
+      payment_terms_snapshot: estimate.payment_terms_snapshot,
+      deposit_enabled: estimate.deposit_enabled,
+      deposit_percentage: estimate.deposit_percentage,
       is_locked: false,
       parent_estimate_id: estimate.parent_estimate_id || estimate.id,
       version: nextVersion,
@@ -637,6 +640,12 @@ export default function EstimateView() {
   const isShowingDetails = estimate.is_locked
     ? estimate.show_details_snapshot === true
     : showDetails;
+
+  const rawTerms = estimate.payment_terms_snapshot || '30_days';
+  const isUponReceipt = rawTerms === 'upon_receipt';
+  const displayPaymentDays = isUponReceipt
+    ? 30
+    : parseInt(rawTerms.replace('_days', '')) || 30;
 
   return (
     <div className="min-h-screen bg-gray-100 text-black font-sans print:bg-white flex flex-col">
@@ -1149,20 +1158,37 @@ export default function EstimateView() {
                       : 'Standard business estimate. Certified digital record. Valid for 30 days from issuance.'}
                   </p>
                 </div>
-                <div className="text-left sm:text-right min-w-0">
+                <div className="text-left sm:text-right min-w-0 sm:pl-16">
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
                     {profile.country === 'FR'
                       ? 'Conditions de Paiement'
                       : 'Terms'}
                   </p>
-                  <p className="text-[10px] text-gray-400 leading-relaxed font-bold break-words">
-                    {profile.country === 'FR'
-                      ? estimate.deposit_enabled
-                        ? 'Acompte exigible à la signature pour valider le devis. Solde sous 30 jours.'
-                        : 'Règlement sous 30 jours.'
-                      : estimate.deposit_enabled
-                        ? 'Deposit due upon acceptance to initiate work. Balance due upon receipt.'
-                        : 'Payment due upon receipt.'}
+                  <p
+                    className="text-[10px] text-gray-400 leading-relaxed font-bold break-words"
+                    style={{ paddingLeft: '64px' }}
+                  >
+                    {profile.country === 'FR' ? (
+                      <>
+                        {estimate.deposit_enabled
+                          ? `Acompte de ${estimate.deposit_percentage || 0}% exigible à la signature pour le lancement du projet. Solde dû ${
+                              isUponReceipt
+                                ? 'dès réception.'
+                                : `sous ${displayPaymentDays} jours.`
+                            }`
+                          : `Règlement ${isUponReceipt ? 'dès réception.' : `sous ${displayPaymentDays} jours.`}`}
+                      </>
+                    ) : (
+                      <>
+                        {estimate.deposit_enabled
+                          ? `Deposit of ${estimate.deposit_percentage || 0}% due upon acceptance to initiate work. Balance due ${
+                              isUponReceipt
+                                ? 'upon receipt.'
+                                : `within ${displayPaymentDays} days.`
+                            }`
+                          : `Payment due ${isUponReceipt ? 'upon receipt.' : `within ${displayPaymentDays} days.`}`}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

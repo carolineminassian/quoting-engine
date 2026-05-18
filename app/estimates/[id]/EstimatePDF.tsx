@@ -411,57 +411,48 @@ export default function EstimatePDF({
                 : 'Standard business estimate. Certified digital record. Valid for 30 days from issuance.'}
             </Text>
           </View>
-          <View style={[styles.footerBlock, { alignItems: 'flex-end' }]}>
-            <Text style={styles.footerTitle}>
+          <View
+            style={[
+              styles.footerBlock,
+              { alignItems: 'flex-end', textAlign: 'right' }
+            ]}
+          >
+            <Text
+              style={[
+                styles.footerTitle,
+                { width: '100%', textAlign: 'right' }
+              ]}
+            >
               {isFr ? 'Conditions de Paiement' : 'Terms'}
             </Text>
-            <Text style={[styles.footerText, { fontWeight: 'bold' }]}>
+            <Text
+              style={[styles.footerText, { fontWeight: 'bold', width: '100%' }]}
+            >
               {(() => {
-                const terms = estimate.payment_terms_snapshot || '30_days';
+                const rawTerms = estimate.payment_terms_snapshot || '30_days';
+                const isUponReceipt = rawTerms === 'upon_receipt';
+                const displayPaymentDays = isUponReceipt
+                  ? 30
+                  : parseInt(rawTerms.replace('_days', '')) || 30;
+
                 if (isFr) {
                   if (estimate.deposit_enabled) {
-                    const suffix =
-                      terms === 'upon_receipt'
+                    return `Acompte de ${estimate.deposit_percentage || 0}% exigible à la signature pour le lancement du projet. Solde dû ${
+                      isUponReceipt
                         ? 'dès réception.'
-                        : terms === '15_days'
-                          ? 'sous 15 jours.'
-                          : terms === '60_days'
-                            ? 'sous 60 jours.'
-                            : 'sous 30 jours.';
-                    return `Acompte exigible à la signature pour valider le devis. Solde ${suffix}`;
+                        : `sous ${displayPaymentDays} jours.`
+                    }`;
                   }
-                  switch (terms) {
-                    case 'upon_receipt':
-                      return 'Règlement dès réception de la facture.';
-                    case '15_days':
-                      return 'Règlement sous 15 jours.';
-                    case '60_days':
-                      return 'Règlement sous 60 jours.';
-                    default:
-                      return 'Règlement sous 30 jours.';
-                  }
+                  return `Règlement ${isUponReceipt ? 'dès réception.' : `sous ${displayPaymentDays} jours.`}`;
                 } else {
                   if (estimate.deposit_enabled) {
-                    const suffix =
-                      terms === 'upon_receipt'
+                    return `Deposit of ${estimate.deposit_percentage || 0}% due upon acceptance to initiate work. Balance due ${
+                      isUponReceipt
                         ? 'upon receipt.'
-                        : terms === '15_days'
-                          ? 'within 15 days.'
-                          : terms === '60_days'
-                            ? 'within 60 days.'
-                            : 'within 30 days.';
-                    return `Deposit due upon acceptance to initiate work. Balance due ${suffix}`;
+                        : `within ${displayPaymentDays} days.`
+                    }`;
                   }
-                  switch (terms) {
-                    case 'upon_receipt':
-                      return 'Payment due upon receipt.';
-                    case '15_days':
-                      return 'Payment due within 15 days.';
-                    case '60_days':
-                      return 'Payment due within 60 days.';
-                    default:
-                      return 'Payment due within 30 days.';
-                  }
+                  return `Payment due ${isUponReceipt ? 'upon receipt.' : `within ${displayPaymentDays} days.`}`;
                 }
               })()}
             </Text>

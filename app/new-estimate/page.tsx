@@ -6,13 +6,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 import MaterialCombobox from '@/components/MaterialCombobox';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 import {
   Listbox,
   ListboxButton,
   ListboxOptions,
   ListboxOption,
   Transition,
-  Switch
+  Switch,
+  RadioGroup,
+  Radio
 } from '@headlessui/react';
 
 const LoadingDots = () => (
@@ -739,7 +742,6 @@ function NewEstimateContent() {
                 : 'Cancel & Exit'}
             </Link>
           </div>
-
           {/* Guest Lock Context Overlay */}
           {isGuest && (
             <div className="bg-blue-50 p-6 sm:p-8 rounded-xl border border-blue-100 mb-8 flex flex-col gap-4">
@@ -769,7 +771,6 @@ function NewEstimateContent() {
               </div>
             </div>
           )}
-
           {/* Client Contact Section */}
           <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -887,17 +888,23 @@ function NewEstimateContent() {
               </div>
 
               <div className="col-span-1 sm:col-span-2 group relative">
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                <div className="flex items-center border border-gray-200 rounded-xl focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs rounded-l-xl">
                     A
                   </div>
-                  <input
+                  <AddressAutocomplete
+                    value={client.address || ''}
+                    userCountry={profile?.country || 'US'}
                     placeholder={lang.address || 'Street Address'}
-                    maxLength={250}
-                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                    value={client.address}
-                    onChange={(e) =>
-                      setClient({ ...client, address: e.target.value })
+                    onChange={(val) => setClient({ ...client, address: val })}
+                    onSelect={(components) =>
+                      setClient({
+                        ...client,
+                        address: components.address,
+                        city: components.city,
+                        zip: components.zip,
+                        country: components.country
+                      })
                     }
                   />
                 </div>
@@ -959,7 +966,6 @@ function NewEstimateContent() {
               </div>
             </div>
           </div>
-
           {/* Internal Strategy (Margin) Area */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
             {/* Margin Settings Column */}
@@ -1074,7 +1080,6 @@ function NewEstimateContent() {
               </div>
             </div>
           </div>
-
           {/* Builder Sections */}
           <div className="space-y-6">
             {sections.map((sec, sIdx) => (
@@ -1119,7 +1124,6 @@ function NewEstimateContent() {
                         }}
                         onChange={(e) => {
                           updateSection(sIdx, 'title', e.target.value);
-                          // Only reveal the dropdown if the user has typed actual characters
                           if (e.target.value.trim() !== '') {
                             setActiveDropdownIdx(sIdx);
                           } else {
@@ -1264,6 +1268,7 @@ function NewEstimateContent() {
                         ? 'Description du Service'
                         : 'Service Description'}
                     </label>
+
                     <input
                       type="text"
                       maxLength={500}
@@ -1286,6 +1291,7 @@ function NewEstimateContent() {
                             ? 'Marge Service:'
                             : 'Service Margin:'}
                         </span>
+
                         <div className="relative w-24">
                           <input
                             type="number"
@@ -1303,6 +1309,7 @@ function NewEstimateContent() {
                             className="w-full p-2 pr-6 border border-blue-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right text-sm"
                             placeholder="0"
                           />
+
                           <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
                             %
                           </span>
@@ -1335,10 +1342,12 @@ function NewEstimateContent() {
                                 ? 'Taux Horaire'
                                 : 'Hourly Rate'}
                           </span>
+
                           <span className="pointer-events-none text-slate-400 text-[10px]">
                             ▼
                           </span>
                         </ListboxButton>
+
                         <Transition
                           as={Fragment}
                           leave="transition ease-in duration-100"
@@ -1356,6 +1365,7 @@ function NewEstimateContent() {
                                 ? 'Taux Horaire'
                                 : 'Hourly Rate'}
                             </ListboxOption>
+
                             <ListboxOption
                               value="daily"
                               className={({ active }) =>
@@ -1382,6 +1392,7 @@ function NewEstimateContent() {
                           ? 'Heures estimées'
                           : 'Est. Hours'}
                     </label>
+
                     <input
                       type="number"
                       min="0"
@@ -1409,6 +1420,7 @@ function NewEstimateContent() {
                           : 'Rate/Hour'}
                       ({profile?.currency === 'EUR' ? '€' : '$'})
                     </label>
+
                     <input
                       type="number"
                       min="0"
@@ -1429,6 +1441,7 @@ function NewEstimateContent() {
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
                       {profile?.country === 'FR' ? 'Taxe (%)' : 'Tax Rate (%)'}
                     </label>
+
                     <div className="relative">
                       <input
                         type="number"
@@ -1444,6 +1457,7 @@ function NewEstimateContent() {
                           )
                         }
                       />
+
                       <span className="absolute right-3 top-3.5 text-slate-400 text-[10px] font-bold pointer-events-none">
                         %
                       </span>
@@ -1457,6 +1471,7 @@ function NewEstimateContent() {
                           ? 'Marge Travail'
                           : 'Labor Margin'}
                       </label>
+
                       <div className="relative">
                         <input
                           type="number"
@@ -1476,6 +1491,7 @@ function NewEstimateContent() {
                             )
                           }
                         />
+
                         <span className="absolute right-3 top-3.5 text-blue-400 text-[10px] font-bold pointer-events-none">
                           %
                         </span>
@@ -1484,6 +1500,7 @@ function NewEstimateContent() {
                   )}
                 </div>
                 {/* Material Items Header & Loop */}
+
                 <div className="mb-4">
                   <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-4">
                     {lang.materials || 'Materials'}
@@ -1496,12 +1513,14 @@ function NewEstimateContent() {
                         className="flex flex-col lg:flex-row gap-3 items-stretch bg-gray-50/50 p-3 rounded-lg border border-gray-100/50"
                       >
                         {/* Name & Material Box */}
+
                         <div className="flex-1 relative min-w-[200px]">
                           {item.materialId ? (
                             <div className="flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded text-sm relative h-[34px]">
                               <span className="font-bold text-gray-900 truncate pr-4 text-xs">
                                 {item.name}
                               </span>
+
                               <button
                                 onClick={() =>
                                   updateItem(sIdx, iIdx, 'materialId', '')
@@ -1557,14 +1576,16 @@ function NewEstimateContent() {
                             />
                           )}
                         </div>
-
                         {/* Inputs Grid */}
+
                         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                           {/* QTY */}
+
                           <div className="flex-1 min-w-[80px] sm:w-20 sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
                               {profile?.country === 'FR' ? 'Qté' : 'Qty'}
                             </span>
+
                             <input
                               type="number"
                               min="0"
@@ -1581,12 +1602,13 @@ function NewEstimateContent() {
                               }
                             />
                           </div>
-
                           {/* UNIT */}
+
                           <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none z-10 transition-colors group-focus-within:text-blue-500">
                               {profile?.country === 'FR' ? 'Unité' : 'Unit'}
                             </span>
+
                             <Listbox
                               value={getResolvedUnitKey(item.unit)}
                               onChange={(val) =>
@@ -1603,6 +1625,7 @@ function NewEstimateContent() {
                                       : 'ea'}
                                   </span>
                                 </ListboxButton>
+
                                 <Transition
                                   as={Fragment}
                                   leave="transition ease-in duration-100"
@@ -1627,12 +1650,13 @@ function NewEstimateContent() {
                               </div>
                             </Listbox>
                           </div>
-
                           {/* COST */}
+
                           <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
                               {profile?.country === 'FR' ? 'Prix' : 'Cost'}
                             </span>
+
                             <input
                               type="number"
                               min="0"
@@ -1659,12 +1683,13 @@ function NewEstimateContent() {
                               }
                             />
                           </div>
-
                           {/* TAX */}
+
                           <div className="flex-1 min-w-[90px] sm:w-[100px] sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
                               {profile?.country === 'FR' ? 'Taxe' : 'Tax'}
                             </span>
+
                             <input
                               type="number"
                               min="0"
@@ -1680,17 +1705,19 @@ function NewEstimateContent() {
                                 )
                               }
                             />
+
                             <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
                               %
                             </span>
                           </div>
-
                           {/* MARGIN (Granular) */}
+
                           {marginMode === 'granular' && (
                             <div className="flex-1 min-w-[90px] sm:w-[100px] sm:flex-none relative shrink-0 group">
                               <span className="absolute left-2 top-2.5 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-600">
                                 Mgn
                               </span>
+
                               <input
                                 type="number"
                                 min="0"
@@ -1710,13 +1737,14 @@ function NewEstimateContent() {
                                   )
                                 }
                               />
+
                               <span className="absolute right-2 top-2 text-[10px] font-black text-blue-400 pointer-events-none">
                                 %
                               </span>
                             </div>
                           )}
-
                           {/* DELETE ROW */}
+
                           <button
                             onClick={() => {
                               const n = [...sections];
@@ -1755,137 +1783,8 @@ function NewEstimateContent() {
               </div>
             ))}
           </div>
+          {/* Streamlined Full-Width Dashed Add Service Button */}
 
-          {/* Commercial Terms Block */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 mt-8">
-            {/* Payment Terms Column */}
-            <div className="flex flex-col gap-3">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-                {profile?.country === 'FR'
-                  ? 'Conditions de Règlement'
-                  : 'Payment Terms'}
-              </label>
-              <div className="flex flex-row gap-3 items-center w-full">
-                <Listbox
-                  value={paymentTermsType}
-                  onChange={(val: any) => setPaymentTermsType(val)}
-                >
-                  <div className="relative flex-1">
-                    <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer h-[44px]">
-                      <span className="block truncate">
-                        {paymentTermsType === 'upon_receipt'
-                          ? profile?.country === 'FR'
-                            ? 'Dès réception'
-                            : 'Upon Receipt'
-                          : profile?.country === 'FR'
-                            ? 'Jours net'
-                            : 'Net Days'}
-                      </span>
-                      <span className="pointer-events-none text-gray-400 text-[10px]">
-                        ▼
-                      </span>
-                    </ListboxButton>
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <ListboxOptions className="absolute top-full mt-1 z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
-                        <ListboxOption
-                          value="upon_receipt"
-                          className={({ active }) =>
-                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-                          }
-                        >
-                          {profile?.country === 'FR'
-                            ? 'Dès réception'
-                            : 'Upon Receipt'}
-                        </ListboxOption>
-                        <ListboxOption
-                          value="net_days"
-                          className={({ active }) =>
-                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-                          }
-                        >
-                          {profile?.country === 'FR' ? 'Jours net' : 'Net Days'}
-                        </ListboxOption>
-                      </ListboxOptions>
-                    </Transition>
-                  </div>
-                </Listbox>
-
-                {paymentTermsType === 'net_days' && (
-                  <div className="flex items-center w-32 sm:w-36 animate-fade-in shrink-0 border border-blue-200 rounded-xl focus-within:border-blue-500 bg-blue-50/30 shadow-inner h-[44px] transition-colors overflow-hidden">
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={paymentDays}
-                      onChange={(e) =>
-                        setPaymentDays(
-                          Math.min(
-                            120,
-                            Math.max(1, parseInt(e.target.value) || 1)
-                          )
-                        )
-                      }
-                      className="flex-1 w-full py-3 pl-3 pr-2 bg-transparent outline-none font-mono font-bold text-right text-sm text-blue-900"
-                    />
-                    <span className="pr-4 pl-2 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none shrink-0 select-none border-l border-blue-200/50">
-                      {profile?.country === 'FR' ? 'Jrs' : 'Days'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Deposit Column */}
-            <div className="flex flex-col gap-3">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-                {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
-              </label>
-              <div className="flex flex-row items-center w-full bg-gray-50/40 border border-gray-200 rounded-xl p-2 h-[44px] shadow-inner">
-                <Switch
-                  checked={depositEnabled}
-                  onChange={setDepositEnabled}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ml-1 ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
-                  />
-                </Switch>
-
-                <div className="h-5 border-l border-gray-200 mx-3 shrink-0" />
-
-                <div
-                  className={`flex items-center w-28 shrink-0 border border-blue-200 rounded-xl focus-within:border-blue-500 bg-blue-50/30 shadow-inner h-[44px] overflow-hidden ml-auto transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                >
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    disabled={!depositEnabled}
-                    value={depositPercentage}
-                    onChange={(e) =>
-                      setDepositPercentage(
-                        Math.min(
-                          100,
-                          Math.max(1, parseInt(e.target.value) || 0)
-                        )
-                      )
-                    }
-                    className="flex-1 w-full py-3 pl-3 pr-2 bg-transparent outline-none font-mono font-bold text-right text-sm text-blue-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <span className="pr-4 pl-3 text-[11px] font-black text-blue-400 uppercase tracking-widest pointer-events-none shrink-0 select-none border-l border-blue-200/50">
-                    %
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Full-Width Dashed Add Service Button */}
           <button
             onClick={() => {
               setSections([
@@ -1901,10 +1800,122 @@ function NewEstimateContent() {
                 }
               ]);
             }}
-            className="w-full mt-6 p-6 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase tracking-widest text-[10px] hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all"
+            className="w-full mt-4 p-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase tracking-widest text-[10px] hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/40 transition-all cursor-pointer"
           >
-            + {profile?.country === 'FR' ? 'Ajouter un Service' : 'Add Service'}
+            +{profile?.country === 'FR' ? 'Ajouter un Service' : 'Add Service'}
           </button>
+          {/* Commercial Terms Block */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 mt-8">
+            {/* Payment Terms Column */}
+            <div className="flex flex-col gap-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+                {profile?.country === 'FR'
+                  ? 'Conditions de Règlement'
+                  : 'Payment Terms'}
+              </label>
+              <div className="flex flex-row gap-3 items-center w-full h-[44px]">
+                <div className="flex flex-1 border border-gray-200 rounded-xl h-full overflow-hidden p-1 bg-gray-50/50">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentTermsType('upon_receipt')}
+                    className={`flex-1 rounded-lg font-bold text-xs tracking-wide transition-all uppercase text-center cursor-pointer ${
+                      paymentTermsType === 'upon_receipt'
+                        ? 'bg-white shadow-sm border border-gray-100 text-blue-600 font-black'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {profile?.country === 'FR'
+                      ? 'Dès réception'
+                      : 'Upon Receipt'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentTermsType('net_days')}
+                    className={`flex-1 rounded-lg font-bold text-xs tracking-wide transition-all uppercase text-center cursor-pointer ${
+                      paymentTermsType === 'net_days'
+                        ? 'bg-white shadow-sm border border-gray-100 text-blue-600 font-black'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {profile?.country === 'FR' ? 'Jours Net' : 'Net Days'}
+                  </button>
+                </div>
+
+                <div
+                  className={`flex items-center w-28 max-w-[112px] min-w-[112px] shrink-0 border border-blue-200 rounded-xl focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 bg-blue-50/30 shadow-inner h-full overflow-hidden transition-all duration-200 ${paymentTermsType === 'net_days' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
+                >
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    disabled={paymentTermsType !== 'net_days'}
+                    value={paymentDays}
+                    onChange={(e) =>
+                      setPaymentDays(
+                        Math.min(
+                          120,
+                          Math.max(1, parseInt(e.target.value) || 1)
+                        )
+                      )
+                    }
+                    className="flex-1 w-full py-3 pl-2 pr-1 bg-transparent outline-none font-mono font-bold text-right text-sm text-blue-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="w-12 text-center text-[10px] font-black text-blue-400 uppercase tracking-widest pointer-events-none shrink-0 select-none border-l border-blue-200/50 flex items-center justify-center h-full bg-blue-50/10">
+                    {profile?.country === 'FR' ? 'Jrs' : 'Days'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Deposit Column */}
+            <div className="flex flex-col gap-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+                {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
+              </label>
+              <div className="flex flex-row gap-3 items-center w-full h-[44px]">
+                <div className="flex-1 h-full px-4 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-700 flex justify-between items-center shadow-sm hover:bg-gray-50/50 transition-all select-none">
+                  <span>
+                    {profile?.country === 'FR'
+                      ? 'Exiger un acompte'
+                      : 'Require Deposit'}
+                  </span>
+                  <Switch
+                    checked={depositEnabled}
+                    onChange={setDepositEnabled}
+                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
+                    />
+                  </Switch>
+                </div>
+
+                <div
+                  className={`flex items-center w-28 max-w-[112px] min-w-[112px] shrink-0 border border-blue-200 rounded-xl focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 bg-blue-50/30 shadow-inner h-full overflow-hidden transition-all duration-200 ${depositEnabled ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
+                >
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    disabled={!depositEnabled}
+                    value={depositPercentage}
+                    onChange={(e) =>
+                      setDepositPercentage(
+                        Math.min(
+                          100,
+                          Math.max(1, parseInt(e.target.value) || 0)
+                        )
+                      )
+                    }
+                    className="flex-1 w-full py-3 pl-2 pr-1 bg-transparent outline-none font-mono font-bold text-right text-sm text-blue-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="w-12 text-center text-[10px] font-black text-blue-400 uppercase tracking-widest pointer-events-none shrink-0 select-none border-l border-blue-200/50 flex items-center justify-center h-full bg-blue-50/10">
+                    %
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

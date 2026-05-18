@@ -36,6 +36,8 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<
     'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
   >('date_desc');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isZipping, setIsZipping] = useState(false);
 
   // Modal States
   const [dialog, setDialog] = useState<{
@@ -80,9 +82,158 @@ export default function DashboardPage() {
       setEstimates(estsRes.data || []);
       setMaterials(matsRes.data || []);
       setLoading(false);
+
+      // Check URL parameters to automatically set the dashboard view context
+      const params = new URLSearchParams(window.location.search);
+      const statusParam = params.get('status');
+      if (
+        statusParam &&
+        ['all', 'draft', 'pending', 'approved', 'rejected'].includes(
+          statusParam
+        )
+      ) {
+        setFilterStatus(statusParam as any);
+      }
     }
     fetchData();
   }, [router]);
+
+  const handleExportZip = async () => {
+    if (processedEstimates.length === 0) return;
+    setIsZipping(true);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const { pdf } = await import('@react-pdf/renderer');
+      const EstimatePDF = (await import('../estimates/[id]/EstimatePDF'))
+        .default;
+
+      const zip = new JSZip();
+
+      for (const est of processedEstimates) {
+        const country = est.country_snapshot || profile?.country || 'US';
+        const currentLang =
+          country === 'FR' ? translations.FR : translations.US;
+
+        const getMultiplier = (
+          sec: any,
+          item: any = null,
+          isLabor: boolean = false
+        ) => {
+          const mode = est.margin_mode_snapshot || 'none';
+          if (mode === 'global')
+            return 1 + (est.global_margin_snapshot || 0) / 100;
+          if (mode === 'service') return 1 + (sec.marginRate || 0) / 100;
+          if (mode === 'granular') {
+            if (isLabor) return 1 + (sec.laborMarginRate || 0) / 100;
+            if (item) return 1 + (item.marginRate || 0) / 100;
+          }
+          return 1;
+        };
+
+        const getEffectiveLaborRateCents = (sec: any) =>
+          Math.round(
+            (sec.hourlyRate || 0) * 100 * getMultiplier(sec, null, true)
+          );
+        const getEffectiveItemCostCents = (sec: any, item: any) =>
+          Math.round(
+            (item.cost_per_unit_cents || 0) * getMultiplier(sec, item, false)
+          );
+        const getSectionTotal = (sec: any) => {
+          const laborCents =
+            getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
+          const matsCents = (sec.items || []).reduce(
+            (acc: number, item: any) =>
+              acc + getEffectiveItemCostCents(sec, item) * (item.qty || 0),
+            0
+          );
+          return (matsCents + laborCents) / 100;
+        };
+
+        let subtotalAccumulator = 0;
+        const groups: Record<number, number> = {};
+        const baseTaxRate =
+          est.tax_rate_snapshot !== null
+            ? est.tax_rate_snapshot
+            : profile?.default_tax_rate || 0;
+
+        (est.sections || []).forEach((sec: any) => {
+          const laborCents =
+            getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
+          if (laborCents > 0) {
+            subtotalAccumulator += laborCents;
+            const r =
+              sec.laborTaxRate !== undefined ? sec.laborTaxRate : baseTaxRate;
+            groups[r] = (groups[r] || 0) + Math.round(laborCents * (r / 100));
+          }
+          (sec.items || []).forEach((item: any) => {
+            const matCents =
+              getEffectiveItemCostCents(sec, item) * (item.qty || 0);
+            if (matCents > 0) {
+              subtotalAccumulator += matCents;
+              const r = item.taxRate !== undefined ? item.taxRate : baseTaxRate;
+              groups[r] = (groups[r] || 0) + Math.round(matCents * (r / 100));
+            }
+          });
+        });
+
+        const preparedSections = (est.sections || []).map((sec: any) => ({
+          title:
+            sec.title ||
+            (country === 'FR'
+              ? 'Services Professionnels'
+              : 'Professional Services'),
+          description: sec.description || '',
+          total: getSectionTotal(sec),
+          hasDetails: est.show_details_snapshot === true,
+          laborHours: sec.laborHours || 0,
+          laborType: sec.laborType,
+          laborRate: getEffectiveLaborRateCents(sec) / 100,
+          laborTaxRate:
+            sec.laborTaxRate !== undefined ? sec.laborTaxRate : baseTaxRate,
+          items: (sec.items || []).map((item: any) => ({
+            name: item.name || 'Material Item',
+            qty: item.qty || 0,
+            unit: item.unit || '',
+            cost: getEffectiveItemCostCents(sec, item) / 100,
+            taxRate: item.taxRate !== undefined ? item.taxRate : baseTaxRate
+          }))
+        }));
+
+        const docBlob = await pdf(
+          <EstimatePDF
+            estimate={est}
+            profile={{
+              ...profile,
+              country,
+              currency: est.currency_snapshot || profile?.currency
+            }}
+            lang={currentLang}
+            subtotal={subtotalAccumulator / 100}
+            taxGroups={Object.entries(groups) as any}
+            grandTotal={est.total_amount_cents / 100}
+            sections={preparedSections}
+          />
+        ).toBlob();
+
+        const filename = `${country === 'FR' ? 'Devis' : 'Estimate'}-${est.custom_id || est.id.slice(0, 8)}.pdf`;
+        zip.file(filename, docBlob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = downloadUrl;
+      downloadAnchor.download = `PactEstim-Export-${filterStatus}-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('ZIP generation failed:', error);
+    } finally {
+      setIsZipping(false);
+    }
+  };
 
   const handleDelete = (id: string) => {
     setDialog({
@@ -113,6 +264,9 @@ export default function DashboardPage() {
         return est.is_locked && est.client_status === 'rejected';
       return true;
     })
+    .filter((est) =>
+      (est.client_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
     .sort((a, b) => {
       if (sortBy === 'date_desc')
         return (
@@ -366,62 +520,110 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-black font-sans relative pb-40">
       <div className="max-w-5xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-12">
+        {/* CLEAN MINIMAL HEADER */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-black tracking-tighter uppercase">
+            <h1 className="text-3xl font-black tracking-tighter uppercase">
               {lang.dashboard}
             </h1>
-            <div className="flex items-center gap-3 mt-1">
-              <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
                 {profile?.business_name}
               </p>
               {isFreePlan && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                    {profile?.country === 'FR' ? 'Plan Gratuit' : 'Free Plan'}
+                <div className="flex items-center gap-1.5 border-l border-gray-200 pl-2">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-sm">
+                    {profile?.country === 'FR' ? 'Gratuit' : 'Free'}
                   </span>
-                  {standardLimitReached ? (
-                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
-                      {remainingCredits}{' '}
-                      {profile?.country === 'FR'
-                        ? 'Crédits Restants'
-                        : 'Credits Left'}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                      {5 - monthlyEstimates}{' '}
-                      {profile?.country === 'FR'
-                        ? 'Gratuits Restants'
-                        : 'Free Left'}
-                    </span>
-                  )}
+                  <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">
+                    {standardLimitReached
+                      ? remainingCredits
+                      : 5 - monthlyEstimates}{' '}
+                    {profile?.country === 'FR' ? 'restants' : 'left'}
+                  </span>
                 </div>
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-4 w-full sm:w-auto">
-            {profile.subscription_tier === 'pro' && estimates.length > 0 && (
-              <button
-                onClick={() => setExportModal(true)}
-                className="flex flex-1 sm:flex-none items-center justify-center text-center px-6 py-3 border border-green-200 bg-green-50 text-green-700 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:border-green-300 transition-colors min-h-[44px]"
-              >
-                {profile.country === 'FR' ? 'Exporter Excel' : 'Export Data'}
-              </button>
-            )}
-            <Link
-              href="/materials"
-              className="flex flex-1 sm:flex-none items-center justify-center text-center px-6 py-3 border border-gray-200 bg-white rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:border-gray-300 transition-colors min-h-[44px]"
-            >
-              {lang.priceList}
-            </Link>
-            <Link
-              href="/new-estimate"
-              className="flex flex-1 sm:flex-none items-center justify-center text-center px-6 py-3 bg-blue-600 text-white rounded-lg font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-colors min-h-[44px]"
-            >
-              {lang.newEstimate}
-            </Link>
-          </div>
+
+          {/* PRIMARY CALL TO ACTION */}
+          <Link
+            href="/new-estimate"
+            className="w-full sm:w-auto flex items-center justify-center text-center px-5 py-2 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-blue-700 transition-colors h-[38px]"
+          >
+            {lang.newEstimate}
+          </Link>
         </div>
+
+        {/* UNIFIED ACTION & CONTROL PANEL */}
+        {estimates.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center mb-4">
+            {/* Live Text Filter input */}
+            <div className="relative flex-1 max-w-md flex items-center">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={
+                  profile?.country === 'FR'
+                    ? 'Filtrer par nom de client...'
+                    : 'Filter by client name...'
+                }
+                className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-xl text-xs font-bold focus:outline-none focus:border-blue-500 bg-white text-black placeholder-gray-400 shadow-sm"
+                style={{ height: '52px' }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 text-gray-400 hover:text-gray-600 text-xs font-bold h-full flex items-center justify-center top-0"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Utility operational downloads row */}
+            <div className="flex items-center gap-2">
+              {profile.subscription_tier === 'pro' && (
+                <button
+                  onClick={() => setExportModal(true)}
+                  className="flex-1 sm:flex-none flex items-center justify-center text-center px-5 border border-green-200 bg-green-50/60 text-green-700 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-green-100/70 transition-colors"
+                  style={{ height: '31px' }}
+                >
+                  {profile.country === 'FR' ? 'Excel (CSV)' : 'Excel (CSV)'}
+                </button>
+              )}
+
+              <button
+                disabled={isZipping || processedEstimates.length === 0}
+                onClick={handleExportZip}
+                className="flex-1 sm:flex-none bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-40 font-black uppercase tracking-widest text-[10px] px-5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                style={{ height: '31px' }}
+              >
+                <svg
+                  className="w-3.5 h-3.5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                  />
+                </svg>
+                {isZipping
+                  ? profile?.country === 'FR'
+                    ? 'Compression...'
+                    : 'Archiving...'
+                  : profile?.country === 'FR'
+                    ? `Télécharger les ${processedEstimates.length} PDFs (ZIP)`
+                    : `Download ${processedEstimates.length} PDFs (ZIP)`}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* CONTROLS: SORT & FILTER */}
         {estimates.length > 0 && (

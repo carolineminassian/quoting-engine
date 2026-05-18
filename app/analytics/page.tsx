@@ -98,7 +98,7 @@ export default function AnalyticsPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilterType>('ALL');
   const [targetCurrency, setTargetCurrency] = useState<CurrencyType>('USD');
   const [rawEstimates, setRawEstimates] = useState<any[]>([]);
-  const [exchangeRate, setExchangeRate] = useState<number>(1.1); // Taux de repli par défaut
+  const [exchangeRate, setExchangeRate] = useState<number>(1.1);
 
   useEffect(() => {
     async function fetchData() {
@@ -111,7 +111,6 @@ export default function AnalyticsPage() {
         return;
       }
 
-      // Appel de l'API pour récupérer le taux réel du jour EUR -> USD
       try {
         const rateRes = await fetch('https://open.er-api.com/v6/latest/EUR');
         const rateData = await rateRes.json();
@@ -120,11 +119,6 @@ export default function AnalyticsPage() {
         }
       } catch (rateErr) {
         console.error('Failed to fetch live exchange rates:', rateErr);
-      }
-
-      if (!user) {
-        router.push('/login');
-        return;
       }
 
       const { data: prof } = await supabase
@@ -173,11 +167,11 @@ export default function AnalyticsPage() {
 
   const formatMoney = (cents: number) => {
     const symbol = targetCurrency === 'EUR' ? '€' : '$';
-    const formattedValue = (cents / 100).toLocaleString(
+    const formattedValue = Math.round(cents / 100).toLocaleString(
       lang === 'FR' ? 'fr-FR' : 'en-US',
       {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
       }
     );
     return `${symbol}${formattedValue}`;
@@ -200,7 +194,7 @@ export default function AnalyticsPage() {
           <h1 className="text-3xl font-black uppercase tracking-tighter mb-4">
             {t.lockedOnly}
           </h1>
-          <p className="text-gray-500 mb-8 max-w-md mx-auto">
+          <p className="text-gray-500 mb-8 max-w-md mx-auto text-xs font-bold uppercase tracking-widest">
             {t.upgradeAlert}
           </p>
           <Link
@@ -333,9 +327,7 @@ export default function AnalyticsPage() {
     }
   });
 
-  const count = countApproved; // Maps to existing downstream UI logic
-  const avgValue = count > 0 ? Math.round(totalRevenueCents / count) : 0;
-
+  const count = countApproved;
   const netRevenueHT = totalRevenueCents - totalTaxCents;
   const totalCostBasis = totalLaborCostCents + totalMaterialCostCents;
   const netMarginCents = Math.max(0, netRevenueHT - totalCostBasis);
@@ -415,7 +407,7 @@ export default function AnalyticsPage() {
           <div className="flex flex-wrap gap-4 w-full md:w-auto">
             {/* Listbox Time Filter */}
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
-              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                 {t.timeFilter}
               </span>
               <Listbox value={timeFilter} onChange={setTimeFilter}>
@@ -478,7 +470,7 @@ export default function AnalyticsPage() {
 
             {/* Listbox Currency Selector */}
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
-              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                 {t.currencySelect}
               </span>
               <Listbox value={targetCurrency} onChange={setTargetCurrency}>
@@ -525,36 +517,59 @@ export default function AnalyticsPage() {
         {/* KPIs Cards Block */}
         <div className="flex flex-col gap-4 sm:gap-6 mb-8">
           {/* Row 1: Consolidated Status Counts */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
-            <div className="flex-1 p-5 flex justify-between items-center">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between overflow-hidden">
+            <div className="flex-1 p-5 flex justify-between items-center w-full">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 {t.approvedProj}
               </span>
-              <span className="text-lg font-black font-mono text-green-600 bg-green-50 px-3 py-1 rounded-md">
+              <Link
+                href="/dashboard?status=approved"
+                className="text-3xl font-black font-mono text-green-600 bg-green-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+              >
                 {countApproved}
-              </span>
+              </Link>
             </div>
-            <div className="flex-1 p-5 flex justify-between items-center">
+
+            {/* Standard Column Separator 1 */}
+            <div
+              className="hidden sm:block bg-gray-200 shrink-0"
+              style={{ width: '3px', height: '36px' }}
+            />
+
+            <div className="flex-1 p-5 flex justify-between items-center w-full">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 {t.pendingProj}
               </span>
-              <span className="text-lg font-black font-mono text-blue-600 bg-blue-50 px-3 py-1 rounded-md">
+              <Link
+                href="/dashboard?status=pending"
+                className="text-3xl font-black font-mono text-blue-600 bg-blue-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+              >
                 {countPending}
-              </span>
+              </Link>
             </div>
-            <div className="flex-1 p-5 flex justify-between items-center">
+
+            {/* Standard Column Separator 2 */}
+            <div
+              className="hidden sm:block bg-gray-200 shrink-0"
+              style={{ width: '3px', height: '36px' }}
+            />
+
+            <div className="flex-1 p-5 flex justify-between items-center w-full">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 {t.rejectedProj}
               </span>
-              <span className="text-lg font-black font-mono text-red-500 bg-red-50 px-3 py-1 rounded-md">
+              <Link
+                href="/dashboard?status=rejected"
+                className="text-3xl font-black font-mono text-red-500 bg-red-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+              >
                 {countRejected}
-              </span>
+              </Link>
             </div>
           </div>
 
           {/* Row 2: Financials & Rates Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center">
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 {t.totalRev}
               </p>
@@ -562,7 +577,7 @@ export default function AnalyticsPage() {
                 {formatMoney(totalRevenueCents)}
               </p>
             </div>
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center">
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 {t.pipelineValue}
               </p>
@@ -570,7 +585,7 @@ export default function AnalyticsPage() {
                 {formatMoney(pendingRevenueCents)}
               </p>
             </div>
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center">
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 {t.conversionRate}
               </p>
@@ -582,7 +597,7 @@ export default function AnalyticsPage() {
         </div>
 
         {count === 0 ? (
-          <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400 font-bold text-sm uppercase tracking-wider">
+          <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400 text-[10px] font-black uppercase tracking-widest">
             {t.noData}
           </div>
         ) : (
@@ -595,15 +610,15 @@ export default function AnalyticsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center">
                 <div className="space-y-4">
                   <div>
-                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-1">
+                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-1 tracking-widest">
                       {t.grossRevenue}
                     </span>
-                    <span className="text-xl font-bold font-mono text-gray-700">
+                    <span className="text-3xl font-black font-mono text-gray-700">
                       {formatMoney(netRevenueHT)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-emerald-500 uppercase block mb-1">
+                    <span className="text-[10px] font-black text-emerald-500 uppercase block mb-1 tracking-widest">
                       {t.netMargin}
                     </span>
                     <span className="text-3xl font-black font-mono text-emerald-600">
@@ -612,9 +627,9 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
                 <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-wider mb-2">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2 text-gray-400">
                     <span>Rentabilité</span>
-                    <span className="text-emerald-600 font-mono">
+                    <span className="text-emerald-600 font-mono text-xs font-bold">
                       {netRevenueHT > 0
                         ? Math.round((netMarginCents / netRevenueHT) * 100)
                         : 0}
@@ -660,7 +675,7 @@ export default function AnalyticsPage() {
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 bg-blue-600 rounded-sm shrink-0" />
                     <div>
-                      <span className="block text-[9px] font-black text-gray-400 uppercase">
+                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">
                         {t.labor}
                       </span>
                       <span className="text-xs font-bold font-mono text-gray-800">
@@ -671,7 +686,7 @@ export default function AnalyticsPage() {
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 bg-orange-400 rounded-sm shrink-0" />
                     <div>
-                      <span className="block text-[9px] font-black text-gray-400 uppercase">
+                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">
                         {t.materials}
                       </span>
                       <span className="text-xs font-bold font-mono text-gray-800">
@@ -691,10 +706,10 @@ export default function AnalyticsPage() {
                   {sortedServices.map((service, idx) => (
                     <div key={idx} className="flex flex-col gap-1">
                       <div className="flex justify-between text-xs font-bold text-gray-800">
-                        <span className="truncate max-w-[70%] tracking-tight uppercase text-[10px]">
+                        <span className="truncate max-w-[70%] uppercase text-[10px] font-black tracking-wider text-gray-500">
                           {service.name}
                         </span>
-                        <span className="font-mono text-[11px] text-blue-600">
+                        <span className="font-mono text-xs font-bold text-blue-600">
                           {formatMoney(service.val)}
                         </span>
                       </div>
@@ -719,7 +734,7 @@ export default function AnalyticsPage() {
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                 <div className="sm:col-span-1 bg-gray-50 p-6 rounded-xl border border-gray-100 flex flex-col items-center justify-center text-center">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-3">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
                     {t.retentionRate}
                   </span>
                   <div className="relative w-24 h-24 flex items-center justify-center">
@@ -748,7 +763,7 @@ export default function AnalyticsPage() {
                       {retentionRate}%
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold text-gray-400 mt-2">
+                  <span className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest">
                     {repeatClientsCount} {t.repeatCustomers}
                   </span>
                 </div>
@@ -767,7 +782,7 @@ export default function AnalyticsPage() {
                           <p className="text-xs font-black uppercase text-gray-800 tracking-tight">
                             {client.name}
                           </p>
-                          <p className="text-[10px] text-gray-400 font-bold">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
                             {client.count}{' '}
                             {client.count > 1
                               ? lang === 'FR'
@@ -810,7 +825,7 @@ export default function AnalyticsPage() {
                         {formatMoney(d.val)}
                       </div>
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-tighter text-gray-400 group-hover:text-black transition-colors">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-black transition-colors">
                       {d.label}
                     </span>
                   </div>
