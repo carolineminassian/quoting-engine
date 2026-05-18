@@ -906,7 +906,7 @@ function NewEstimateContent() {
               <div className="group relative">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                   <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    C
+                    {profile?.country === 'FR' ? 'V' : 'C'}
                   </div>
                   <input
                     placeholder={profile?.country === 'FR' ? 'Ville' : 'City'}
@@ -922,8 +922,8 @@ function NewEstimateContent() {
 
               <div className="group relative">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    Z
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-[10px] tracking-tighter">
+                    {profile?.country === 'FR' ? 'CP' : 'Z'}
                   </div>
                   <input
                     placeholder={
@@ -1791,7 +1791,7 @@ function NewEstimateContent() {
                       leaveFrom="opacity-100"
                       leaveTo="opacity-0"
                     >
-                      <ListboxOptions className="absolute bottom-full mb-1 z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                      <ListboxOptions className="absolute top-full mt-1 z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
                         <ListboxOption
                           value="upon_receipt"
                           className={({ active }) =>
@@ -1816,7 +1816,7 @@ function NewEstimateContent() {
                 </Listbox>
 
                 {paymentTermsType === 'net_days' && (
-                  <div className="relative w-24 sm:w-28 animate-fade-in shrink-0">
+                  <div className="flex items-center w-32 sm:w-36 animate-fade-in shrink-0 border border-blue-200 rounded-xl focus-within:border-blue-500 bg-blue-50/30 shadow-inner h-[44px] transition-colors overflow-hidden">
                     <input
                       type="number"
                       min="1"
@@ -1830,9 +1830,9 @@ function NewEstimateContent() {
                           )
                         )
                       }
-                      className="w-full p-3 pr-12 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right h-[44px] text-sm text-blue-900 shadow-inner"
+                      className="flex-1 w-full py-3 pl-3 pr-2 bg-transparent outline-none font-mono font-bold text-right text-sm text-blue-900"
                     />
-                    <span className="absolute right-3 top-3.5 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none">
+                    <span className="pr-4 pl-2 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none shrink-0 select-none border-l border-blue-200/50">
                       {profile?.country === 'FR' ? 'Jrs' : 'Days'}
                     </span>
                   </div>
@@ -1859,29 +1859,27 @@ function NewEstimateContent() {
                 <div className="h-5 border-l border-gray-200 mx-3 shrink-0" />
 
                 <div
-                  className={`flex items-center gap-2 flex-1 transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                  className={`flex items-center w-28 shrink-0 border border-blue-200 rounded-xl focus-within:border-blue-500 bg-blue-50/30 shadow-inner h-[44px] overflow-hidden ml-auto transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 >
-                  <div className="relative w-full">
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      disabled={!depositEnabled}
-                      value={depositPercentage}
-                      onChange={(e) =>
-                        setDepositPercentage(
-                          Math.min(
-                            100,
-                            Math.max(1, parseInt(e.target.value) || 0)
-                          )
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    disabled={!depositEnabled}
+                    value={depositPercentage}
+                    onChange={(e) =>
+                      setDepositPercentage(
+                        Math.min(
+                          100,
+                          Math.max(1, parseInt(e.target.value) || 0)
                         )
-                      }
-                      className="w-full py-1 pr-6 border-none outline-none font-mono font-bold bg-transparent text-right text-sm text-blue-900"
-                    />
-                    <span className="absolute right-2 top-1.5 text-[10px] font-black text-blue-400 pointer-events-none">
-                      %
-                    </span>
-                  </div>
+                      )
+                    }
+                    className="flex-1 w-full py-3 pl-3 pr-2 bg-transparent outline-none font-mono font-bold text-right text-sm text-blue-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="pr-4 pl-3 text-[11px] font-black text-blue-400 uppercase tracking-widest pointer-events-none shrink-0 select-none border-l border-blue-200/50">
+                    %
+                  </span>
                 </div>
               </div>
             </div>
