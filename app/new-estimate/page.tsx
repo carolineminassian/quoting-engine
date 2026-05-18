@@ -81,7 +81,10 @@ function NewEstimateContent() {
     name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    city: '',
+    zip: '',
+    country: ''
   });
   const [customRef, setCustomRef] = useState('');
 
@@ -253,7 +256,10 @@ function NewEstimateContent() {
             name: foundClient.name || '',
             email: foundClient.email || '',
             phone: foundClient.phone || '',
-            address: foundClient.address || ''
+            address: foundClient.address || '',
+            city: foundClient.city || '',
+            zip: foundClient.zip || '',
+            country: foundClient.country || ''
           });
         }
       }
@@ -268,7 +274,10 @@ function NewEstimateContent() {
             name: est.client_name || '',
             email: est.client_email || '',
             phone: est.client_phone || '',
-            address: est.client_address || ''
+            address: est.client_address || '',
+            city: est.client_city || '',
+            zip: est.client_zip || '',
+            country: est.client_country || ''
           });
           setCustomRef(est.custom_id || '');
           setMarginMode(est.margin_mode_snapshot || 'none');
@@ -571,6 +580,9 @@ function NewEstimateContent() {
       client_email: client.email,
       client_phone: client.phone,
       client_address: client.address,
+      client_city: client.city,
+      client_zip: client.zip,
+      client_country: client.country,
       custom_id: customRef.trim() || null,
       total_amount_cents: totals.totalCents,
       tax_amount_cents: totals.tax,
@@ -606,7 +618,10 @@ function NewEstimateContent() {
             .update({
               email: client.email,
               phone: client.phone,
-              address: client.address
+              address: client.address,
+              city: client.city,
+              zip: client.zip,
+              country: client.country
             })
             .eq('id', existing.id);
         } else {
@@ -616,7 +631,10 @@ function NewEstimateContent() {
               name: client.name,
               email: client.email,
               phone: client.phone,
-              address: client.address
+              address: client.address,
+              city: client.city,
+              zip: client.zip,
+              country: client.country
             }
           ]);
         }
@@ -722,8 +740,228 @@ function NewEstimateContent() {
             </Link>
           </div>
 
-          {/* Integrated Configuration Grid Area */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+          {/* Guest Lock Context Overlay */}
+          {isGuest && (
+            <div className="bg-blue-50 p-6 sm:p-8 rounded-xl border border-blue-100 mb-8 flex flex-col gap-4">
+              <div>
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-1">
+                  {profile?.country === 'FR' ? 'Mode Invité' : 'Guest Mode'}
+                </p>
+                <p className="text-sm font-bold text-gray-700 leading-relaxed">
+                  {profile?.country === 'FR'
+                    ? 'Vous pouvez rédiger votre devis maintenant. Pour générer le PDF, nous vous demanderons de créer un compte gratuit.'
+                    : 'You can draft your estimate now. To generate the final PDF, we will ask you to create a free account.'}
+                </p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                  {profile?.country === 'FR'
+                    ? 'Nom de votre entreprise'
+                    : 'Your Business Name'}
+                </label>
+                <input
+                  required
+                  maxLength={60}
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  className="flex-1 p-2 bg-transparent outline-none font-bold text-black border-t border-gray-100 pt-3"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Client Contact Section */}
+          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
+                {profile?.country === 'FR'
+                  ? 'Coordonnées du Client'
+                  : 'Customer Contact Details'}
+              </p>
+              {pastClients.length > 0 && (
+                <Listbox
+                  value={
+                    pastClients.some((c) => c.name === client.name)
+                      ? client.name
+                      : ''
+                  }
+                  onChange={(val) => {
+                    const selected = pastClients.find((c) => c.name === val);
+                    if (selected) {
+                      setClient({
+                        name: selected.name || '',
+                        email: selected.email || '',
+                        phone: selected.phone || '',
+                        address: selected.address || '',
+                        city: selected.city || '',
+                        zip: selected.zip || '',
+                        country: selected.country || ''
+                      });
+                    }
+                  }}
+                >
+                  <div className="relative w-full sm:w-64">
+                    <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-600 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {client.name || lang.selectClient || 'Select Client'}
+                      </span>
+                      <span className="pointer-events-none text-gray-400">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-xs font-bold">
+                        {pastClients.map((c, i) => (
+                          <ListboxOption
+                            key={i}
+                            value={c.name}
+                            className={({ active }) =>
+                              `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                            }
+                          >
+                            {c.name}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="col-span-1 sm:col-span-2 group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    N
+                  </div>
+                  <input
+                    placeholder={lang.clientName || 'Client Name'}
+                    maxLength={80}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.name}
+                    onChange={(e) =>
+                      setClient({ ...client, name: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    @
+                  </div>
+                  <input
+                    type="email"
+                    placeholder={lang.email || 'Email Address'}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.email}
+                    onChange={(e) =>
+                      setClient({ ...client, email: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    #
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder={lang.phone || 'Phone Number'}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.phone}
+                    onChange={(e) =>
+                      setClient({ ...client, phone: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="col-span-1 sm:col-span-2 group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    A
+                  </div>
+                  <input
+                    placeholder={lang.address || 'Street Address'}
+                    maxLength={250}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.address}
+                    onChange={(e) =>
+                      setClient({ ...client, address: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    C
+                  </div>
+                  <input
+                    placeholder={profile?.country === 'FR' ? 'Ville' : 'City'}
+                    maxLength={100}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.city}
+                    onChange={(e) =>
+                      setClient({ ...client, city: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    Z
+                  </div>
+                  <input
+                    placeholder={
+                      profile?.country === 'FR'
+                        ? 'Code Postal'
+                        : 'Zip / Postal Code'
+                    }
+                    maxLength={20}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.zip}
+                    onChange={(e) =>
+                      setClient({ ...client, zip: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="col-span-1 sm:col-span-2 group relative">
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
+                    🌐
+                  </div>
+                  <input
+                    placeholder={profile?.country === 'FR' ? 'Pays' : 'Country'}
+                    maxLength={100}
+                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
+                    value={client.country}
+                    onChange={(e) =>
+                      setClient({ ...client, country: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Internal Strategy (Margin) Area */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
             {/* Margin Settings Column */}
             <div className="flex flex-col gap-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
@@ -833,262 +1071,6 @@ function NewEstimateContent() {
                     </span>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Payment Terms Column */}
-            <div className="flex flex-col gap-3">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-                {profile?.country === 'FR'
-                  ? 'Conditions de Règlement'
-                  : 'Payment Terms'}
-              </label>
-              <div className="flex flex-row gap-3 items-center w-full">
-                <select
-                  value={paymentTermsType}
-                  onChange={(e) => setPaymentTermsType(e.target.value as any)}
-                  className="flex-1 p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/40 text-[10px] uppercase tracking-widest text-gray-700 h-[44px] cursor-pointer"
-                >
-                  <option value="upon_receipt">
-                    {profile?.country === 'FR'
-                      ? 'Dès réception'
-                      : 'Upon Receipt'}
-                  </option>
-                  <option value="net_days">
-                    {profile?.country === 'FR' ? 'jours net' : 'Net Days'}
-                  </option>
-                </select>
-
-                {paymentTermsType === 'net_days' && (
-                  <div className="relative w-24 sm:w-28 animate-fade-in shrink-0">
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={paymentDays}
-                      onChange={(e) =>
-                        setPaymentDays(
-                          Math.min(
-                            120,
-                            Math.max(1, parseInt(e.target.value) || 1)
-                          )
-                        )
-                      }
-                      className="w-full p-3 pr-12 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right h-[44px] text-sm text-blue-900 shadow-inner"
-                    />
-                    <span className="absolute right-3 top-3.5 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none">
-                      {profile?.country === 'FR' ? 'Jrs' : 'Days'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Deposit Column */}
-            <div className="flex flex-col gap-3">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-                {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
-              </label>
-              <div className="flex flex-row items-center w-full bg-gray-50/40 border border-gray-200 rounded-xl p-2 h-[44px] shadow-inner">
-                <Switch
-                  checked={depositEnabled}
-                  onChange={setDepositEnabled}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ml-1 ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
-                  />
-                </Switch>
-
-                <div className="h-5 border-l border-gray-200 mx-3 shrink-0" />
-
-                <div
-                  className={`flex items-center gap-2 flex-1 transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                >
-                  <div className="relative w-full">
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      disabled={!depositEnabled}
-                      value={depositPercentage}
-                      onChange={(e) =>
-                        setDepositPercentage(
-                          Math.min(
-                            100,
-                            Math.max(1, parseInt(e.target.value) || 0)
-                          )
-                        )
-                      }
-                      className="w-full py-1 pr-6 border-none outline-none font-mono font-bold bg-transparent text-right text-sm text-blue-900"
-                    />
-                    <span className="absolute right-2 top-1.5 text-[10px] font-black text-blue-400 pointer-events-none">
-                      %
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Guest Lock Context Overlay */}
-          {isGuest && (
-            <div className="bg-blue-50 p-6 sm:p-8 rounded-xl border border-blue-100 mb-8 flex flex-col gap-4">
-              <div>
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-1">
-                  {profile?.country === 'FR' ? 'Mode Invité' : 'Guest Mode'}
-                </p>
-                <p className="text-sm font-bold text-gray-700 leading-relaxed">
-                  {profile?.country === 'FR'
-                    ? 'Vous pouvez rédiger votre devis maintenant. Pour générer le PDF, nous vous demanderons de créer un compte gratuit.'
-                    : 'You can draft your estimate now. To generate the final PDF, we will ask you to create a free account.'}
-                </p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                  {profile?.country === 'FR'
-                    ? 'Nom de votre entreprise'
-                    : 'Your Business Name'}
-                </label>
-                <input
-                  required
-                  maxLength={60}
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  className="flex-1 p-2 bg-transparent outline-none font-bold text-black border-t border-gray-100 pt-3"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Client Contact Section */}
-          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
-                {profile?.country === 'FR'
-                  ? 'Coordonnées du Client'
-                  : 'Customer Contact Details'}
-              </p>
-              {pastClients.length > 0 && (
-                <Listbox
-                  value={
-                    pastClients.some((c) => c.name === client.name)
-                      ? client.name
-                      : ''
-                  }
-                  onChange={(val) => {
-                    const selected = pastClients.find((c) => c.name === val);
-                    if (selected) {
-                      setClient({
-                        name: selected.name || '',
-                        email: selected.email || '',
-                        phone: selected.phone || '',
-                        address: selected.address || ''
-                      });
-                    }
-                  }}
-                >
-                  <div className="relative w-full sm:w-64">
-                    <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-600 flex justify-between items-center cursor-pointer">
-                      <span className="block truncate">
-                        {client.name || lang.selectClient || 'Select Client'}
-                      </span>
-                      <span className="pointer-events-none text-gray-400">
-                        ▼
-                      </span>
-                    </ListboxButton>
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-xs font-bold">
-                        {pastClients.map((c, i) => (
-                          <ListboxOption
-                            key={i}
-                            value={c.name}
-                            className={({ active }) =>
-                              `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-                            }
-                          >
-                            {c.name}
-                          </ListboxOption>
-                        ))}
-                      </ListboxOptions>
-                    </Transition>
-                  </div>
-                </Listbox>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="col-span-1 sm:col-span-2 group relative">
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    N
-                  </div>
-                  <input
-                    placeholder={lang.clientName || 'Client Name'}
-                    maxLength={80}
-                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                    value={client.name}
-                    onChange={(e) =>
-                      setClient({ ...client, name: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="group relative">
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    @
-                  </div>
-                  <input
-                    type="email"
-                    placeholder={lang.email || 'Email Address'}
-                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                    value={client.email}
-                    onChange={(e) =>
-                      setClient({ ...client, email: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="group relative">
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    #
-                  </div>
-                  <input
-                    type="tel"
-                    placeholder={lang.phone || 'Phone Number'}
-                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                    value={client.phone}
-                    onChange={(e) =>
-                      setClient({ ...client, phone: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="col-span-1 sm:col-span-2 group relative">
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    A
-                  </div>
-                  <input
-                    placeholder={lang.address || 'Project Address'}
-                    maxLength={250}
-                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                    value={client.address}
-                    onChange={(e) =>
-                      setClient({ ...client, address: e.target.value })
-                    }
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -1772,6 +1754,137 @@ function NewEstimateContent() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Commercial Terms Block */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 mt-8">
+            {/* Payment Terms Column */}
+            <div className="flex flex-col gap-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+                {profile?.country === 'FR'
+                  ? 'Conditions de Règlement'
+                  : 'Payment Terms'}
+              </label>
+              <div className="flex flex-row gap-3 items-center w-full">
+                <Listbox
+                  value={paymentTermsType}
+                  onChange={(val: any) => setPaymentTermsType(val)}
+                >
+                  <div className="relative flex-1">
+                    <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer h-[44px]">
+                      <span className="block truncate">
+                        {paymentTermsType === 'upon_receipt'
+                          ? profile?.country === 'FR'
+                            ? 'Dès réception'
+                            : 'Upon Receipt'
+                          : profile?.country === 'FR'
+                            ? 'Jours net'
+                            : 'Net Days'}
+                      </span>
+                      <span className="pointer-events-none text-gray-400 text-[10px]">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute bottom-full mb-1 z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                        <ListboxOption
+                          value="upon_receipt"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {profile?.country === 'FR'
+                            ? 'Dès réception'
+                            : 'Upon Receipt'}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="net_days"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {profile?.country === 'FR' ? 'Jours net' : 'Net Days'}
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+
+                {paymentTermsType === 'net_days' && (
+                  <div className="relative w-24 sm:w-28 animate-fade-in shrink-0">
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={paymentDays}
+                      onChange={(e) =>
+                        setPaymentDays(
+                          Math.min(
+                            120,
+                            Math.max(1, parseInt(e.target.value) || 1)
+                          )
+                        )
+                      }
+                      className="w-full p-3 pr-12 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right h-[44px] text-sm text-blue-900 shadow-inner"
+                    />
+                    <span className="absolute right-3 top-3.5 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none">
+                      {profile?.country === 'FR' ? 'Jrs' : 'Days'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Deposit Column */}
+            <div className="flex flex-col gap-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+                {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
+              </label>
+              <div className="flex flex-row items-center w-full bg-gray-50/40 border border-gray-200 rounded-xl p-2 h-[44px] shadow-inner">
+                <Switch
+                  checked={depositEnabled}
+                  onChange={setDepositEnabled}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ml-1 ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
+                  />
+                </Switch>
+
+                <div className="h-5 border-l border-gray-200 mx-3 shrink-0" />
+
+                <div
+                  className={`flex items-center gap-2 flex-1 transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                >
+                  <div className="relative w-full">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      disabled={!depositEnabled}
+                      value={depositPercentage}
+                      onChange={(e) =>
+                        setDepositPercentage(
+                          Math.min(
+                            100,
+                            Math.max(1, parseInt(e.target.value) || 0)
+                          )
+                        )
+                      }
+                      className="w-full py-1 pr-6 border-none outline-none font-mono font-bold bg-transparent text-right text-sm text-blue-900"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] font-black text-blue-400 pointer-events-none">
+                      %
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Full-Width Dashed Add Service Button */}
