@@ -81,10 +81,7 @@ function NewEstimateContent() {
     name: '',
     email: '',
     phone: '',
-    address: '',
-    city: '',
-    zip: '',
-    country: ''
+    address: ''
   });
   const [customRef, setCustomRef] = useState('');
 
