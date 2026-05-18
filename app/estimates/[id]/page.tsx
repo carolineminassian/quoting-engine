@@ -1157,8 +1157,12 @@ export default function EstimateView() {
                   </p>
                   <p className="text-[10px] text-gray-400 leading-relaxed font-bold break-words">
                     {profile.country === 'FR'
-                      ? 'Règlement sous 30 jours.'
-                      : 'Payment due upon receipt.'}
+                      ? estimate.deposit_enabled
+                        ? 'Acompte exigible à la signature pour valider le devis. Solde sous 30 jours.'
+                        : 'Règlement sous 30 jours.'
+                      : estimate.deposit_enabled
+                        ? 'Deposit due upon acceptance to initiate work. Balance due upon receipt.'
+                        : 'Payment due upon receipt.'}
                   </p>
                 </div>
               </div>

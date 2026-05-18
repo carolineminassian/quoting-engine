@@ -11,7 +11,8 @@ import {
   ListboxButton,
   ListboxOptions,
   ListboxOption,
-  Transition
+  Transition,
+  Switch
 } from '@headlessui/react';
 
 const LoadingDots = () => (
@@ -80,7 +81,10 @@ function NewEstimateContent() {
     name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    city: '',
+    zip: '',
+    country: ''
   });
   const [customRef, setCustomRef] = useState('');
 
@@ -92,6 +96,11 @@ function NewEstimateContent() {
   // Per-estimate deposit adjustments
   const [depositEnabled, setDepositEnabled] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState<number>(20);
+
+  const [paymentTermsType, setPaymentTermsType] = useState<
+    'upon_receipt' | 'net_days'
+  >('net_days');
+  const [paymentDays, setPaymentDays] = useState<number>(30);
 
   const [sections, setSections] = useState<EstimateSection[]>([
     {
@@ -129,6 +138,10 @@ function NewEstimateContent() {
             setDepositEnabled(pending.depositEnabled);
           if (pending.depositPercentage !== undefined)
             setDepositPercentage(pending.depositPercentage);
+          if (pending.paymentTermsType)
+            setPaymentTermsType(pending.paymentTermsType);
+          if (pending.paymentDays !== undefined)
+            setPaymentDays(pending.paymentDays);
           if (pending.businessName) {
             cachedBusinessName = pending.businessName;
             setBusinessName(pending.businessName);
@@ -266,6 +279,15 @@ function NewEstimateContent() {
           setDepositEnabled(est.deposit_enabled ?? false);
           setDepositPercentage(est.deposit_percentage ?? 20);
 
+          const rawTerms = est.payment_terms_snapshot || '30_days';
+          if (rawTerms === 'upon_receipt') {
+            setPaymentTermsType('upon_receipt');
+            setPaymentDays(30);
+          } else {
+            setPaymentTermsType('net_days');
+            setPaymentDays(parseInt(rawTerms.replace('_days', '')) || 30);
+          }
+
           const loadedSections = (est.sections || []).map((sec: any) => ({
             ...sec,
             description: sec.description || '',
@@ -287,6 +309,14 @@ function NewEstimateContent() {
       } else if (prof.data && !pendingRaw) {
         setDepositEnabled(prof.data.default_deposit_enabled ?? false);
         setDepositPercentage(prof.data.default_deposit_percentage ?? 20);
+        const defaultTerms = prof.data.default_payment_terms || '30_days';
+        if (defaultTerms === 'upon_receipt') {
+          setPaymentTermsType('upon_receipt');
+          setPaymentDays(30);
+        } else {
+          setPaymentTermsType('net_days');
+          setPaymentDays(parseInt(defaultTerms.replace('_days', '')) || 30);
+        }
         setSections((prevSections) => {
           const n = [...prevSections];
           if (n[0]) {
@@ -473,7 +503,9 @@ function NewEstimateContent() {
         marginMode,
         globalMargin,
         depositEnabled,
-        depositPercentage
+        depositPercentage,
+        paymentTermsType,
+        paymentDays
       };
       localStorage.setItem(
         'pactestim_pending_estimate',
@@ -553,7 +585,11 @@ function NewEstimateContent() {
       margin_mode_snapshot: marginMode,
       global_margin_snapshot: globalMargin,
       deposit_enabled: depositEnabled,
-      deposit_percentage: depositPercentage
+      deposit_percentage: depositPercentage,
+      payment_terms_snapshot:
+        paymentTermsType === 'upon_receipt'
+          ? 'upon_receipt'
+          : `${paymentDays}_days`
     };
 
     const res = editId
@@ -689,115 +725,212 @@ function NewEstimateContent() {
             </Link>
           </div>
 
-          {/* Separate Configuration Blocks Container */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-col gap-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-              {profile?.country === 'FR'
-                ? 'Stratégie de Marge'
-                : 'Margin Strategy'}
-            </label>
-            <div className="flex flex-row gap-3 items-center w-full">
-              <Listbox
-                value={marginMode}
-                onChange={(val: any) => setMarginMode(val)}
-              >
-                <div className="relative flex-1">
-                  <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer h-[44px]">
-                    <span className="block truncate">
-                      {marginMode === 'none'
-                        ? profile?.country === 'FR'
-                          ? 'Aucune'
-                          : 'None'
-                        : ''}
-                      {marginMode === 'global'
-                        ? profile?.country === 'FR'
-                          ? 'Marge Globale'
-                          : 'Global Margin'
-                        : ''}
-                      {marginMode === 'service'
-                        ? profile?.country === 'FR'
-                          ? 'Marge par Service'
-                          : 'Per Service Margin'
-                        : ''}
-                      {marginMode === 'granular'
-                        ? profile?.country === 'FR'
-                          ? 'Marge Granulaire'
-                          : 'Granular (Line Item)'
-                        : ''}
-                    </span>
-                    <span className="pointer-events-none text-gray-400 text-[10px]">
-                      ▼
-                    </span>
-                  </ListboxButton>
-                  <Transition
-                    as={Fragment}
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
-                      <ListboxOption
-                        value="none"
-                        className={({ active }) =>
-                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-                        }
-                      >
-                        {profile?.country === 'FR' ? 'Aucune' : 'None'}
-                      </ListboxOption>
-                      <ListboxOption
-                        value="global"
-                        className={({ active }) =>
-                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-                        }
-                      >
-                        {profile?.country === 'FR'
-                          ? 'Marge Globale'
-                          : 'Global Margin'}
-                      </ListboxOption>
-                      <ListboxOption
-                        value="service"
-                        className={({ active }) =>
-                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-                        }
-                      >
-                        {profile?.country === 'FR'
-                          ? 'Marge par Service'
-                          : 'Per Service Margin'}
-                      </ListboxOption>
-                      <ListboxOption
-                        value="granular"
-                        className={({ active }) =>
-                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-                        }
-                      >
-                        {profile?.country === 'FR'
-                          ? 'Marge Granulaire'
-                          : 'Granular (Line Item)'}
-                      </ListboxOption>
-                    </ListboxOptions>
-                  </Transition>
-                </div>
-              </Listbox>
+          {/* Integrated Configuration Grid Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+            {/* Margin Settings Column */}
+            <div className="flex flex-col gap-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+                {profile?.country === 'FR'
+                  ? 'Stratégie de Marge'
+                  : 'Margin Strategy'}
+              </label>
+              <div className="flex flex-row gap-3 items-center w-full">
+                <Listbox
+                  value={marginMode}
+                  onChange={(val: any) => setMarginMode(val)}
+                >
+                  <div className="relative flex-1">
+                    <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer h-[44px]">
+                      <span className="block truncate">
+                        {marginMode === 'none'
+                          ? profile?.country === 'FR'
+                            ? 'Aucune'
+                            : 'None'
+                          : ''}
+                        {marginMode === 'global'
+                          ? profile?.country === 'FR'
+                            ? 'Marge Globale'
+                            : 'Global Margin'
+                          : ''}
+                        {marginMode === 'service'
+                          ? profile?.country === 'FR'
+                            ? 'Marge par Service'
+                            : 'Per Service Margin'
+                          : ''}
+                        {marginMode === 'granular'
+                          ? profile?.country === 'FR'
+                            ? 'Marge Granulaire'
+                            : 'Granular (Line Item)'
+                          : ''}
+                      </span>
+                      <span className="pointer-events-none text-gray-400 text-[10px]">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                        <ListboxOption
+                          value="none"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {profile?.country === 'FR' ? 'Aucune' : 'None'}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="global"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {profile?.country === 'FR'
+                            ? 'Marge Globale'
+                            : 'Global Margin'}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="service"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {profile?.country === 'FR'
+                            ? 'Marge par Service'
+                            : 'Per Service Margin'}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="granular"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {profile?.country === 'FR'
+                            ? 'Marge Granulaire'
+                            : 'Granular (Line Item)'}
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
 
-              {marginMode === 'global' && (
-                <div className="relative w-24 sm:w-28 animate-fade-in shrink-0">
-                  <input
-                    type="number"
-                    min="0"
-                    value={globalMargin === 0 ? '' : globalMargin}
-                    onChange={(e) =>
-                      setGlobalMargin(
-                        Math.max(0, parseFloat(e.target.value) || 0)
-                      )
-                    }
-                    className="w-full p-3 pr-8 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right h-[44px] text-sm text-blue-900 shadow-inner"
-                    placeholder="0"
+                {marginMode === 'global' && (
+                  <div className="relative w-24 sm:w-28 animate-fade-in shrink-0">
+                    <input
+                      type="number"
+                      min="0"
+                      value={globalMargin === 0 ? '' : globalMargin}
+                      onChange={(e) =>
+                        setGlobalMargin(
+                          Math.max(0, parseFloat(e.target.value) || 0)
+                        )
+                      }
+                      className="w-full p-3 pr-8 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right h-[44px] text-sm text-blue-900 shadow-inner"
+                      placeholder="0"
+                    />
+                    <span className="absolute right-3 top-3.5 text-[10px] font-black text-blue-400 pointer-events-none">
+                      %
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Terms Column */}
+            <div className="flex flex-col gap-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+                {profile?.country === 'FR'
+                  ? 'Conditions de Règlement'
+                  : 'Payment Terms'}
+              </label>
+              <div className="flex flex-row gap-3 items-center w-full">
+                <select
+                  value={paymentTermsType}
+                  onChange={(e) => setPaymentTermsType(e.target.value as any)}
+                  className="flex-1 p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/40 text-[10px] uppercase tracking-widest text-gray-700 h-[44px] cursor-pointer"
+                >
+                  <option value="upon_receipt">
+                    {profile?.country === 'FR'
+                      ? 'Dès réception'
+                      : 'Upon Receipt'}
+                  </option>
+                  <option value="net_days">
+                    {profile?.country === 'FR' ? 'jours net' : 'Net Days'}
+                  </option>
+                </select>
+
+                {paymentTermsType === 'net_days' && (
+                  <div className="relative w-24 sm:w-28 animate-fade-in shrink-0">
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={paymentDays}
+                      onChange={(e) =>
+                        setPaymentDays(
+                          Math.min(
+                            120,
+                            Math.max(1, parseInt(e.target.value) || 1)
+                          )
+                        )
+                      }
+                      className="w-full p-3 pr-12 border border-blue-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold bg-blue-50/30 text-right h-[44px] text-sm text-blue-900 shadow-inner"
+                    />
+                    <span className="absolute right-3 top-3.5 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none">
+                      {profile?.country === 'FR' ? 'Jrs' : 'Days'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Deposit Column */}
+            <div className="flex flex-col gap-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
+                {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
+              </label>
+              <div className="flex flex-row items-center w-full bg-gray-50/40 border border-gray-200 rounded-xl p-2 h-[44px] shadow-inner">
+                <Switch
+                  checked={depositEnabled}
+                  onChange={setDepositEnabled}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ml-1 ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
                   />
-                  <span className="absolute right-3 top-3.5 text-[10px] font-black text-blue-400 pointer-events-none">
-                    %
-                  </span>
+                </Switch>
+
+                <div className="h-5 border-l border-gray-200 mx-3 shrink-0" />
+
+                <div
+                  className={`flex items-center gap-2 flex-1 transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                >
+                  <div className="relative w-full">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      disabled={!depositEnabled}
+                      value={depositPercentage}
+                      onChange={(e) =>
+                        setDepositPercentage(
+                          Math.min(
+                            100,
+                            Math.max(1, parseInt(e.target.value) || 0)
+                          )
+                        )
+                      }
+                      className="w-full py-1 pr-6 border-none outline-none font-mono font-bold bg-transparent text-right text-sm text-blue-900"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] font-black text-blue-400 pointer-events-none">
+                      %
+                    </span>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -1711,65 +1844,6 @@ function NewEstimateContent() {
 
           {/* Right Block: Modifiers & Primary Actions */}
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto justify-end">
-            {/* Ultra-Compact Stationary Deposit Capsule */}
-            <div className="w-full sm:w-[250px] h-10 bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 shadow-sm select-none shrink-0">
-              {/* Left Section: Strict layout tree node with invariant dimensions */}
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">
-                  {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setDepositEnabled(!depositEnabled)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
-                  />
-                </button>
-              </div>
-
-              {/* Central Divider: Persistent baseline separation line */}
-              <div className="h-4 border-l border-gray-200/80 mx-2.5 shrink-0" />
-
-              {/* Right Section: Invariant layout geometry. State changes manipulate opacity only to prevent layout shifts */}
-              <div
-                className={`flex items-center gap-2.5 flex-1 justify-end transition-all duration-200 ${depositEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-              >
-                {/* Flex layout container completely eliminates any text overlapping */}
-                <div className="flex items-center border-b border-gray-200 focus-within:border-blue-500 transition-colors pb-0.5 shrink-0">
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    disabled={!depositEnabled}
-                    value={depositPercentage}
-                    onChange={(e) =>
-                      setDepositPercentage(
-                        Math.min(
-                          100,
-                          Math.max(1, parseInt(e.target.value) || 0)
-                        )
-                      )
-                    }
-                    className="w-8 font-mono font-bold text-right text-xs text-blue-900 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <span className="text-[9px] font-black text-blue-400 select-none pl-0.5 pr-0.5">
-                    %
-                  </span>
-                </div>
-
-                <div className="text-right min-w-[60px] max-w-[75px] truncate">
-                  <span className="font-mono font-bold text-xs text-gray-900 tracking-tight">
-                    {profile?.currency === 'EUR' ? '€' : '$'}
-                    {((totalCents * depositPercentage) / 10000)
-                      .toFixed(2)
-                      .replace('.', profile?.country === 'FR' ? ',' : '.')}
-                  </span>
-                </div>
-              </div>
-            </div>
-
             {/* Main Action Button */}
             <div className="w-full sm:w-auto shrink-0">
               <button

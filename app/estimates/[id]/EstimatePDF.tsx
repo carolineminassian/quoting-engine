@@ -416,7 +416,54 @@ export default function EstimatePDF({
               {isFr ? 'Conditions de Paiement' : 'Terms'}
             </Text>
             <Text style={[styles.footerText, { fontWeight: 'bold' }]}>
-              {isFr ? 'Règlement sous 30 jours.' : 'Payment due upon receipt.'}
+              {(() => {
+                const terms = estimate.payment_terms_snapshot || '30_days';
+                if (isFr) {
+                  if (estimate.deposit_enabled) {
+                    const suffix =
+                      terms === 'upon_receipt'
+                        ? 'dès réception.'
+                        : terms === '15_days'
+                          ? 'sous 15 jours.'
+                          : terms === '60_days'
+                            ? 'sous 60 jours.'
+                            : 'sous 30 jours.';
+                    return `Acompte exigible à la signature pour valider le devis. Solde ${suffix}`;
+                  }
+                  switch (terms) {
+                    case 'upon_receipt':
+                      return 'Règlement dès réception de la facture.';
+                    case '15_days':
+                      return 'Règlement sous 15 jours.';
+                    case '60_days':
+                      return 'Règlement sous 60 jours.';
+                    default:
+                      return 'Règlement sous 30 jours.';
+                  }
+                } else {
+                  if (estimate.deposit_enabled) {
+                    const suffix =
+                      terms === 'upon_receipt'
+                        ? 'upon receipt.'
+                        : terms === '15_days'
+                          ? 'within 15 days.'
+                          : terms === '60_days'
+                            ? 'within 60 days.'
+                            : 'within 30 days.';
+                    return `Deposit due upon acceptance to initiate work. Balance due ${suffix}`;
+                  }
+                  switch (terms) {
+                    case 'upon_receipt':
+                      return 'Payment due upon receipt.';
+                    case '15_days':
+                      return 'Payment due within 15 days.';
+                    case '60_days':
+                      return 'Payment due within 60 days.';
+                    default:
+                      return 'Payment due within 30 days.';
+                  }
+                }
+              })()}
             </Text>
           </View>
         </View>
