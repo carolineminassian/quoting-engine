@@ -5,6 +5,11 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { translations } from '@/lib/translations';
+import {
+  getRawLaborRateCents,
+  getRawItemCostCents,
+  buildMaterialsMap
+} from '@/lib/estimateCalculations';
 import LoadingDots from '@/components/LoadingDots';
 import {
   Listbox,
@@ -224,41 +229,30 @@ export default function AnalyticsPage() {
       est.sections.forEach((sec: any) => {
         const title = sec.title?.trim().toUpperCase() || lang.unspecified;
 
-        const laborRaw = Math.round(
-          (sec.laborHours || 0) * (sec.hourlyRate || 0) * 100
-        );
+        // Labor cost basis (pre-margin) for this section
+        const laborRawCents = getRawLaborRateCents(sec) * (sec.laborHours || 0);
         const laborNormalized = getAmountInTargetCurrency(
-          laborRaw,
+          laborRawCents,
           estCurrency
         );
         totalLaborCostCents += laborNormalized;
 
-        let materialsNormalized = 0;
+        // Materials cost basis (pre-margin) for this section
+        let materialsRawCents = 0;
         if (Array.isArray(sec.items)) {
           sec.items.forEach((item: any) => {
-            const itemCost = Math.round(
-              (item.cost_per_unit_cents || 0) * (item.qty || 0)
-            );
-            materialsNormalized += getAmountInTargetCurrency(
-              itemCost,
-              estCurrency
-            );
+            materialsRawCents += getRawItemCostCents(item) * (item.qty || 0);
           });
         }
-        totalMaterialCostCents += materialsNormalized;
+        totalMaterialCostCents += getAmountInTargetCurrency(
+          materialsRawCents,
+          estCurrency
+        );
 
-        const sectionTotalRaw =
-          laborRaw +
-          (Array.isArray(sec.items)
-            ? sec.items.reduce(
-                (acc: number, item: any) =>
-                  acc +
-                  Math.round((item.cost_per_unit_cents || 0) * (item.qty || 0)),
-                0
-              )
-            : 0);
+        // Service category cost basis (labor + materials)
+        const sectionTotalRawCents = laborRawCents + materialsRawCents;
         const sectionTotalNormalized = getAmountInTargetCurrency(
-          sectionTotalRaw,
+          sectionTotalRawCents,
           estCurrency
         );
         serviceMap[title] = (serviceMap[title] || 0) + sectionTotalNormalized;

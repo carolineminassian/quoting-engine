@@ -1,9 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
+import {
+  getTaxSummary,
+  type EstimateFinancialContext,
+  type EstimateSection as CalcEstimateSection
+} from '@/lib/estimateCalculations';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -397,82 +402,32 @@ function NewEstimateContent() {
     }));
   };
 
-  const calculateTotals = () => {
-    let subtotalCents = 0;
-    let totalTaxCents = 0;
+  const calculateTotals = useMemo(() => {
+    // Build a synthetic estimate context from the live form state.
+    // The calc lib expects snapshot fields; for drafts we use the current state.
+    const estimateContext: EstimateFinancialContext = {
+      margin_mode_snapshot: marginMode,
+      global_margin_snapshot: globalMargin,
+      tax_rate_snapshot: null // Use profile default as fallback
+    };
 
-    sections.forEach((sec) => {
-      let secLaborCents = Math.round(sec.laborHours * sec.hourlyRate * 100);
+    const profileTaxRate = profile?.default_tax_rate || 0;
 
-      if (marginMode === 'granular' && sec.laborMarginRate) {
-        secLaborCents = Math.round(
-          secLaborCents * (1 + sec.laborMarginRate / 100)
-        );
-      }
-
-      let secItemsCents = 0;
-      sec.items.forEach((item) => {
-        let itemCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
-        if (marginMode === 'granular' && item.marginRate) {
-          itemCost = Math.round(itemCost * (1 + item.marginRate / 100));
-        }
-        secItemsCents += itemCost;
-      });
-
-      let secTotalBeforeServiceMargin = secLaborCents + secItemsCents;
-
-      if (marginMode === 'service' && sec.marginRate) {
-        secTotalBeforeServiceMargin = Math.round(
-          secTotalBeforeServiceMargin * (1 + sec.marginRate / 100)
-        );
-      }
-
-      let secLaborTaxCents = 0;
-      let secItemsTaxCents = 0;
-
-      if (marginMode === 'service' && sec.marginRate) {
-        const marginMultiplier = 1 + sec.marginRate / 100;
-        secLaborTaxCents = Math.round(
-          secLaborCents * marginMultiplier * ((sec.laborTaxRate || 0) / 100)
-        );
-
-        sec.items.forEach((item) => {
-          let iCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
-          const marginedICost = Math.round(iCost * marginMultiplier);
-          secItemsTaxCents += Math.round(
-            marginedICost * ((item.taxRate || 0) / 100)
-          );
-        });
-      } else {
-        secLaborTaxCents = Math.round(
-          secLaborCents * ((sec.laborTaxRate || 0) / 100)
-        );
-        sec.items.forEach((item) => {
-          let iCost = (item.cost_per_unit_cents || 0) * (item.qty || 0);
-          if (marginMode === 'granular' && item.marginRate) {
-            iCost = Math.round(iCost * (1 + item.marginRate / 100));
-          }
-          secItemsTaxCents += Math.round(iCost * ((item.taxRate || 0) / 100));
-        });
-      }
-
-      subtotalCents += secTotalBeforeServiceMargin;
-      totalTaxCents += secLaborTaxCents + secItemsTaxCents;
-    });
-
-    if (marginMode === 'global' && globalMargin) {
-      subtotalCents = Math.round(subtotalCents * (1 + globalMargin / 100));
-      totalTaxCents = Math.round(totalTaxCents * (1 + globalMargin / 100));
-    }
+    const { subtotalCents, totalTaxCents } = getTaxSummary(
+      estimateContext,
+      sections as any, // Local EstimateSection has identical shape to CalcEstimateSection
+      profileTaxRate
+      // No materialsById — items in new-estimate already have cost_per_unit_cents inline
+    );
 
     return {
       subtotalCents,
       tax: totalTaxCents,
       totalCents: subtotalCents + totalTaxCents
     };
-  };
+  }, [sections, marginMode, globalMargin, profile?.default_tax_rate]);
 
-  const { subtotalCents, tax, totalCents } = calculateTotals();
+  const { subtotalCents, tax, totalCents } = calculateTotals;
 
   const handleSave = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -539,7 +494,7 @@ function NewEstimateContent() {
       }
     }
 
-    const totals = calculateTotals();
+    const totals = calculateTotals;
     const finalSections = [];
 
     for (const sec of sections) {

@@ -1,9 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { translations, t } from '@/lib/translations';
+import {
+  getMultiplier,
+  getEffectiveLaborRateCents,
+  getEffectiveItemCostCents,
+  getSectionTotalCents,
+  getTaxSummary,
+  generateDescription,
+  buildMaterialsMap,
+  hydrateSections
+} from '@/lib/estimateCalculations';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -102,147 +112,70 @@ export default function DashboardPage() {
         .default;
 
       const zip = new JSZip();
+      const materialsById = buildMaterialsMap(materials);
 
       for (const est of processedEstimates) {
         const country = est.country_snapshot || profile?.country || 'US';
         const currentLang =
           country === 'FR' ? translations.FR : translations.US;
 
-        const getMultiplier = (
-          sec: any,
-          item: any = null,
-          isLabor: boolean = false
-        ) => {
-          const mode = est.margin_mode_snapshot || 'none';
-          if (mode === 'global')
-            return 1 + (est.global_margin_snapshot || 0) / 100;
-          if (mode === 'service') return 1 + (sec.marginRate || 0) / 100;
-          if (mode === 'granular') {
-            if (isLabor) return 1 + (sec.laborMarginRate || 0) / 100;
-            if (item) return 1 + (item.marginRate || 0) / 100;
-          }
-          return 1;
-        };
+        // 1. Hydrate items with material data (name/cost/unit) where missing
+        const hydratedSections = hydrateSections(
+          est.sections || [],
+          materialsById
+        );
 
-        // 1. HYDRATATION PURE : Lier les matériaux sans altérer la structure d'origine.
-        const hydratedSections = (est.sections || []).map((sec: any) => ({
-          ...sec,
-          items: (sec.items || []).map((item: any) => {
-            if (!item.materialId) return item;
-            const m = materials.find((mat) => mat.id === item.materialId);
-            return {
-              ...item,
-              name: item.name || m?.name,
-              cost_per_unit_cents:
-                item.cost_per_unit_cents ?? m?.cost_per_unit_cents ?? 0,
-              unit: item.unit || m?.unit
-            };
-          })
-        }));
+        // 2. Compute subtotal + tax breakdown using the central helper
+        const profileTaxRate = profile?.default_tax_rate || 0;
+        const { subtotalCents, taxGroups } = getTaxSummary(
+          est,
+          hydratedSections,
+          profileTaxRate,
+          materialsById
+        );
 
-        const getEffectiveLaborRateCents = (sec: any) =>
-          Math.round(
-            (sec.hourlyRate || 0) * 100 * getMultiplier(sec, null, true)
-          );
-        const getEffectiveItemCostCents = (sec: any, item: any) =>
-          Math.round(
-            (item.cost_per_unit_cents || 0) * getMultiplier(sec, item, false)
-          );
-
-        const getSectionTotal = (sec: any) => {
-          const laborCents =
-            getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
-          const matsCents = (sec.items || []).reduce(
-            (acc: number, item: any) =>
-              acc + getEffectiveItemCostCents(sec, item) * (item.qty || 0),
-            0
-          );
-          return (matsCents + laborCents) / 100;
-        };
-
-        let subtotalAccumulator = 0;
-        const groups: Record<number, number> = {};
         const baseTaxRate =
           est.tax_rate_snapshot !== null
             ? est.tax_rate_snapshot
-            : profile?.default_tax_rate || 0;
+            : profileTaxRate;
 
-        // 2. AGRÉGATION MATHÉMATIQUE (avec les sections hydratées)
-        hydratedSections.forEach((sec: any) => {
-          const laborCents =
-            getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
-          if (laborCents > 0) {
-            subtotalAccumulator += laborCents;
-            const r =
-              sec.laborTaxRate !== undefined ? sec.laborTaxRate : baseTaxRate;
-            groups[r] = (groups[r] || 0) + Math.round(laborCents * (r / 100));
-          }
-          (sec.items || []).forEach((item: any) => {
-            const matCents =
-              getEffectiveItemCostCents(sec, item) * (item.qty || 0);
-            if (matCents > 0) {
-              subtotalAccumulator += matCents;
-              const r = item.taxRate !== undefined ? item.taxRate : baseTaxRate;
-              groups[r] = (groups[r] || 0) + Math.round(matCents * (r / 100));
-            }
-          });
-        });
-
-        // 3. MAPPING FINAL : Prepare sections with automatic descriptions
+        // 3. Prepare sections for the PDF: each gets resolved description, totals, items
         const isDetailsEnabled = est.show_details_snapshot === true;
+        const descTranslations = {
+          descBase: currentLang.descBase,
+          descZeroCostMats: currentLang.descZeroCostMats,
+          descZeroCostLabor: currentLang.descZeroCostLabor
+        };
 
         const preparedSections = hydratedSections.map((sec: any) => {
-          // --- BEGIN MIRRORED GENERATE DESCRIPTION LOGIC ---
-          const isFr = country === 'FR';
-
-          let desc = '';
-          if (sec.description && sec.description.trim() !== '') {
-            desc = sec.description;
-          } else {
-            let baseText = isFr
-              ? "Prestation complète incluant la main-d'œuvre professionnelle, la logistique et les matériaux nécessaires à cette phase du projet."
-              : 'Comprehensive delivery including all necessary professional labor, logistics, and materials required for this project phase.';
-
-            const zeroCostMats = sec.items
-              .map((item: any) => {
-                const effectiveCost = getEffectiveItemCostCents(sec, item);
-                return effectiveCost === 0 && item.name ? item.name : null;
-              })
-              .filter(Boolean);
-
-            if (zeroCostMats.length > 0) {
-              const matString = zeroCostMats.join(', ');
-              baseText += isFr
-                ? ` Matériaux inclus sans frais supplémentaires ou fournis par le client : ${matString}.`
-                : ` Materials included at no charge or client-provided: ${matString}.`;
-            }
-
-            if (sec.laborHours > 0 && getEffectiveLaborRateCents(sec) === 0) {
-              baseText += isFr
-                ? " Main-d'œuvre incluse sans frais supplémentaires."
-                : ' Labor included at no charge for this phase.';
-            }
-            desc = baseText;
-          }
-          // --- END MIRRORED GENERATE DESCRIPTION LOGIC ---
+          const sectionTotalDollars =
+            getSectionTotalCents(est, sec, materialsById) / 100;
+          const effectiveLaborRate = getEffectiveLaborRateCents(est, sec) / 100;
 
           return {
             ...sec,
-            description: desc, // The PDF now receives the fully realized description
-            total: getSectionTotal(sec),
-            sectionTotal: getSectionTotal(sec),
+            description: generateDescription(
+              est,
+              sec,
+              descTranslations,
+              materialsById
+            ),
+            total: sectionTotalDollars,
+            sectionTotal: sectionTotalDollars,
             hasDetails: isDetailsEnabled,
             show_details: isDetailsEnabled,
-            laborRate: getEffectiveLaborRateCents(sec) / 100,
+            laborRate: effectiveLaborRate,
             laborTaxRate:
               sec.laborTaxRate !== undefined ? sec.laborTaxRate : baseTaxRate,
             items: (sec.items || []).map((item: any) => ({
               ...item,
-              cost: getEffectiveItemCostCents(sec, item) / 100,
+              cost:
+                getEffectiveItemCostCents(est, sec, item, materialsById) / 100,
               taxRate: item.taxRate !== undefined ? item.taxRate : baseTaxRate
             }))
           };
         });
+
         const docBlob = await pdf(
           <EstimatePDF
             estimate={{
@@ -251,21 +184,20 @@ export default function DashboardPage() {
               show_details_snapshot: isDetailsEnabled,
               sections: preparedSections
             }}
-            // materials={materials}
             profile={{
               ...profile,
               country,
               currency: est.currency_snapshot || profile?.currency
             }}
             lang={currentLang}
-            subtotal={subtotalAccumulator / 100}
-            taxGroups={Object.entries(groups) as any}
+            subtotal={subtotalCents / 100}
+            taxGroups={Object.entries(taxGroups) as any}
             grandTotal={est.total_amount_cents / 100}
             sections={preparedSections}
           />
         ).toBlob();
 
-        const filename = `${country === 'FR' ? 'Devis' : 'Estimate'}-${est.custom_id || est.id.slice(0, 8)}.pdf`;
+        const filename = `${currentLang.estimateLabel}-${est.custom_id || est.id.slice(0, 8)}.pdf`;
         zip.file(filename, docBlob);
       }
 
@@ -336,6 +268,11 @@ export default function DashboardPage() {
         return a.total_amount_cents - b.total_amount_cents;
       return 0;
     });
+
+  const materialsById = useMemo(
+    () => buildMaterialsMap(materials),
+    [materials]
+  );
 
   const handleExportCSV = (type: 'summary' | 'detailed') => {
     let csv = '';
@@ -436,22 +373,6 @@ export default function DashboardPage() {
 
         const baseInfo = `${escapeCsv(e.custom_id || e.id)},${date},${cName},${cEmail},${cPhone},${cAddr},${status}`;
 
-        const getMultiplier = (
-          sec: any,
-          item: any = null,
-          isLabor: boolean = false
-        ) => {
-          const mode = e.margin_mode_snapshot || 'none';
-          if (mode === 'global')
-            return 1 + (e.global_margin_snapshot || 0) / 100;
-          if (mode === 'service') return 1 + (sec.marginRate || 0) / 100;
-          if (mode === 'granular') {
-            if (isLabor) return 1 + (sec.laborMarginRate || 0) / 100;
-            if (item) return 1 + (item.marginRate || 0) / 100;
-          }
-          return 1;
-        };
-
         (e.sections || []).forEach((sec: any) => {
           const serviceTitle = escapeCsv(
             sec.title || (isFr ? 'Service' : 'Service')
@@ -464,7 +385,7 @@ export default function DashboardPage() {
             const baseCost = sec.hourlyRate || 0;
             const baseAmount = baseCost * qty;
 
-            const mult = getMultiplier(sec, null, true);
+            const mult = getMultiplier(e, sec, null, true);
             const marginPct = (mult - 1) * 100;
             const clientPriceBeforeTax = baseAmount * mult;
             const marginAmount = clientPriceBeforeTax - baseAmount;
@@ -496,7 +417,7 @@ export default function DashboardPage() {
 
           // Process Materials
           (sec.items || []).forEach((item: any) => {
-            const m = materials.find((mat) => mat.id === item.materialId);
+            const m = materialsById.get(item.materialId);
             const name =
               item.name ||
               m?.name ||
@@ -510,7 +431,7 @@ export default function DashboardPage() {
             const qty = item.qty || 0;
             const baseAmount = baseCost * qty;
 
-            const mult = getMultiplier(sec, item, false);
+            const mult = getMultiplier(e, sec, item, false);
             const marginPct = (mult - 1) * 100;
             const clientPriceBeforeTax = baseAmount * mult;
             const marginAmount = clientPriceBeforeTax - baseAmount;

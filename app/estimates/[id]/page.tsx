@@ -7,6 +7,14 @@ import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { translations, t } from '@/lib/translations';
+import {
+  getEffectiveLaborRateCents,
+  getEffectiveItemCostCents,
+  getSectionTotal,
+  getTaxSummary,
+  generateDescription,
+  buildMaterialsMap
+} from '@/lib/estimateCalculations';
 
 interface BrandLogoProps {
   country: 'US' | 'FR';
@@ -157,104 +165,19 @@ export default function EstimateView() {
   // --- MARGIN ENGINE & MATH HELPERS ---
 
   const materialsById = useMemo(
-    () => new Map(materials.map((m) => [m.id, m])),
+    () => buildMaterialsMap(materials),
     [materials]
   );
 
-  const getMultiplier = (
-    sec: any,
-    item: any = null,
-    isLabor: boolean = false
-  ) => {
-    const mode = estimate?.margin_mode_snapshot || 'none';
-    if (mode === 'global')
-      return 1 + (estimate.global_margin_snapshot || 0) / 100;
-    if (mode === 'service') return 1 + (sec.marginRate || 0) / 100;
-    if (mode === 'granular') {
-      if (isLabor) return 1 + (sec.laborMarginRate || 0) / 100;
-      if (item) return 1 + (item.marginRate || 0) / 100;
-    }
-    return 1;
-  };
-
-  const getEffectiveLaborRateCents = (sec: any) => {
-    const rawRateCents = (sec.hourlyRate || 0) * 100;
-    return Math.round(rawRateCents * getMultiplier(sec, null, true));
-  };
-
-  const getEffectiveItemCostCents = (sec: any, item: any) => {
-    const snapshottedCost = item.cost_per_unit_cents;
-    const liveCost =
-      materialsById.get(item.materialId)?.cost_per_unit_cents || 0;
-    const rawCost = snapshottedCost !== undefined ? snapshottedCost : liveCost;
-    return Math.round(rawCost * getMultiplier(sec, item, false));
-  };
-
-  const getSectionTotal = (sec: any) => {
-    const laborCents = getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
-    const matsCents = sec.items.reduce((acc: number, item: any) => {
-      return acc + getEffectiveItemCostCents(sec, item) * (item.qty || 0);
-    }, 0);
-    return (matsCents + laborCents) / 100;
-  };
-
-  const getTaxSummary = () => {
-    let subtotal = 0;
-    const groups: Record<number, number> = {};
-
-    (estimate.sections || []).forEach((sec: any) => {
-      const laborCents =
-        getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
-
-      if (laborCents > 0) {
-        subtotal += laborCents;
-        const r =
-          sec.laborTaxRate !== undefined ? sec.laborTaxRate : profile.tax_rate;
-        groups[r] = (groups[r] || 0) + Math.round(laborCents * (r / 100));
-      }
-
-      (sec.items || []).forEach((item: any) => {
-        const matCents = getEffectiveItemCostCents(sec, item) * (item.qty || 0);
-
-        if (matCents > 0) {
-          subtotal += matCents;
-          const r =
-            item.taxRate !== undefined ? item.taxRate : profile.tax_rate;
-          groups[r] = (groups[r] || 0) + Math.round(matCents * (r / 100));
-        }
-      });
-    });
-
-    return { subtotal, groups };
-  };
-
-  const generateDescription = (sec: any) => {
-    if (sec.description && sec.description.trim() !== '') {
-      return sec.description;
-    }
-
-    let baseText = lang.descBase;
-
-    const zeroCostMats = sec.items
-      .map((item: any) => {
-        const effectiveCost = getEffectiveItemCostCents(sec, item);
-        const m = materialsById.get(item.materialId);
-        const name = item.name || m?.name;
-        return effectiveCost === 0 && name ? name : null;
-      })
-      .filter(Boolean);
-
-    if (zeroCostMats.length > 0) {
-      baseText +=
-        ' ' + t(lang.descZeroCostMats, { mats: zeroCostMats.join(', ') });
-    }
-
-    if (sec.laborHours > 0 && getEffectiveLaborRateCents(sec) === 0) {
-      baseText += ' ' + lang.descZeroCostLabor;
-    }
-
-    return baseText;
-  };
+  // Translation bundle for auto-generated descriptions
+  const descTranslations = useMemo(
+    () => ({
+      descBase: lang?.descBase || '',
+      descZeroCostMats: lang?.descZeroCostMats || '',
+      descZeroCostLabor: lang?.descZeroCostLabor || ''
+    }),
+    [lang]
+  );
 
   // --- ACTIONS ---
 
@@ -504,19 +427,30 @@ export default function EstimateView() {
       const { pdf } = await import('@react-pdf/renderer');
       const EstimatePDF = (await import('./EstimatePDF')).default;
 
-      const { subtotal, groups } = getTaxSummary();
+      const { subtotalCents: pdfSubtotalCents, taxGroups: pdfTaxGroups } =
+        getTaxSummary(
+          estimate,
+          estimate.sections || [],
+          profile.tax_rate,
+          materialsById
+        );
       const isShowingDetails = estimate.is_locked
         ? estimate.show_details_snapshot === true
         : showDetails;
 
       const preparedSections = estimate.sections.map((sec: any) => ({
         title: sec.title || lang.professionalServices,
-        description: generateDescription(sec),
-        total: getSectionTotal(sec),
+        description: generateDescription(
+          estimate,
+          sec,
+          descTranslations,
+          materialsById
+        ),
+        total: getSectionTotal(estimate, sec, materialsById),
         hasDetails: isShowingDetails,
         laborHours: sec.laborHours || 0,
         laborType: sec.laborType,
-        laborRate: getEffectiveLaborRateCents(sec) / 100,
+        laborRate: getEffectiveLaborRateCents(estimate, sec) / 100,
         laborTaxRate:
           sec.laborTaxRate !== undefined ? sec.laborTaxRate : profile.tax_rate,
         items: (sec.items || []).map((item: any) => {
@@ -529,7 +463,9 @@ export default function EstimateView() {
               item.unit ||
               m?.unit ||
               '',
-            cost: getEffectiveItemCostCents(sec, item) / 100,
+            cost:
+              getEffectiveItemCostCents(estimate, sec, item, materialsById) /
+              100,
             taxRate:
               item.taxRate !== undefined ? item.taxRate : profile.tax_rate
           };
@@ -541,13 +477,12 @@ export default function EstimateView() {
           estimate={estimate}
           profile={profile}
           lang={lang}
-          subtotal={subtotal / 100}
-          taxGroups={Object.entries(groups) as any}
+          subtotal={pdfSubtotalCents / 100}
+          taxGroups={Object.entries(pdfTaxGroups) as any}
           grandTotal={estimate.total_amount_cents / 100}
           sections={preparedSections}
         />
       ).toBlob();
-
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -631,7 +566,12 @@ export default function EstimateView() {
     );
   }
 
-  const { subtotal, groups } = getTaxSummary();
+  const { subtotalCents, taxGroups } = getTaxSummary(
+    estimate,
+    estimate.sections || [],
+    profile.tax_rate,
+    materialsById
+  );
   const isShowingDetails = estimate.is_locked
     ? estimate.show_details_snapshot === true
     : showDetails;
@@ -891,7 +831,12 @@ export default function EstimateView() {
                         {sec.title || lang.professionalServices}
                       </p>
                       <p className="text-xs text-gray-400 font-medium leading-relaxed mb-3 whitespace-pre-wrap break-words max-w-2xl">
-                        {generateDescription(sec)}
+                        {generateDescription(
+                          estimate,
+                          sec,
+                          descTranslations,
+                          materialsById
+                        )}
                       </p>
 
                       {isShowingDetails ? (
@@ -903,7 +848,7 @@ export default function EstimateView() {
                                 ? lang.laborDayUnit
                                 : 'h'}{' '}
                               @{' '}
-                              {(getEffectiveLaborRateCents(sec) / 100)
+                              {(getEffectiveLaborRateCents(estimate, sec) / 100)
                                 .toFixed(2)
                                 .replace(
                                   '.',
@@ -925,13 +870,14 @@ export default function EstimateView() {
                             const displayName =
                               item.name || m?.name || 'Material Item';
                             const displayCostCents = getEffectiveItemCostCents(
+                              estimate,
                               sec,
-                              item
+                              item,
+                              materialsById
                             );
                             const rawUnit = item.unit || m?.unit || '';
                             const displayUnit =
                               lang?.units?.[rawUnit] || rawUnit;
-
                             return (
                               <div
                                 key={i}
@@ -998,7 +944,7 @@ export default function EstimateView() {
                     </td>
                     <td className="py-8 text-right font-mono font-black text-xl text-gray-700 align-top shrink-0 whitespace-nowrap">
                       {profile.currency === 'EUR' ? '€' : '$'}
-                      {getSectionTotal(sec)
+                      {getSectionTotal(estimate, sec, materialsById)
                         .toFixed(2)
                         .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                     </td>
@@ -1013,12 +959,12 @@ export default function EstimateView() {
                   <span>{lang.subtotalHT}</span>
                   <span className="text-gray-600 font-mono whitespace-nowrap">
                     {profile.currency === 'EUR' ? '€' : '$'}
-                    {(subtotal / 100)
+                    {(subtotalCents / 100)
                       .toFixed(2)
                       .replace('.', profile.currency === 'EUR' ? ',' : '.')}
                   </span>
                 </div>
-                {Object.entries(groups)
+                {Object.entries(taxGroups)
                   .sort((a, b) => Number(b[0]) - Number(a[0]))
                   .map(([rate, amt]) => (
                     <div
