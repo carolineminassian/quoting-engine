@@ -1,14 +1,6 @@
 import React from 'react';
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  Font
-} from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
-// Enregistrement d'une police standard propre
 StyleSheet.create({});
 
 const styles = StyleSheet.create({
@@ -244,7 +236,7 @@ export default function EstimatePDF({
 }: EstimatePDFProps) {
   const isFr = profile.country === 'FR';
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
-
+  console.log('Sections reçues dans le PDF :', sections);
   const formatPrice = (value: number) => {
     const formatted = value.toFixed(2);
     return profile.currency === 'EUR'
@@ -303,10 +295,31 @@ export default function EstimatePDF({
         {sections.map((sec, idx) => (
           <View key={idx} style={styles.row} wrap={false}>
             <View style={styles.colDescription}>
-              <Text style={styles.sectionTitle}>{sec.title}</Text>
-              <Text style={styles.sectionText}>{sec.description}</Text>
+              <Text style={styles.sectionTitle}>
+                {sec.title || (isFr ? 'Prestation' : 'Service')}
+              </Text>
 
-              {/* Détails internes optionnels du snapshot */}
+              {/* 1. Custom Description (Always visible) */}
+              {sec.description && (
+                <Text style={styles.sectionText}>{sec.description}</Text>
+              )}
+
+              {/* 2. Public Materials List (Only visible if Internal Details are OFF) */}
+              {!sec.hasDetails && (sec.items || []).length > 0 && (
+                <View style={{ marginBottom: 6, marginTop: 2 }}>
+                  {sec.items.map((item: any, i: number) => (
+                    <Text
+                      key={`auto-${i}`}
+                      style={{ fontSize: 9, color: '#6b7280', marginBottom: 2 }}
+                    >
+                      • {item.name || (isFr ? 'Article' : 'Item')}{' '}
+                      {item.qty > 0 ? `(${item.qty} ${item.unit || ''})` : ''}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* 3. Detailed Internal Breakdown Box (Only visible if Internal Details are ON) */}
               {sec.hasDetails && (
                 <View style={styles.breakdownBox}>
                   {sec.laborHours > 0 && (
@@ -325,16 +338,16 @@ export default function EstimatePDF({
                       (Tax: {sec.laborTaxRate}%)
                     </Text>
                   )}
-                  {sec.items.map((item: any, i: number) => (
-                    <Text key={i} style={styles.breakdownLine}>
-                      • {item.name} : {item.qty} {item.unit} @{' '}
-                      {formatPrice(item.cost)} (Tax: {item.taxRate}%)
+                  {(sec.items || []).map((item: any, i: number) => (
+                    <Text key={`detail-${i}`} style={styles.breakdownLine}>
+                      • {item.name} : {item.qty} {item.unit || ''} @{' '}
+                      {formatPrice(item.cost || 0)} (Tax: {item.taxRate}%)
                     </Text>
                   ))}
                 </View>
               )}
             </View>
-            <Text style={styles.colAmount}>{formatPrice(sec.total)}</Text>
+            <Text style={styles.colAmount}>{formatPrice(sec.total || 0)}</Text>
           </View>
         ))}
 

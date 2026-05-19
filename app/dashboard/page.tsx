@@ -130,6 +130,22 @@ export default function DashboardPage() {
           return 1;
         };
 
+        // 1. HYDRATATION PURE : Lier les matériaux sans altérer la structure d'origine.
+        const hydratedSections = (est.sections || []).map((sec: any) => ({
+          ...sec,
+          items: (sec.items || []).map((item: any) => {
+            if (!item.materialId) return item;
+            const m = materials.find((mat) => mat.id === item.materialId);
+            return {
+              ...item,
+              name: item.name || m?.name,
+              cost_per_unit_cents:
+                item.cost_per_unit_cents ?? m?.cost_per_unit_cents ?? 0,
+              unit: item.unit || m?.unit
+            };
+          })
+        }));
+
         const getEffectiveLaborRateCents = (sec: any) =>
           Math.round(
             (sec.hourlyRate || 0) * 100 * getMultiplier(sec, null, true)
@@ -138,6 +154,7 @@ export default function DashboardPage() {
           Math.round(
             (item.cost_per_unit_cents || 0) * getMultiplier(sec, item, false)
           );
+
         const getSectionTotal = (sec: any) => {
           const laborCents =
             getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
@@ -156,7 +173,8 @@ export default function DashboardPage() {
             ? est.tax_rate_snapshot
             : profile?.default_tax_rate || 0;
 
-        (est.sections || []).forEach((sec: any) => {
+        // 2. AGRÉGATION MATHÉMATIQUE (avec les sections hydratées)
+        hydratedSections.forEach((sec: any) => {
           const laborCents =
             getEffectiveLaborRateCents(sec) * (sec.laborHours || 0);
           if (laborCents > 0) {
@@ -176,32 +194,70 @@ export default function DashboardPage() {
           });
         });
 
-        const preparedSections = (est.sections || []).map((sec: any) => ({
-          title:
-            sec.title ||
-            (country === 'FR'
-              ? 'Services Professionnels'
-              : 'Professional Services'),
-          description: sec.description || '',
-          total: getSectionTotal(sec),
-          hasDetails: est.show_details_snapshot === true,
-          laborHours: sec.laborHours || 0,
-          laborType: sec.laborType,
-          laborRate: getEffectiveLaborRateCents(sec) / 100,
-          laborTaxRate:
-            sec.laborTaxRate !== undefined ? sec.laborTaxRate : baseTaxRate,
-          items: (sec.items || []).map((item: any) => ({
-            name: item.name || 'Material Item',
-            qty: item.qty || 0,
-            unit: item.unit || '',
-            cost: getEffectiveItemCostCents(sec, item) / 100,
-            taxRate: item.taxRate !== undefined ? item.taxRate : baseTaxRate
-          }))
-        }));
+        // 3. MAPPING FINAL : Prepare sections with automatic descriptions
+        const isDetailsEnabled = est.show_details_snapshot === true;
 
+        const preparedSections = hydratedSections.map((sec: any) => {
+          // --- BEGIN MIRRORED GENERATE DESCRIPTION LOGIC ---
+          const isFr = country === 'FR';
+
+          let desc = '';
+          if (sec.description && sec.description.trim() !== '') {
+            desc = sec.description;
+          } else {
+            let baseText = isFr
+              ? "Prestation complète incluant la main-d'œuvre professionnelle, la logistique et les matériaux nécessaires à cette phase du projet."
+              : 'Comprehensive delivery including all necessary professional labor, logistics, and materials required for this project phase.';
+
+            const zeroCostMats = sec.items
+              .map((item: any) => {
+                const effectiveCost = getEffectiveItemCostCents(sec, item);
+                return effectiveCost === 0 && item.name ? item.name : null;
+              })
+              .filter(Boolean);
+
+            if (zeroCostMats.length > 0) {
+              const matString = zeroCostMats.join(', ');
+              baseText += isFr
+                ? ` Matériaux inclus sans frais supplémentaires ou fournis par le client : ${matString}.`
+                : ` Materials included at no charge or client-provided: ${matString}.`;
+            }
+
+            if (sec.laborHours > 0 && getEffectiveLaborRateCents(sec) === 0) {
+              baseText += isFr
+                ? " Main-d'œuvre incluse sans frais supplémentaires."
+                : ' Labor included at no charge for this phase.';
+            }
+            desc = baseText;
+          }
+          // --- END MIRRORED GENERATE DESCRIPTION LOGIC ---
+
+          return {
+            ...sec,
+            description: desc, // The PDF now receives the fully realized description
+            total: getSectionTotal(sec),
+            sectionTotal: getSectionTotal(sec),
+            hasDetails: isDetailsEnabled,
+            show_details: isDetailsEnabled,
+            laborRate: getEffectiveLaborRateCents(sec) / 100,
+            laborTaxRate:
+              sec.laborTaxRate !== undefined ? sec.laborTaxRate : baseTaxRate,
+            items: (sec.items || []).map((item: any) => ({
+              ...item,
+              cost: getEffectiveItemCostCents(sec, item) / 100,
+              taxRate: item.taxRate !== undefined ? item.taxRate : baseTaxRate
+            }))
+          };
+        });
         const docBlob = await pdf(
           <EstimatePDF
-            estimate={est}
+            estimate={{
+              ...est,
+              show_details: isDetailsEnabled,
+              show_details_snapshot: isDetailsEnabled,
+              sections: preparedSections
+            }}
+            materials={materials}
             profile={{
               ...profile,
               country,

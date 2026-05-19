@@ -117,6 +117,7 @@ function NewEstimateContent() {
     }
   ]);
   const [savedSteps, setSavedSteps] = useState<string[]>([]);
+  const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
   const [activeDropdownIdx, setActiveDropdownIdx] = useState<number | null>(
     null
   );
@@ -178,7 +179,7 @@ function NewEstimateContent() {
         return;
       }
 
-      const [prof, mats, ests, clientsRes] = await Promise.all([
+      const [prof, mats, ests, clientsRes, hiddenRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase
           .from('materials')
@@ -189,7 +190,11 @@ function NewEstimateContent() {
           .from('estimates')
           .select('client_name, created_at, sections')
           .eq('user_id', user.id),
-        supabase.from('clients').select('*').eq('user_id', user.id)
+        supabase.from('clients').select('*').eq('user_id', user.id),
+        supabase
+          .from('hidden_categories')
+          .select('category_name')
+          .eq('user_id', user.id)
       ]);
 
       if (prof.data) {
@@ -249,6 +254,9 @@ function NewEstimateContent() {
         }
       });
       setSavedSteps(Array.from(stepSet));
+      if (hiddenRes?.data) {
+        setHiddenCategories(hiddenRes.data.map((hc: any) => hc.category_name));
+      }
       // Sélection automatique du client via l'URL
       if (targetClientId && clientsRes?.data && !editId && !pendingRaw) {
         const foundClient = clientsRes.data.find(
@@ -1175,55 +1183,129 @@ function NewEstimateContent() {
                         />
 
                         <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto p-1 text-black normal-case not-italic font-sans">
-                          {savedSteps.filter((step) =>
-                            step
-                              .toLowerCase()
-                              .includes((sec.title || '').toLowerCase())
-                          ).length > 0 ? (
-                            savedSteps
-                              .filter((step) =>
+                          {(() => {
+                            // 1. Establish a single source of truth for unhidden categories
+                            const availableSteps = savedSteps.filter(
+                              (step) => !hiddenCategories.includes(step)
+                            );
+                            const filteredSteps = availableSteps.filter(
+                              (step) =>
                                 step
                                   .toLowerCase()
                                   .includes((sec.title || '').toLowerCase())
-                              )
-                              .map((step, idx) => (
-                                <button
+                            );
+
+                            // Case A: User typed a search or menu is open with filtered matches available
+                            if (filteredSteps.length > 0) {
+                              return filteredSteps.map((step, idx) => (
+                                <div
                                   key={idx}
+                                  className="w-full flex items-center justify-between p-1 hover:bg-blue-50 rounded-lg group/item transition-colors"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateSection(sIdx, 'title', step);
+                                      setActiveDropdownIdx(null);
+                                    }}
+                                    className="flex-1 text-left p-2 text-[10px] font-black uppercase tracking-widest text-gray-700 group-hover/item:text-blue-900 cursor-pointer block truncate"
+                                  >
+                                    {step}
+                                  </button>
+                                  {!isGuest && (
+                                    <button
+                                      type="button"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        setHiddenCategories((prev) => [
+                                          ...prev,
+                                          step
+                                        ]);
+                                        await supabase
+                                          .from('hidden_categories')
+                                          .insert([
+                                            {
+                                              user_id: profile.id,
+                                              category_name: step
+                                            }
+                                          ]);
+                                      }}
+                                      className="p-2 text-gray-300 hover:text-red-500 rounded text-xs font-bold transition-colors cursor-pointer"
+                                      title={
+                                        profile?.country === 'FR'
+                                          ? 'Supprimer de la liste'
+                                          : 'Remove from list'
+                                      }
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </div>
+                              ));
+                            }
+
+                            // Case B: User typed something new that has zero matches
+                            if (sec.title) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveDropdownIdx(null)}
+                                  className="w-full text-left p-3 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg uppercase tracking-wider italic cursor-pointer block"
+                                >
+                                  {profile?.country === 'FR'
+                                    ? '✨ Raccourci : Entrée pour valider la nouvelle catégorie'
+                                    : '✨ Shortcut: Press Enter to save new category'}
+                                </button>
+                              );
+                            }
+
+                            // Case C: Lookup field is blank (Display all remaining categories with action items)
+                            return availableSteps.map((step, idx) => (
+                              <div
+                                key={idx}
+                                className="w-full flex items-center justify-between p-1 hover:bg-blue-50 rounded-lg group/item transition-colors"
+                              >
+                                <button
                                   type="button"
                                   onClick={() => {
                                     updateSection(sIdx, 'title', step);
                                     setActiveDropdownIdx(null);
                                   }}
-                                  className="w-full text-left p-3 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors cursor-pointer block"
+                                  className="flex-1 text-left p-2 text-[10px] font-black uppercase tracking-widest text-gray-700 group-hover/item:text-blue-900 cursor-pointer block truncate"
                                 >
                                   {step}
                                 </button>
-                              ))
-                          ) : sec.title ? (
-                            <button
-                              type="button"
-                              onClick={() => setActiveDropdownIdx(null)}
-                              className="w-full text-left p-3 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg uppercase tracking-wider italic cursor-pointer block"
-                            >
-                              {profile?.country === 'FR'
-                                ? '✨ Raccourci : Entrée pour valider la nouvelle catégorie'
-                                : '✨ Shortcut: Press Enter to save new category'}
-                            </button>
-                          ) : (
-                            savedSteps.map((step, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => {
-                                  updateSection(sIdx, 'title', step);
-                                  setActiveDropdownIdx(null);
-                                }}
-                                className="w-full text-left p-3 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg transition-colors cursor-pointer block"
-                              >
-                                {step}
-                              </button>
-                            ))
-                          )}
+                                {!isGuest && (
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      setHiddenCategories((prev) => [
+                                        ...prev,
+                                        step
+                                      ]);
+                                      await supabase
+                                        .from('hidden_categories')
+                                        .insert([
+                                          {
+                                            user_id: profile.id,
+                                            category_name: step
+                                          }
+                                        ]);
+                                    }}
+                                    className="p-2 text-gray-300 hover:text-red-500 rounded text-xs font-bold transition-colors cursor-pointer"
+                                    title={
+                                      profile?.country === 'FR'
+                                        ? 'Supprimer de la liste'
+                                        : 'Remove from list'
+                                    }
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </>
                     )}
