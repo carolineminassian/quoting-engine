@@ -4,6 +4,8 @@ import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { translations } from '@/lib/translations';
+import LoadingDots from '@/components/LoadingDots';
 import {
   Listbox,
   ListboxButton,
@@ -12,86 +14,13 @@ import {
   Transition
 } from '@headlessui/react';
 
-const dict = {
-  EN: {
-    title: 'Analytics',
-    subtitle: 'Insights based on your pipeline and approved estimates.',
-    lockedOnly: 'Pro Feature',
-    totalRev: 'Confirmed Revenue',
-    approvedProj: 'Approved Projects',
-    pipelineValue: 'Pending Pipeline',
-    conversionRate: 'Win Rate',
-    pendingProj: 'Pending Projects',
-    rejectedProj: 'Rejected Projects',
-    avgValue: 'Avg Estimate Value',
-    last6Months: 'Revenue Trend',
-    upgradeAlert: 'Analytics are exclusively available on the Pro Plan.',
-    timeFilter: 'Time Period',
-    currencySelect: 'Display Currency',
-    allTime: 'All Time',
-    thisYear: 'This Year',
-    thisMonth: 'This Month',
-    last6MonthsFilter: 'Last 6 Months',
-    revenueVsMargin: 'Gross Revenue vs Net Margin',
-    grossRevenue: 'Gross Rev (Excl. Tax)',
-    netMargin: 'Net Margin',
-    laborMaterialRatio: 'Labor / Material Ratio',
-    labor: 'Labor',
-    materials: 'Materials',
-    profitableServices: 'Most Profitable Services',
-    topClients: 'Top Customers & Retention',
-    retentionRate: 'Customer Retention Rate',
-    repeatCustomers: 'Repeat Customers',
-    noData: 'No data available for this selection.'
-  },
-  FR: {
-    title: 'Analytique',
-    subtitle: 'Données basées sur vos devis en attente et approuvés.',
-    lockedOnly: 'Fonctionnalité Pro',
-    totalRev: 'Revenus Confirmés',
-    approvedProj: 'Projets Approuvés',
-    pipelineValue: 'Valeur en Attente',
-    conversionRate: 'Taux de Conversion',
-    pendingProj: 'Projets en Attente',
-    rejectedProj: 'Projets Refusés',
-    avgValue: 'Valeur Moyenne',
-    last6Months: 'Évolution des Revenus',
-    upgradeAlert:
-      'Les analyses sont exclusivement disponibles avec le Plan Pro.',
-    timeFilter: 'Période',
-    currencySelect: 'Devise d’Affichage',
-    allTime: 'Tout le temps',
-    thisYear: 'Cette Année',
-    thisMonth: 'Ce Mois',
-    last6MonthsFilter: '6 Derniers Mois',
-    revenueVsMargin: 'CA Brut vs. Marge Nette',
-    grossRevenue: 'CA Brut (HT)',
-    netMargin: 'Marge Nette',
-    laborMaterialRatio: 'Ratio Main-d’œuvre / Matériaux',
-    labor: 'Main-d’œuvre',
-    materials: 'Matériaux',
-    profitableServices: 'Services les plus Rentables',
-    topClients: 'Top Clients & Fidélisation',
-    retentionRate: 'Taux de Fidélisation',
-    repeatCustomers: 'Clients Récurrents',
-    noData: 'Aucune donnée disponible pour cette sélection.'
-  }
-};
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
-
 type TimeFilterType = 'ALL' | 'YEAR' | 'MONTH' | '6MOS';
 type CurrencyType = 'EUR' | 'USD';
 
 export default function AnalyticsPage() {
   const router = useRouter();
-  const [lang, setLang] = useState<'EN' | 'FR'>('EN');
+  const [lang, setLang] = useState<any>(null);
+  const [country, setCountry] = useState<'US' | 'FR'>('US');
   const [loading, setLoading] = useState(true);
   const [isPro, setIsPro] = useState(true);
 
@@ -111,14 +40,28 @@ export default function AnalyticsPage() {
         return;
       }
 
+      // Fetch live exchange rate (with sessionStorage cache for ~6 hours)
       try {
-        const rateRes = await fetch('https://open.er-api.com/v6/latest/EUR');
-        const rateData = await rateRes.json();
-        if (rateData?.rates?.USD) {
-          setExchangeRate(rateData.rates.USD);
+        const cached = sessionStorage.getItem('eur_usd_rate');
+        const cachedAt = sessionStorage.getItem('eur_usd_rate_at');
+        const sixHoursMs = 6 * 60 * 60 * 1000;
+        const isFresh =
+          cached && cachedAt && Date.now() - parseInt(cachedAt) < sixHoursMs;
+
+        if (isFresh) {
+          setExchangeRate(parseFloat(cached));
+        } else {
+          const rateRes = await fetch('https://open.er-api.com/v6/latest/EUR');
+          const rateData = await rateRes.json();
+          if (rateData?.rates?.USD) {
+            setExchangeRate(rateData.rates.USD);
+            sessionStorage.setItem('eur_usd_rate', String(rateData.rates.USD));
+            sessionStorage.setItem('eur_usd_rate_at', String(Date.now()));
+          }
         }
       } catch (rateErr) {
         console.error('Failed to fetch live exchange rates:', rateErr);
+        // Falls back to hardcoded 1.1
       }
 
       const { data: prof } = await supabase
@@ -128,7 +71,9 @@ export default function AnalyticsPage() {
         .single();
 
       if (prof) {
-        setLang(prof.country === 'FR' ? 'FR' : 'EN');
+        const profCountry: 'US' | 'FR' = prof.country === 'FR' ? 'FR' : 'US';
+        setCountry(profCountry);
+        setLang(profCountry === 'FR' ? translations.FR : translations.US);
         setTargetCurrency(prof.currency === 'EUR' ? 'EUR' : 'USD');
         if (prof.subscription_tier !== 'pro') {
           setIsPro(false);
@@ -168,7 +113,7 @@ export default function AnalyticsPage() {
   const formatMoney = (cents: number) => {
     const symbol = targetCurrency === 'EUR' ? '€' : '$';
     const formattedValue = Math.round(cents / 100).toLocaleString(
-      lang === 'FR' ? 'fr-FR' : 'en-US',
+      country === 'FR' ? 'fr-FR' : 'en-US',
       {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
@@ -177,9 +122,7 @@ export default function AnalyticsPage() {
     return `${symbol}${formattedValue}`;
   };
 
-  const t = dict[lang];
-
-  if (loading)
+  if (loading || !lang)
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <LoadingDots />
@@ -192,16 +135,16 @@ export default function AnalyticsPage() {
         <div className="max-w-4xl mx-auto text-center mt-20">
           <div className="text-6xl mb-6">📊</div>
           <h1 className="text-3xl font-black uppercase tracking-tighter mb-4">
-            {t.lockedOnly}
+            {lang.analyticsLockedOnly}
           </h1>
           <p className="text-gray-500 mb-8 max-w-md mx-auto text-xs font-bold uppercase tracking-widest">
-            {t.upgradeAlert}
+            {lang.analyticsUpgradeAlert}
           </p>
           <Link
             href="/upgrade"
             className="inline-block bg-blue-600 text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-blue-700 transition-transform active:scale-95"
           >
-            Upgrade to Pro
+            {lang.upgradeToPro}
           </Link>
         </div>
       </main>
@@ -272,18 +215,14 @@ export default function AnalyticsPage() {
     totalRevenueCents += grossTotal;
     totalTaxCents += taxTotal;
 
-    const cName =
-      est.client_name?.trim() ||
-      (lang === 'FR' ? 'Client Anonyme' : 'Anonymous Client');
+    const cName = est.client_name?.trim() || lang.anonymousClient;
     if (!clientMap[cName]) clientMap[cName] = { total: 0, count: 0 };
     clientMap[cName].total += grossTotal;
     clientMap[cName].count += 1;
 
     if (Array.isArray(est.sections)) {
       est.sections.forEach((sec: any) => {
-        const title =
-          sec.title?.trim().toUpperCase() ||
-          (lang === 'FR' ? 'INDÉTERMINÉ' : 'UNSPECIFIED');
+        const title = sec.title?.trim().toUpperCase() || lang.unspecified;
 
         const laborRaw = Math.round(
           (sec.laborHours || 0) * (sec.hourlyRate || 0) * 100
@@ -364,7 +303,7 @@ export default function AnalyticsPage() {
     d.setMonth(d.getMonth() - (5 - i));
     const m = d.getMonth();
     const y = d.getFullYear();
-    const label = d.toLocaleString(lang === 'FR' ? 'fr-FR' : 'en-US', {
+    const label = d.toLocaleString(country === 'FR' ? 'fr-FR' : 'en-US', {
       month: 'short'
     });
 
@@ -397,10 +336,10 @@ export default function AnalyticsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-gray-200 pb-8">
           <div>
             <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight mb-2">
-              {t.title}
+              {lang.analyticsTitle}
             </h1>
             <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
-              {t.subtitle}
+              {lang.analyticsSubtitle}
             </p>
           </div>
 
@@ -408,16 +347,16 @@ export default function AnalyticsPage() {
             {/* Listbox Time Filter */}
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                {t.timeFilter}
+                {lang.timePeriod}
               </span>
               <Listbox value={timeFilter} onChange={setTimeFilter}>
                 <div className="relative w-full sm:w-44">
                   <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors shadow-sm text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
                     <span className="block truncate">
-                      {timeFilter === 'ALL' && t.allTime}
-                      {timeFilter === 'YEAR' && t.thisYear}
-                      {timeFilter === '6MOS' && t.last6MonthsFilter}
-                      {timeFilter === 'MONTH' && t.thisMonth}
+                      {timeFilter === 'ALL' && lang.allTime}
+                      {timeFilter === 'YEAR' && lang.thisYear}
+                      {timeFilter === '6MOS' && lang.last6MonthsFilter}
+                      {timeFilter === 'MONTH' && lang.thisMonth}
                     </span>
                     <span className="pointer-events-none text-gray-400 text-[10px]">
                       ▼
@@ -436,7 +375,7 @@ export default function AnalyticsPage() {
                           `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {t.allTime}
+                        {lang.allTime}
                       </ListboxOption>
                       <ListboxOption
                         value="YEAR"
@@ -444,7 +383,7 @@ export default function AnalyticsPage() {
                           `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {t.thisYear}
+                        {lang.thisYear}
                       </ListboxOption>
                       <ListboxOption
                         value="6MOS"
@@ -452,7 +391,7 @@ export default function AnalyticsPage() {
                           `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {t.last6MonthsFilter}
+                        {lang.last6MonthsFilter}
                       </ListboxOption>
                       <ListboxOption
                         value="MONTH"
@@ -460,7 +399,7 @@ export default function AnalyticsPage() {
                           `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {t.thisMonth}
+                        {lang.thisMonth}
                       </ListboxOption>
                     </ListboxOptions>
                   </Transition>
@@ -471,7 +410,7 @@ export default function AnalyticsPage() {
             {/* Listbox Currency Selector */}
             <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                {t.currencySelect}
+                {lang.displayCurrency}
               </span>
               <Listbox value={targetCurrency} onChange={setTargetCurrency}>
                 <div className="relative w-full sm:w-36">
@@ -520,7 +459,7 @@ export default function AnalyticsPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between overflow-hidden">
             <div className="flex-1 p-5 flex justify-between items-center w-full">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                {t.approvedProj}
+                {lang.approvedProjects}
               </span>
               <Link
                 href="/dashboard?status=approved"
@@ -530,7 +469,6 @@ export default function AnalyticsPage() {
               </Link>
             </div>
 
-            {/* Standard Column Separator 1 */}
             <div
               className="hidden sm:block bg-gray-200 shrink-0"
               style={{ width: '3px', height: '36px' }}
@@ -538,7 +476,7 @@ export default function AnalyticsPage() {
 
             <div className="flex-1 p-5 flex justify-between items-center w-full">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                {t.pendingProj}
+                {lang.pendingProjects}
               </span>
               <Link
                 href="/dashboard?status=pending"
@@ -548,7 +486,6 @@ export default function AnalyticsPage() {
               </Link>
             </div>
 
-            {/* Standard Column Separator 2 */}
             <div
               className="hidden sm:block bg-gray-200 shrink-0"
               style={{ width: '3px', height: '36px' }}
@@ -556,7 +493,7 @@ export default function AnalyticsPage() {
 
             <div className="flex-1 p-5 flex justify-between items-center w-full">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                {t.rejectedProj}
+                {lang.rejectedProjects}
               </span>
               <Link
                 href="/dashboard?status=rejected"
@@ -571,7 +508,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                {t.totalRev}
+                {lang.confirmedRevenue}
               </p>
               <p className="text-3xl font-black text-green-600 font-mono">
                 {formatMoney(totalRevenueCents)}
@@ -579,7 +516,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                {t.pipelineValue}
+                {lang.pendingPipeline}
               </p>
               <p className="text-3xl font-black text-blue-600 font-mono">
                 {formatMoney(pendingRevenueCents)}
@@ -587,7 +524,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                {t.conversionRate}
+                {lang.winRate}
               </p>
               <p className="text-3xl font-black text-gray-800 font-mono">
                 {conversionRate}%
@@ -598,20 +535,20 @@ export default function AnalyticsPage() {
 
         {count === 0 ? (
           <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-400 text-[10px] font-black uppercase tracking-widest">
-            {t.noData}
+            {lang.noDataAvailable}
           </div>
         ) : (
           <div className="space-y-8">
             {/* Gross Revenue vs Net Margin Card */}
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
-                {t.revenueVsMargin}
+                {lang.revenueVsMargin}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center">
                 <div className="space-y-4">
                   <div>
                     <span className="text-[10px] font-black text-gray-400 uppercase block mb-1 tracking-widest">
-                      {t.grossRevenue}
+                      {lang.grossRevenue}
                     </span>
                     <span className="text-3xl font-black font-mono text-gray-700">
                       {formatMoney(netRevenueHT)}
@@ -619,7 +556,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div>
                     <span className="text-[10px] font-black text-emerald-500 uppercase block mb-1 tracking-widest">
-                      {t.netMargin}
+                      {lang.netMargin}
                     </span>
                     <span className="text-3xl font-black font-mono text-emerald-600">
                       {formatMoney(netMarginCents)}
@@ -628,7 +565,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2 text-gray-400">
-                    <span>Rentabilité</span>
+                    <span>{lang.profitability}</span>
                     <span className="text-emerald-600 font-mono text-xs font-bold">
                       {netRevenueHT > 0
                         ? Math.round((netMarginCents / netRevenueHT) * 100)
@@ -654,7 +591,7 @@ export default function AnalyticsPage() {
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
-                    {t.laborMaterialRatio}
+                    {lang.laborMaterialRatio}
                   </p>
                   <div className="flex h-8 rounded-lg overflow-hidden mb-6 shadow-inner">
                     <div
@@ -676,7 +613,7 @@ export default function AnalyticsPage() {
                     <span className="w-3 h-3 bg-blue-600 rounded-sm shrink-0" />
                     <div>
                       <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        {t.labor}
+                        {lang.laborLabelShort}
                       </span>
                       <span className="text-xs font-bold font-mono text-gray-800">
                         {formatMoney(totalLaborCostCents)}
@@ -687,7 +624,7 @@ export default function AnalyticsPage() {
                     <span className="w-3 h-3 bg-orange-400 rounded-sm shrink-0" />
                     <div>
                       <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        {t.materials}
+                        {lang.materialsLabelShort}
                       </span>
                       <span className="text-xs font-bold font-mono text-gray-800">
                         {formatMoney(totalMaterialCostCents)}
@@ -700,7 +637,7 @@ export default function AnalyticsPage() {
               {/* Profitable Services Card */}
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
-                  {t.profitableServices}
+                  {lang.profitableServices}
                 </p>
                 <div className="space-y-3.5">
                   {sortedServices.map((service, idx) => (
@@ -730,12 +667,12 @@ export default function AnalyticsPage() {
             {/* Customer Retention Card */}
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
-                {t.topClients}
+                {lang.topClients}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                 <div className="sm:col-span-1 bg-gray-50 p-6 rounded-xl border border-gray-100 flex flex-col items-center justify-center text-center">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
-                    {t.retentionRate}
+                    {lang.retentionRate}
                   </span>
                   <div className="relative w-24 h-24 flex items-center justify-center">
                     <svg
@@ -764,7 +701,7 @@ export default function AnalyticsPage() {
                     </span>
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest">
-                    {repeatClientsCount} {t.repeatCustomers}
+                    {repeatClientsCount} {lang.repeatCustomers}
                   </span>
                 </div>
 
@@ -785,12 +722,8 @@ export default function AnalyticsPage() {
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
                             {client.count}{' '}
                             {client.count > 1
-                              ? lang === 'FR'
-                                ? 'devis validés'
-                                : 'finalized estimates'
-                              : lang === 'FR'
-                                ? 'devis validé'
-                                : 'finalized estimate'}
+                              ? lang.finalizedEstimates
+                              : lang.finalizedEstimate}
                           </p>
                         </div>
                       </div>
@@ -806,7 +739,7 @@ export default function AnalyticsPage() {
             {/* Revenue Trend Graph Card */}
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-8 border-b border-gray-100 pb-4">
-                {t.last6Months}
+                {lang.revenueTrend}
               </p>
               <div className="h-48 flex items-end justify-between gap-2 sm:gap-4">
                 {chartData.map((d, i) => (
