@@ -1,7 +1,11 @@
 export const translations = {
   US: {
+    // === EXISTING KEYS (preserved) ===
     dashboard: 'Dashboard',
+    privacyPolicy: 'Privacy Policy',
+    termsOfService: 'Terms of Service',
     projects: 'Projects',
+    clientsNav: 'Clients',
     priceList: 'Price List',
     settings: 'Business Settings',
     signOut: 'Sign Out',
@@ -60,10 +64,8 @@ export const translations = {
     limitMessage:
       'You have used your 5 free estimates for this month. Upgrade to Pro or buy credits to continue creating professional proposals.',
     exportExcel: 'Export Excel',
-    // File Input
     chooseFile: 'Choose File',
     noFileChosen: 'No file chosen',
-    // Upgrade Page
     upgradeTitle: 'Upgrade PactEstim',
     upgradeSubtitle: 'Unlock unlimited potential',
     bestValue: 'Best Value',
@@ -93,11 +95,239 @@ export const translations = {
       sqft: 'Square Foot',
       gal: 'Gallon',
       lb: 'Pound'
-    }
+    },
+
+    // === NEW: COMMON / DIALOGS ===
+    notice: 'Notice',
+    confirm: 'Confirm',
+    confirmOk: 'OK',
+    cancelExit: 'Cancel & Exit',
+
+    // === NEW: STATUS LABELS ===
+    statusApproved: 'Approved',
+    statusRejected: 'Rejected',
+    statusPending: 'Pending',
+    statusFree: 'Free',
+    statusLeft: 'left',
+
+    // === NEW: DASHBOARD ===
+    untitledProject: 'Untitled Project',
+    noContactEmail: 'No contact email',
+    filterByClient: 'Filter by client name...',
+    filterLabel: 'Filter:',
+    sortByLabel: 'Sort by:',
+    allProjects: 'All Projects',
+    draftsOnly: 'Drafts Only',
+    pendingOnly: 'Pending Only',
+    approvedOnly: 'Approved Only',
+    rejectedOnly: 'Rejected Only',
+    newestFirst: 'Newest First',
+    oldestFirst: 'Oldest First',
+    highestAmount: 'Highest Amount',
+    lowestAmount: 'Lowest Amount',
+    deleteDraftConfirm: 'Delete this draft?',
+    noEstimatesMatch: 'No estimates match your criteria.',
+    archiving: 'Archiving...',
+    downloadPdfsZip: 'Download {count} PDFs (ZIP)',
+    exportFormat: 'Export Format',
+    exportFormatDesc: 'Choose the level of detail for your Excel (CSV) report.',
+    summarizedView: 'Summarized View',
+    summarizedViewDesc: 'One row per estimate with grand totals.',
+    detailedView: 'Detailed View',
+    detailedViewDesc:
+      'Line-by-line breakdown of labor, materials, and profit margins.',
+
+    // === NEW: NEW ESTIMATE ===
+    editProjectTitle: 'Edit Project',
+    customerContactDetails: 'Customer Contact Details',
+    yourBusinessName: 'Your Business Name',
+    guestMode: 'Guest Mode',
+    guestModeDesc:
+      'You can draft your estimate now. To generate the final PDF, we will ask you to create a free account.',
+    city: 'City',
+    cityShort: 'C',
+    zip: 'Zip / Postal Code',
+    zipShort: 'Z',
+    country: 'Country',
+    marginStrategy: 'Margin Strategy',
+    marginNone: 'None',
+    marginGlobal: 'Global Margin',
+    marginService: 'Per Service Margin',
+    marginGranular: 'Granular (Line Item)',
+    serviceCategoryStep: 'Service Category / Step',
+    servicePlaceholder: 'e.g. Demolition, Painting...',
+    hideDescription: 'Hide Description',
+    addDescription: 'Add Description',
+    removeFromList: 'Remove from list',
+    enterToSaveCategory: '✨ Shortcut: Press Enter to save new category',
+    serviceMargin: 'Service Margin:',
+    serviceDescription: 'Service Description',
+    serviceDescPlaceholder:
+      'Details or description of work for this service...',
+    laborSettings: 'Labor Settings',
+    dailyRate: 'Daily Rate',
+    estDays: 'Est. Days',
+    estHours: 'Est. Hours',
+    rateDay: 'Rate/Day',
+    rateHour: 'Rate/Hour',
+    taxRatePct: 'Tax Rate (%)',
+    laborMargin: 'Labor Margin',
+    qtyShort: 'Qty',
+    unitShort: 'Unit',
+    costShort: 'Cost',
+    taxShort: 'Tax',
+    create: 'Create',
+    noMaterialsFound: 'No materials found.',
+    qtyZeroError:
+      'The quantity of each material must be greater than 0. Remove the row if the item is not needed.',
+    signUpRequired: 'Sign Up Required',
+    signUpDesc: 'Create a free account to save and generate this estimate.',
+    addService: 'Add Service',
+    paymentTerms: 'Payment Terms',
+    uponReceipt: 'Upon Receipt',
+    netDays: 'Net Days',
+    daysShort: 'Days',
+    deposit: 'Deposit',
+    requireDeposit: 'Require Deposit',
+    generateEstimate: 'Generate Estimate',
+
+    // === NEW: ESTIMATE VIEW ===
+    internalDetails: 'Internal Details',
+    createRevision: 'Create Revision',
+    sending: 'Sending...',
+    emailBtn: 'Email',
+    generating: 'Generating...',
+    downloadPdf: 'Download PDF',
+    finalize: 'Finalize',
+    finalizeConfirm:
+      'This will lock the estimate for compliance. You cannot edit it again. Proceed?',
+    cancelDraftConfirm: 'Are you sure you want to cancel this draft?',
+    estimateApproved: 'Estimate Approved',
+    estimateRejected: 'Estimate Rejected',
+    pendingApproval: 'Pending Client Approval',
+    reject: 'Reject',
+    approveEstimate: 'Approve Estimate',
+    statusChangeApproveConfirm:
+      'Are you sure you want to approve this estimate?',
+    statusChangeRejectConfirm: 'Are you sure you want to reject this estimate?',
+    estimateLabel: 'Estimate',
+    clientLabel: 'Client',
+    dateLabel: 'Date:',
+    refLabel: 'Ref:',
+    serviceCategoryHeader: 'Service Category / Step',
+    amountHeader: 'Amount',
+    professionalServices: 'Professional Services',
+    laborLabel: 'Labor',
+    laborDayUnit: 'd',
+    laborDayPerUnit: '/d',
+    subtotalHT: 'Subtotal',
+    grandTotalLabel: 'Grand Total',
+    balanceDue: 'Balance Due',
+    depositLabel: 'Deposit',
+    complianceLegal: 'Compliance & Legal',
+    complianceText:
+      'Standard business estimate. Certified digital record. Valid for 30 days from issuance.',
+    termsHeader: 'Terms',
+    termsWithDeposit:
+      'Deposit of {pct}% due upon acceptance to initiate work. Balance due {balance}',
+    termsNoDeposit: 'Payment due {balance}',
+    termsBalanceUponReceipt: 'upon receipt.',
+    termsBalanceWithinDays: 'within {days} days.',
+    discussionMods: 'Discussion & Modifications',
+    noMessagesYet:
+      'No messages yet. Use the field below to request adjustment notes.',
+    addMessage: 'Add a message',
+    requestRevisions:
+      'Request revisions regarding service quantities, labor rates, or material phases...',
+    send: 'Send',
+    failedToPostMessage: 'Failed to post message.',
+    revisionError: 'Error creating estimate revision.',
+    finalizeError: 'Error finalizing estimate.',
+    notFound: 'Estimate Not Found',
+    senderEmailError: 'Could not identify your sender email. Please log in.',
+    nativeShareNotSupported: 'Native sharing is not supported on this browser.',
+    connectionError: 'Connection error. Check your internet or API settings.',
+    emailSentSuccess: 'Email sent successfully to {target}',
+    smsSentSuccess: 'SMS sent successfully to {target}',
+    sendError: 'Error: {msg}',
+    failedToSend: 'Failed to send',
+    paymentSuccessful: 'Payment successful! Welcome to Pro.',
+    selectUnitError: 'Please select a unit.',
+    deleteItemConfirm: 'Delete this item?',
+
+    // Profile page
+    profileSettings: 'Settings',
+    businessProfile: 'Business Profile',
+    primaryMarket: 'Primary Market',
+    defaultHourlyRate: 'Default Hourly Rate',
+    defaultDailyRate: 'Default Daily Rate',
+    defaultDownPayment: 'Default Down Payment',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    depositPercentage: 'Deposit Percentage (%)',
+    accountSecurity: 'Account Security',
+    emailAddressLabel: 'Email Address',
+    newPasswordLabel: 'New Password',
+    keepCurrentPassword: 'Leave blank to keep your current password.',
+    updateSecurity: 'Update Security',
+    profileUpdated: 'Profile settings updated.',
+    securityUpdated:
+      'Security updated. If you changed your email, please check your inbox to verify the change.',
+    sessionExpired: 'Session expired. Please log in again.',
+    cancelSubConfirm:
+      'Cancel your Pro subscription? You will keep Pro access until the end of your current billing period.',
+    cancelSubFailed: 'Cancellation failed. Please try again.',
+    subAlreadyCanceled: 'Subscription already canceled.',
+    cancellationScheduled:
+      'Cancellation scheduled. Your Pro access remains active until {date}.',
+    resumeSubConfirm:
+      'Resume your Pro subscription? Billing will continue as normal.',
+    resumeSubFailed: 'Resume failed. Please try again.',
+    subResumed: 'Subscription resumed successfully.',
+    resumeSubscription: 'Resume Subscription',
+    cancellationScheduledFor: 'Cancellation scheduled for {date}',
+    permanentDeletion: 'Permanent Deletion',
+    error: 'Error',
+    deleteAccountConfirm:
+      'Warning: This action cannot be undone. All your business parameters, material rosters, master price lists, client profiles, and historical finalized estimates will be purged permanently. Confirm account erasure?',
+    dangerZone: 'Danger Zone',
+    deleteAccount: 'Delete Account',
+    deleteAccountDesc:
+      'Permanently eliminate your account authentication profile, all historical estimates, materials, and clients records.',
+    deletePermanently: 'Delete Permanently',
+    creditsRemaining: '{count} Credits remaining',
+    proPlanLabel: 'Pro Plan',
+    freePlanLabel: 'Free Plan',
+
+    // Clients page
+    clientRoster: 'Client Roster',
+    clientRosterSubtitle: 'Manage and reference your saved client records.',
+    addNewClient: 'Add New Client',
+    createNewEstimate: 'Create New Estimate',
+    editProfile: 'Edit Profile',
+    saveClient: 'Save Client',
+    clientNameLabel: 'Client Name',
+    billingAddress: 'Billing Address',
+    confirmDeleteClient:
+      'Are you sure you want to permanently delete this client? This action cannot be undone.',
+    noClientsSaved: 'No clients saved yet.',
+    paymentCanceled: 'Payment canceled.',
+    creditsLabel: 'Credits',
+    errorOccurred: 'An error occurred.',
+    shareText: 'Here is your estimate from {business}',
+    descBase:
+      'Comprehensive delivery including all necessary professional labor, logistics, and materials required for this project phase.',
+    descZeroCostMats:
+      'Materials included at no charge or client-provided: {mats}.',
+    descZeroCostLabor: 'Labor included at no charge for this phase.'
   },
   FR: {
+    // === EXISTING KEYS (preserved) ===
     dashboard: 'Tableau de Bord',
+    privacyPolicy: 'Politique de Confidentialité',
+    termsOfService: 'Conditions Générales',
     projects: 'Projets',
+    clientsNav: 'Clients',
     priceList: 'Liste de Prix',
     settings: 'Paramètres',
     signOut: 'Déconnexion',
@@ -156,10 +386,8 @@ export const translations = {
     limitMessage:
       'Vous avez atteint vos 5 devis gratuits ce mois-ci. Passez à la version Pro ou achetez des crédits pour continuer.',
     exportExcel: 'Export Excel',
-    // File Input
     chooseFile: 'Choisir un fichier',
     noFileChosen: 'Aucun fichier choisi',
-    // Upgrade Page
     upgradeTitle: 'Mise à Niveau PactEstim',
     upgradeSubtitle: 'Débloquez un potentiel illimité',
     bestValue: 'Meilleur Choix',
@@ -189,6 +417,248 @@ export const translations = {
       sqm: 'Mètre carré',
       l: 'Litre',
       kg: 'Kilogramme'
-    }
+    },
+
+    // === NEW: COMMON / DIALOGS ===
+    notice: 'Notification',
+    confirm: 'Confirmer',
+    confirmOk: 'Confirmer',
+    cancelExit: 'Annuler et Quitter',
+
+    // === NEW: STATUS LABELS ===
+    statusApproved: 'Approuvé',
+    statusRejected: 'Refusé',
+    statusPending: 'En Attente',
+    statusFree: 'Gratuit',
+    statusLeft: 'restants',
+
+    // === NEW: DASHBOARD ===
+    untitledProject: 'Projet sans nom',
+    noContactEmail: 'Aucun contact',
+    filterByClient: 'Filtrer par nom de client...',
+    filterLabel: 'Statut:',
+    sortByLabel: 'Trier par:',
+    allProjects: 'Tous les Projets',
+    draftsOnly: 'Brouillons',
+    pendingOnly: 'En Attente',
+    approvedOnly: 'Approuvés',
+    rejectedOnly: 'Refusés',
+    newestFirst: 'Plus Récents',
+    oldestFirst: 'Plus Anciens',
+    highestAmount: 'Montant Supérieur',
+    lowestAmount: 'Montant Inférieur',
+    deleteDraftConfirm: 'Supprimer ce brouillon ?',
+    noEstimatesMatch: 'Aucun devis ne correspond aux critères.',
+    archiving: 'Compression...',
+    downloadPdfsZip: 'Télécharger les {count} PDFs (ZIP)',
+    exportFormat: "Format d'exportation",
+    exportFormatDesc:
+      'Choisissez le niveau de détail pour votre rapport Excel (CSV).',
+    summarizedView: 'Vue Résumée',
+    summarizedViewDesc: 'Une ligne par devis avec les totaux.',
+    detailedView: 'Vue Détaillée',
+    detailedViewDesc:
+      "Inclut la main-d'œuvre, les matériaux et marges ligne par ligne.",
+
+    // === NEW: NEW ESTIMATE ===
+    editProjectTitle: 'Modifier le Projet',
+    customerContactDetails: 'Coordonnées du Client',
+    yourBusinessName: 'Nom de votre entreprise',
+    guestMode: 'Mode Invité',
+    guestModeDesc:
+      'Vous pouvez rédiger votre devis maintenant. Pour générer le PDF, nous vous demanderons de créer un compte gratuit.',
+    city: 'Ville',
+    cityShort: 'V',
+    zip: 'Code Postal',
+    zipShort: 'CP',
+    country: 'Pays',
+    marginStrategy: 'Stratégie de Marge',
+    marginNone: 'Aucune',
+    marginGlobal: 'Marge Globale',
+    marginService: 'Marge par Service',
+    marginGranular: 'Marge Granulaire',
+    serviceCategoryStep: 'Catégorie / Étape de Service',
+    servicePlaceholder: 'Ex: Démolition, Peinture...',
+    hideDescription: 'Masquer la description',
+    addDescription: 'Ajouter une description',
+    removeFromList: 'Supprimer de la liste',
+    enterToSaveCategory:
+      '✨ Raccourci : Entrée pour valider la nouvelle catégorie',
+    serviceMargin: 'Marge Service:',
+    serviceDescription: 'Description du Service',
+    serviceDescPlaceholder:
+      'Détails ou description des travaux pour ce service...',
+    laborSettings: "Main-d'œuvre",
+    dailyRate: 'Taux Journalier',
+    estDays: 'Jours estimés',
+    estHours: 'Heures estimées',
+    rateDay: 'Taux/Jour',
+    rateHour: 'Taux/Heure',
+    taxRatePct: 'Taxe (%)',
+    laborMargin: 'Marge Travail',
+    qtyShort: 'Qté',
+    unitShort: 'Unité',
+    costShort: 'Prix',
+    taxShort: 'Taxe',
+    create: 'Créer',
+    noMaterialsFound: 'Aucun résultat',
+    qtyZeroError:
+      "La quantité de chaque matériau doit être supérieure à 0. Supprimez la ligne si l'article n'est pas nécessaire.",
+    signUpRequired: 'Inscription Requise',
+    signUpDesc: 'Créez un compte gratuit pour enregistrer et générer ce devis.',
+    addService: 'Ajouter un Service',
+    paymentTerms: 'Conditions de Règlement',
+    uponReceipt: 'Dès réception',
+    netDays: 'Jours Net',
+    daysShort: 'Jrs',
+    deposit: 'Acompte',
+    requireDeposit: 'Exiger un acompte',
+    generateEstimate: 'Générer le Devis',
+
+    // === NEW: ESTIMATE VIEW ===
+    internalDetails: 'Détails internes',
+    createRevision: 'Créer Révision',
+    sending: 'Envoi...',
+    emailBtn: 'E-mail',
+    generating: 'Génération...',
+    downloadPdf: 'Télécharger PDF',
+    finalize: 'Finaliser',
+    finalizeConfirm:
+      'Ceci verrouillera le devis. Vous ne pourrez plus le modifier. Continuer ?',
+    cancelDraftConfirm: 'Êtes-vous sûr de vouloir annuler ce brouillon ?',
+    estimateApproved: 'Devis Approuvé',
+    estimateRejected: 'Devis Refusé',
+    pendingApproval: 'En attente de validation',
+    reject: 'Refuser',
+    approveEstimate: 'Approuver le Devis',
+    statusChangeApproveConfirm: 'Êtes-vous sûr de vouloir accepter ce devis ?',
+    statusChangeRejectConfirm: 'Êtes-vous sûr de vouloir refuser ce devis ?',
+    estimateLabel: 'Devis',
+    clientLabel: 'Client',
+    dateLabel: 'Date :',
+    refLabel: 'Réf :',
+    serviceCategoryHeader: 'Etape du Service / Catégorie',
+    amountHeader: 'Montant',
+    professionalServices: 'Services Professionnels',
+    laborLabel: "Main-d'œuvre",
+    laborDayUnit: 'j',
+    laborDayPerUnit: '/j',
+    subtotalHT: 'Sous-total HT',
+    grandTotalLabel: 'Total TTC',
+    balanceDue: 'Solde Restant',
+    depositLabel: 'Acompte',
+    complianceLegal: 'Conformité & Mentions Légales',
+    complianceText:
+      "Document généré conformément à l'article 286 du code général des impôts (Loi Anti-Fraude TVA). Ce document est inaltérable une fois finalisé.",
+    termsHeader: 'Conditions de Paiement',
+    termsWithDeposit:
+      'Acompte de {pct}% exigible à la signature pour le lancement du projet. Solde dû {balance}',
+    termsNoDeposit: 'Règlement {balance}',
+    termsBalanceUponReceipt: 'dès réception.',
+    termsBalanceWithinDays: 'sous {days} jours.',
+    discussionMods: 'Discussions & Modifications',
+    noMessagesYet:
+      'Aucun message pour le moment. Utilisez le formulaire ci-dessous pour demander des ajustements.',
+    addMessage: 'Ajouter un message',
+    requestRevisions:
+      "Demandez des modifications sur les quantités, la main-d'œuvre ou les matériaux...",
+    send: 'Envoyer',
+    failedToPostMessage: 'Impossible de publier le commentaire.',
+    revisionError: 'Erreur lors de la création de la révision.',
+    finalizeError: 'Erreur lors de la finalisation.',
+    notFound: 'Devis Introuvable',
+    senderEmailError:
+      "Impossible d'identifier votre e-mail d'expéditeur. Veuillez vous reconnecter.",
+    nativeShareNotSupported:
+      "Le partage natif n'est pas supporté sur ce navigateur.",
+    connectionError: 'Erreur de connexion. Vérifiez votre connexion internet.',
+    emailSentSuccess: 'E-mail envoyé avec succès à {target}',
+    smsSentSuccess: 'SMS envoyé avec succès à {target}',
+    sendError: 'Erreur : {msg}',
+    failedToSend: "L'envoi a échoué",
+    paymentSuccessful: 'Paiement réussi ! Bienvenue dans Pro.',
+    selectUnitError: 'Veuillez choisir une unité.',
+    deleteItemConfirm: 'Supprimer cet article ?',
+
+    // Profile page
+    profileSettings: 'Paramètres',
+    businessProfile: "Profil de l'entreprise",
+    primaryMarket: 'Marché Principal',
+    defaultHourlyRate: 'Taux Horaire (Défaut)',
+    defaultDailyRate: 'Taux Journalier (Défaut)',
+    defaultDownPayment: 'Acompte Automatique (Défaut)',
+    enabled: 'Activé',
+    disabled: 'Désactivé',
+    depositPercentage: "Pourcentage d'acompte (%)",
+    accountSecurity: 'Sécurité du compte',
+    emailAddressLabel: 'Adresse E-mail',
+    newPasswordLabel: 'Nouveau Mot de Passe',
+    keepCurrentPassword:
+      'Laissez vide pour conserver votre mot de passe actuel.',
+    updateSecurity: 'Mettre à jour la sécurité',
+    profileUpdated: 'Paramètres du profil mis à jour.',
+    securityUpdated:
+      'Sécurité mise à jour. Si vous avez modifié votre email, veuillez vérifier votre boîte de réception pour le lien de confirmation.',
+    sessionExpired: 'Session expirée. Veuillez vous reconnecter.',
+    cancelSubConfirm:
+      "Annuler votre abonnement Pro ? Vous gardez l'accès Pro jusqu'à la fin de la période de facturation en cours.",
+    cancelSubFailed: "Échec de l'annulation. Veuillez réessayer.",
+    subAlreadyCanceled: 'Abonnement déjà annulé.',
+    cancellationScheduled:
+      "Annulation programmée. Votre accès Pro reste actif jusqu'au {date}.",
+    resumeSubConfirm:
+      'Réactiver votre abonnement Pro ? La facturation reprendra normalement.',
+    resumeSubFailed: 'Échec de la réactivation. Veuillez réessayer.',
+    subResumed: 'Abonnement réactivé avec succès.',
+    resumeSubscription: "Réactiver l'abonnement",
+    cancellationScheduledFor: 'Annulation prévue le {date}',
+    permanentDeletion: 'Suppression Définitive',
+    error: 'Erreur',
+    deleteAccountConfirm:
+      "Attention : Cette action est irréversible. Toutes vos données d'entreprise, listes de prix de matériaux, répertoire clients et devis archivés seront définitivement effacés conformément à la politique RGPD. Confirmer la suppression ?",
+    dangerZone: 'Zone de Danger',
+    deleteAccount: 'Supprimer le compte',
+    deleteAccountDesc:
+      'Supprimez définitivement votre profil, tous les devis archivés, listes de prix et données clients. Cette opération est immédiate et irréversible.',
+    deletePermanently: 'Supprimer Définitivement',
+    creditsRemaining: '{count} Crédits restants',
+    proPlanLabel: 'Plan Pro',
+    freePlanLabel: 'Plan Gratuit',
+
+    // Clients page
+    clientRoster: 'Répertoire Clients',
+    clientRosterSubtitle: 'Gérez et référencez les coordonnées de vos clients.',
+    addNewClient: 'Ajouter un Client',
+    createNewEstimate: 'Créer un Devis',
+    editProfile: 'Modifier',
+    saveClient: 'Enregistrer',
+    clientNameLabel: 'Nom du Client',
+    billingAddress: 'Adresse de Facturation',
+    confirmDeleteClient:
+      'Voulez-vous vraiment supprimer définitivement ce client ? Cette action est irréversible.',
+    noClientsSaved: 'Aucun client enregistré.',
+    paymentCanceled: 'Paiement annulé.',
+    creditsLabel: 'Crédits',
+    errorOccurred: 'Une erreur est survenue.',
+    shareText: 'Voici votre devis de {business}',
+    descBase:
+      "Prestation complète incluant la main-d'œuvre professionnelle, la logistique et les matériaux nécessaires à cette phase du projet.",
+    descZeroCostMats:
+      'Matériaux inclus sans frais supplémentaires ou fournis par le client : {mats}.',
+    descZeroCostLabor: "Main-d'œuvre incluse sans frais supplémentaires."
   }
 };
+
+// Safe interpolation helper for translation strings with {placeholders}.
+// - Returns '' if str is undefined/null (prevents crashes on missing keys)
+// - Auto-converts numbers to strings
+// - Replaces ALL occurrences of each placeholder
+// Usage: t(lang.someKey, { count: 5, name: 'Alice' })
+export const t = (
+  str: any,
+  vars: Record<string, string | number> = {}
+): string =>
+  Object.entries(vars).reduce(
+    (acc, [k, v]) => acc.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v)),
+    String(str ?? '')
+  );

@@ -3,8 +3,10 @@
 import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { translations } from '@/lib/translations';
+import { translations, t } from '@/lib/translations';
 import Link from 'next/link';
+import LoadingDots from '@/components/LoadingDots';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import {
   Listbox,
   ListboxButton,
@@ -12,14 +14,6 @@ import {
   ListboxOption,
   Transition
 } from '@headlessui/react';
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -294,14 +288,18 @@ export default function DashboardPage() {
   const handleDelete = (id: string) => {
     setDialog({
       type: 'confirm',
-      message:
-        profile?.country === 'FR'
-          ? 'Supprimer ce brouillon ?'
-          : 'Delete this draft?',
+      message: lang.deleteDraftConfirm,
       onConfirm: async () => {
         setDialog(null);
-        await supabase.from('estimates').delete().eq('id', id);
-        setEstimates(estimates.filter((e) => e.id !== id));
+        const { error } = await supabase
+          .from('estimates')
+          .delete()
+          .eq('id', id);
+        if (error) {
+          setDialog({ type: 'alert', message: error.message });
+          return;
+        }
+        setEstimates((prev) => prev.filter((e) => e.id !== id));
       }
     });
   };
@@ -589,13 +587,13 @@ export default function DashboardPage() {
               {isFreePlan && (
                 <div className="flex items-center gap-1.5 border-l border-gray-200 pl-2">
                   <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-sm">
-                    {profile?.country === 'FR' ? 'Gratuit' : 'Free'}
+                    {lang.statusFree}
                   </span>
                   <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">
                     {standardLimitReached
                       ? remainingCredits
                       : 5 - monthlyEstimates}{' '}
-                    {profile?.country === 'FR' ? 'restants' : 'left'}
+                    {lang.statusLeft}
                   </span>
                 </div>
               )}
@@ -620,11 +618,7 @@ export default function DashboardPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={
-                  profile?.country === 'FR'
-                    ? 'Filtrer par nom de client...'
-                    : 'Filter by client name...'
-                }
+                placeholder={lang.filterByClient}
                 className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-xl text-xs font-bold focus:outline-none focus:border-blue-500 bg-white text-black placeholder-gray-400 shadow-sm"
                 style={{ height: '52px' }}
               />
@@ -669,13 +663,12 @@ export default function DashboardPage() {
                     d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
                   />
                 </svg>
+
                 {isZipping
-                  ? profile?.country === 'FR'
-                    ? 'Compression...'
-                    : 'Archiving...'
-                  : profile?.country === 'FR'
-                    ? `Télécharger les ${processedEstimates.length} PDFs (ZIP)`
-                    : `Download ${processedEstimates.length} PDFs (ZIP)`}
+                  ? lang.archiving
+                  : t(lang.downloadPdfsZip, {
+                      count: processedEstimates.length
+                    })}
               </button>
             </div>
           </div>
@@ -686,32 +679,17 @@ export default function DashboardPage() {
           <div className="bg-white p-3 sm:px-4 sm:py-2.5 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
-                {profile?.country === 'FR' ? 'Statut:' : 'Filter:'}
+                {lang.filterLabel}
               </span>
               <Listbox value={filterStatus} onChange={setFilterStatus}>
                 <div className="relative w-full sm:w-40">
                   <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
                     <span className="block truncate">
-                      {filterStatus === 'all' &&
-                        (profile?.country === 'FR'
-                          ? 'Tous les Projets'
-                          : 'All Projects')}
-                      {filterStatus === 'draft' &&
-                        (profile?.country === 'FR'
-                          ? 'Brouillons'
-                          : 'Drafts Only')}
-                      {filterStatus === 'pending' &&
-                        (profile?.country === 'FR'
-                          ? 'En Attente'
-                          : 'Pending Only')}
-                      {filterStatus === 'approved' &&
-                        (profile?.country === 'FR'
-                          ? 'Approuvés'
-                          : 'Approved Only')}
-                      {filterStatus === 'rejected' &&
-                        (profile?.country === 'FR'
-                          ? 'Refusés'
-                          : 'Rejected Only')}
+                      {filterStatus === 'all' && lang.allProjects}
+                      {filterStatus === 'draft' && lang.draftsOnly}
+                      {filterStatus === 'pending' && lang.pendingOnly}
+                      {filterStatus === 'approved' && lang.approvedOnly}
+                      {filterStatus === 'rejected' && lang.rejectedOnly}
                     </span>
                     <span className="pointer-events-none text-gray-400 text-[8px]">
                       ▼
@@ -730,9 +708,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Tous les Projets'
-                          : 'All Projects'}
+                        {lang.allProjects}
                       </ListboxOption>
                       <ListboxOption
                         value="draft"
@@ -740,9 +716,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Brouillons'
-                          : 'Drafts Only'}
+                        {lang.draftsOnly}
                       </ListboxOption>
                       <ListboxOption
                         value="pending"
@@ -750,9 +724,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'En Attente'
-                          : 'Pending Only'}
+                        {lang.pendingOnly}
                       </ListboxOption>
                       <ListboxOption
                         value="approved"
@@ -760,9 +732,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Approuvés'
-                          : 'Approved Only'}
+                        {lang.approvedOnly}
                       </ListboxOption>
                       <ListboxOption
                         value="rejected"
@@ -770,9 +740,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Refusés'
-                          : 'Rejected Only'}
+                        {lang.rejectedOnly}
                       </ListboxOption>
                     </ListboxOptions>
                   </Transition>
@@ -782,28 +750,16 @@ export default function DashboardPage() {
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
-                {profile?.country === 'FR' ? 'Trier par:' : 'Sort by:'}
+                {lang.sortByLabel}
               </span>
               <Listbox value={sortBy} onChange={setSortBy}>
                 <div className="relative w-full sm:w-44">
                   <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
                     <span className="block truncate">
-                      {sortBy === 'date_desc' &&
-                        (profile?.country === 'FR'
-                          ? 'Plus Récents'
-                          : 'Newest First')}
-                      {sortBy === 'date_asc' &&
-                        (profile?.country === 'FR'
-                          ? 'Plus Anciens'
-                          : 'Oldest First')}
-                      {sortBy === 'amount_desc' &&
-                        (profile?.country === 'FR'
-                          ? 'Montant Supérieur'
-                          : 'Highest Amount')}
-                      {sortBy === 'amount_asc' &&
-                        (profile?.country === 'FR'
-                          ? 'Montant Inférieur'
-                          : 'Lowest Amount')}
+                      {sortBy === 'date_desc' && lang.newestFirst}
+                      {sortBy === 'date_asc' && lang.oldestFirst}
+                      {sortBy === 'amount_desc' && lang.highestAmount}
+                      {sortBy === 'amount_asc' && lang.lowestAmount}
                     </span>
                     <span className="pointer-events-none text-gray-400 text-[8px]">
                       ▼
@@ -822,9 +778,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Plus Récents'
-                          : 'Newest First'}
+                        {lang.newestFirst}
                       </ListboxOption>
                       <ListboxOption
                         value="date_asc"
@@ -832,9 +786,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Plus Anciens'
-                          : 'Oldest First'}
+                        {lang.oldestFirst}
                       </ListboxOption>
                       <ListboxOption
                         value="amount_desc"
@@ -842,9 +794,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Montant Supérieur'
-                          : 'Highest Amount'}
+                        {lang.highestAmount}
                       </ListboxOption>
                       <ListboxOption
                         value="amount_asc"
@@ -852,9 +802,7 @@ export default function DashboardPage() {
                           `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
-                        {profile?.country === 'FR'
-                          ? 'Montant Inférieur'
-                          : 'Lowest Amount'}
+                        {lang.lowestAmount}
                       </ListboxOption>
                     </ListboxOptions>
                   </Transition>
@@ -869,9 +817,7 @@ export default function DashboardPage() {
           {processedEstimates.length === 0 ? (
             <div className="bg-white p-10 text-center rounded-xl border border-gray-200">
               <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
-                {profile.country === 'FR'
-                  ? 'Aucun devis ne correspond aux critères.'
-                  : 'No estimates match your criteria.'}
+                {lang.noEstimatesMatch}
               </p>
             </div>
           ) : (
@@ -891,10 +837,7 @@ export default function DashboardPage() {
                   <div className="flex justify-between items-start mb-1 sm:mb-0">
                     <div className="flex items-center gap-3">
                       <h3 className="font-black text-lg text-gray-900 group-hover:text-blue-600 transition-colors">
-                        {est.client_name ||
-                          (profile.country === 'FR'
-                            ? 'Projet sans nom'
-                            : 'Untitled Project')}
+                        {est.client_name || lang.untitledProject}
                       </h3>
                       <span
                         className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${
@@ -910,16 +853,10 @@ export default function DashboardPage() {
                         {!est.is_locked
                           ? lang.draft
                           : est.client_status === 'approved'
-                            ? profile.country === 'FR'
-                              ? 'Approuvé'
-                              : 'Approved'
+                            ? lang.statusApproved
                             : est.client_status === 'rejected'
-                              ? profile.country === 'FR'
-                                ? 'Refusé'
-                                : 'Rejected'
-                              : profile.country === 'FR'
-                                ? 'En Attente'
-                                : 'Pending'}
+                              ? lang.statusRejected
+                              : lang.statusPending}
                       </span>
                     </div>
                     {/* Mobile Price */}
@@ -938,10 +875,7 @@ export default function DashboardPage() {
                     <span>{formatDate(est.created_at)}</span>
                     <span className="hidden sm:inline">•</span>
                     <span className="hidden sm:inline">
-                      {est.client_email ||
-                        (profile.country === 'FR'
-                          ? 'Aucun contact'
-                          : 'No contact email')}
+                      {est.client_email || lang.noContactEmail}
                     </span>
                     <span className="hidden sm:inline">•</span>
                     <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-[10px] text-gray-500">
@@ -966,16 +900,10 @@ export default function DashboardPage() {
                     {!est.is_locked
                       ? lang.draft
                       : est.client_status === 'approved'
-                        ? profile.country === 'FR'
-                          ? 'Approuvé'
-                          : 'Approved'
+                        ? lang.statusApproved
                         : est.client_status === 'rejected'
-                          ? profile.country === 'FR'
-                            ? 'Refusé'
-                            : 'Rejected'
-                          : profile.country === 'FR'
-                            ? 'En Attente'
-                            : 'Pending'}
+                          ? lang.statusRejected
+                          : lang.statusPending}
                   </span>
 
                   {/* Desktop Price */}
@@ -1031,14 +959,10 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
             <h3 className="text-lg font-black uppercase tracking-tighter mb-2 text-gray-900">
-              {profile?.country === 'FR'
-                ? "Format d'exportation"
-                : 'Export Format'}
+              {lang.exportFormat}
             </h3>
             <p className="text-[11px] text-gray-500 font-bold mb-6 uppercase tracking-widest leading-relaxed">
-              {profile?.country === 'FR'
-                ? 'Choisissez le niveau de détail pour votre rapport Excel (CSV).'
-                : 'Choose the level of detail for your Excel (CSV) report.'}
+              {lang.exportFormatDesc}
             </p>
 
             <div className="flex flex-col gap-3 mb-6">
@@ -1047,14 +971,10 @@ export default function DashboardPage() {
                 className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors shadow-sm"
               >
                 <p className="font-black text-sm text-gray-900 uppercase tracking-widest">
-                  {profile?.country === 'FR'
-                    ? 'Vue Résumée'
-                    : 'Summarized View'}
+                  {lang.summarizedView}
                 </p>
                 <p className="text-xs text-gray-500 mt-2 font-bold">
-                  {profile?.country === 'FR'
-                    ? 'Une ligne par devis avec les totaux.'
-                    : 'One row per estimate with grand totals.'}
+                  {lang.summarizedViewDesc}
                 </p>
               </button>
               <button
@@ -1062,14 +982,10 @@ export default function DashboardPage() {
                 className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors shadow-sm"
               >
                 <p className="font-black text-sm text-gray-900 uppercase tracking-widest">
-                  {profile?.country === 'FR'
-                    ? 'Vue Détaillée'
-                    : 'Detailed View'}
+                  {lang.detailedView}
                 </p>
                 <p className="text-xs text-gray-500 mt-2 font-bold">
-                  {profile?.country === 'FR'
-                    ? "Inclut la main-d'œuvre, les matériaux et marges ligne par ligne."
-                    : 'Line-by-line breakdown of labor, materials, and profit margins.'}
+                  {lang.detailedViewDesc}
                 </p>
               </button>
             </div>
@@ -1079,7 +995,7 @@ export default function DashboardPage() {
                 onClick={() => setExportModal(false)}
                 className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-xl transition-colors border border-gray-100"
               >
-                {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
+                {lang.cancel}
               </button>
             </div>
           </div>
@@ -1087,38 +1003,15 @@ export default function DashboardPage() {
       )}
 
       {/* STANDARD DIALOG */}
-      {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
-            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
-              {dialog.title ||
-                (profile?.country === 'FR' ? 'Notification' : 'Notice')}
-            </h3>
-            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
-              {dialog.message}
-            </p>
-            <div className="flex gap-2 justify-end">
-              {dialog.type === 'confirm' && (
-                <button
-                  onClick={() => setDialog(null)}
-                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
-                >
-                  {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (dialog.onConfirm) dialog.onConfirm();
-                  else setDialog(null);
-                }}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
-              >
-                {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        labels={{
+          notice: lang.notice,
+          cancel: lang.cancel,
+          confirmOk: lang.confirmOk
+        }}
+      />
     </main>
   );
 }

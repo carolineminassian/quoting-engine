@@ -1,17 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
+import LoadingDots from '@/components/LoadingDots';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import { translations, t } from '@/lib/translations';
 
 interface BrandLogoProps {
   country: 'US' | 'FR';
@@ -102,10 +97,8 @@ export default function EstimateView() {
           .order('created_at', { ascending: true })
       ]);
 
-      import('@/lib/translations').then(({ translations }) => {
-        const country = est.country_snapshot || prof.data?.country || 'US';
-        setLang(country === 'FR' ? translations.FR : translations.US);
-      });
+      const country = est.country_snapshot || prof.data?.country || 'US';
+      setLang(country === 'FR' ? translations.FR : translations.US);
 
       const displayBusinessName =
         est.business_name_snapshot || prof.data?.business_name;
@@ -163,6 +156,11 @@ export default function EstimateView() {
 
   // --- MARGIN ENGINE & MATH HELPERS ---
 
+  const materialsById = useMemo(
+    () => new Map(materials.map((m) => [m.id, m])),
+    [materials]
+  );
+
   const getMultiplier = (
     sec: any,
     item: any = null,
@@ -187,7 +185,7 @@ export default function EstimateView() {
   const getEffectiveItemCostCents = (sec: any, item: any) => {
     const snapshottedCost = item.cost_per_unit_cents;
     const liveCost =
-      materials.find((m) => m.id === item.materialId)?.cost_per_unit_cents || 0;
+      materialsById.get(item.materialId)?.cost_per_unit_cents || 0;
     const rawCost = snapshottedCost !== undefined ? snapshottedCost : liveCost;
     return Math.round(rawCost * getMultiplier(sec, item, false));
   };
@@ -235,31 +233,24 @@ export default function EstimateView() {
       return sec.description;
     }
 
-    const isFr = profile.country === 'FR';
-    let baseText = isFr
-      ? "Prestation complète incluant la main-d'œuvre professionnelle, la logistique et les matériaux nécessaires à cette phase du projet."
-      : 'Comprehensive delivery including all necessary professional labor, logistics, and materials required for this project phase.';
+    let baseText = lang.descBase;
 
     const zeroCostMats = sec.items
       .map((item: any) => {
         const effectiveCost = getEffectiveItemCostCents(sec, item);
-        const m = materials.find((mat) => mat.id === item.materialId);
+        const m = materialsById.get(item.materialId);
         const name = item.name || m?.name;
         return effectiveCost === 0 && name ? name : null;
       })
       .filter(Boolean);
 
     if (zeroCostMats.length > 0) {
-      const matString = zeroCostMats.join(', ');
-      baseText += isFr
-        ? ` Matériaux inclus sans frais supplémentaires ou fournis par le client : ${matString}.`
-        : ` Materials included at no charge or client-provided: ${matString}.`;
+      baseText +=
+        ' ' + t(lang.descZeroCostMats, { mats: zeroCostMats.join(', ') });
     }
 
     if (sec.laborHours > 0 && getEffectiveLaborRateCents(sec) === 0) {
-      baseText += isFr
-        ? " Main-d'œuvre incluse sans frais supplémentaires."
-        : ' Labor included at no charge for this phase.';
+      baseText += ' ' + lang.descZeroCostLabor;
     }
 
     return baseText;
@@ -270,11 +261,11 @@ export default function EstimateView() {
   const handleStatusChange = async (newStatus: 'approved' | 'rejected') => {
     setDialog({
       type: 'confirm',
-      title: profile.country === 'FR' ? 'Confirmer' : 'Confirm',
+      title: lang.confirm,
       message:
-        profile.country === 'FR'
-          ? `Êtes-vous sûr de vouloir ${newStatus === 'approved' ? 'accepter' : 'refuser'} ce devis ?`
-          : `Are you sure you want to ${newStatus} this estimate?`,
+        newStatus === 'approved'
+          ? lang.statusChangeApproveConfirm
+          : lang.statusChangeRejectConfirm,
       onConfirm: async () => {
         setDialog(null);
         setLoading(true);
@@ -288,7 +279,9 @@ export default function EstimateView() {
               estimateUrl: window.location.href // Added for the email links
             })
           });
-          setEstimate({ ...estimate, client_status: newStatus });
+          setEstimate((prev: any) =>
+            prev ? { ...prev, client_status: newStatus } : prev
+          );
         } catch (e) {
           console.error(e);
         } finally {
@@ -339,10 +332,7 @@ export default function EstimateView() {
     if (error) {
       setDialog({
         type: 'alert',
-        message:
-          profile.country === 'FR'
-            ? 'Erreur lors de la création de la révision.'
-            : 'Error creating estimate revision.'
+        message: lang.revisionError
       });
       setLoading(false);
     } else if (data) {
@@ -367,8 +357,7 @@ export default function EstimateView() {
       user_id: user?.id || null,
       author_name: currentIsOwner
         ? profile?.business_name || 'Business'
-        : estimate?.client_name ||
-          (profile?.country === 'FR' ? 'Client' : 'Client'),
+        : estimate?.client_name || lang.clientLabel,
       content: cleanCommentText,
       is_owner: currentIsOwner
     };
@@ -382,13 +371,14 @@ export default function EstimateView() {
     if (error) {
       setDialog({
         type: 'alert',
-        message:
-          profile.country === 'FR'
-            ? 'Impossible de publier le commentaire.'
-            : 'Failed to post message.'
+        message: lang.failedToPostMessage
       });
     } else if (data) {
-      setComments([...comments, data]);
+      setComments((prev) => {
+        // Avoid double-add if realtime subscription already inserted it
+        if (prev.some((c) => c.id === data.id)) return prev;
+        return [...prev, data];
+      });
       setCommentInput('');
 
       if (!currentIsOwner && estimate?.is_locked) {
@@ -428,10 +418,7 @@ export default function EstimateView() {
     if (method === 'email' && !currentUserEmail) {
       setDialog({
         type: 'alert',
-        message:
-          profile.country === 'FR'
-            ? "Impossible d'identifier votre e-mail d'expéditeur. Veuillez vous reconnecter."
-            : 'Could not identify your sender email. Please log in.'
+        message: lang.senderEmailError
       });
       setSending(false);
       return;
@@ -464,30 +451,28 @@ export default function EstimateView() {
       });
 
       if (res.ok) {
+        const target =
+          method === 'email' ? estimate.client_email : estimate.client_phone;
         setDialog({
           type: 'alert',
-          message:
-            profile.country === 'FR'
-              ? `${method === 'email' ? 'E-mail' : 'SMS'} envoyé avec succès à ${method === 'email' ? estimate.client_email : estimate.client_phone}`
-              : `${method === 'email' ? 'Email' : 'SMS'} sent successfully to ${method === 'email' ? estimate.client_email : estimate.client_phone}`
+          message: t(
+            method === 'email' ? lang.emailSentSuccess : lang.smsSentSuccess,
+            { target }
+          )
         });
       } else {
         const errData = await res.json();
         setDialog({
           type: 'alert',
-          message:
-            profile.country === 'FR'
-              ? `Erreur : ${errData.error?.message || "L'envoi a échoué"}`
-              : `Error: ${errData.error?.message || 'Failed to send'}`
+          message: t(lang.sendError, {
+            msg: errData.error?.message || lang.failedToSend
+          })
         });
       }
     } catch (err) {
       setDialog({
         type: 'alert',
-        message:
-          profile.country === 'FR'
-            ? 'Erreur de connexion. Vérifiez votre connexion internet.'
-            : 'Connection error. Check your internet or API settings.'
+        message: lang.connectionError
       });
     } finally {
       setSending(false);
@@ -498,11 +483,8 @@ export default function EstimateView() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${profile.country === 'FR' ? 'Devis' : 'Estimate'} - ${profile.business_name}`,
-          text:
-            profile.country === 'FR'
-              ? `Voici votre devis de ${profile.business_name}`
-              : `Here is your estimate from ${profile.business_name}`,
+          title: `${lang.estimateLabel} - ${profile.business_name}`,
+          text: t(lang.shareText, { business: profile.business_name }),
           url: window.location.href
         });
       } catch (err) {
@@ -511,10 +493,7 @@ export default function EstimateView() {
     } else {
       setDialog({
         type: 'alert',
-        message:
-          profile.country === 'FR'
-            ? "Le partage natif n'est pas supporté sur ce navigateur."
-            : 'Native sharing is not supported on this browser.'
+        message: lang.nativeShareNotSupported
       });
     }
   };
@@ -531,11 +510,7 @@ export default function EstimateView() {
         : showDetails;
 
       const preparedSections = estimate.sections.map((sec: any) => ({
-        title:
-          sec.title ||
-          (profile.country === 'FR'
-            ? 'Services Professionnels'
-            : 'Professional Services'),
+        title: sec.title || lang.professionalServices,
         description: generateDescription(sec),
         total: getSectionTotal(sec),
         hasDetails: isShowingDetails,
@@ -545,7 +520,7 @@ export default function EstimateView() {
         laborTaxRate:
           sec.laborTaxRate !== undefined ? sec.laborTaxRate : profile.tax_rate,
         items: (sec.items || []).map((item: any) => {
-          const m = materials.find((mat) => mat.id === item.materialId);
+          const m = materialsById.get(item.materialId);
           return {
             name: item.name || m?.name || 'Material Item',
             qty: item.qty || 0,
@@ -576,7 +551,7 @@ export default function EstimateView() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${profile.country === 'FR' ? 'Devis' : 'Estimate'}-${estimate.custom_id || estimate.id.slice(0, 8)}.pdf`;
+      link.download = `${lang.estimateLabel}-${estimate.custom_id || estimate.id.slice(0, 8)}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -591,21 +566,36 @@ export default function EstimateView() {
   const handleFinalize = () => {
     setDialog({
       type: 'confirm',
-      title: profile.country === 'FR' ? 'Finaliser' : 'Finalize',
-      message:
-        profile.country === 'FR'
-          ? 'Ceci verrouillera le devis. Vous ne pourrez plus le modifier. Continuer ?'
-          : 'This will lock the estimate for compliance. You cannot edit it again. Proceed?',
+      title: lang.finalize,
+      message: lang.finalizeConfirm,
       onConfirm: async () => {
         setDialog(null);
-        await supabase
+        const { error } = await supabase
           .from('estimates')
           .update({
             is_locked: true,
             show_details_snapshot: showDetails
           })
           .eq('id', id);
-        location.reload();
+
+        if (error) {
+          setDialog({
+            type: 'alert',
+            message: lang.finalizeError
+          });
+          return;
+        }
+
+        // Update local state instead of full page reload
+        setEstimate((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                is_locked: true,
+                show_details_snapshot: showDetails
+              }
+            : prev
+        );
       }
     });
   };
@@ -613,25 +603,30 @@ export default function EstimateView() {
   const handleCancelDraft = () => {
     setDialog({
       type: 'confirm',
-      title: profile.country === 'FR' ? 'Annuler' : 'Cancel',
-      message:
-        profile.country === 'FR'
-          ? 'Êtes-vous sûr de vouloir annuler ce brouillon ?'
-          : 'Are you sure you want to cancel this draft?',
+      title: lang.cancel,
+      message: lang.cancelDraftConfirm,
       onConfirm: async () => {
         setDialog(null);
-        await supabase.from('estimates').delete().eq('id', id);
+        const { error } = await supabase
+          .from('estimates')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          setDialog({ type: 'alert', message: error.message });
+          return;
+        }
+
         router.push('/dashboard');
       }
     });
   };
-
   if (loading) return <LoadingDots />;
 
   if (!estimate) {
     return (
       <div className="p-10 text-center font-sans text-xl font-black uppercase text-gray-400">
-        Estimate Not Found
+        {lang?.notFound || 'Estimate Not Found'}
       </div>
     );
   }
@@ -669,16 +664,13 @@ export default function EstimateView() {
                   href="/dashboard"
                   className="text-center bg-white border border-gray-200 px-4 py-2 rounded font-bold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  &larr;{' '}
-                  {profile.country === 'FR' ? 'Tableau de bord' : 'Dashboard'}
+                  &larr; {lang.dashboard}
                 </Link>
 
                 {!estimate.is_locked && (
                   <div className="flex justify-between sm:justify-start items-center gap-2 bg-white px-3 py-2 rounded border border-gray-200">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                      {profile.country === 'FR'
-                        ? 'Détails internes'
-                        : 'Internal Details'}
+                      {lang.internalDetails}
                     </span>
                     <button
                       onClick={() => setShowDetails(!showDetails)}
@@ -701,9 +693,7 @@ export default function EstimateView() {
                       onClick={handleCreateRevision}
                       className="flex-1 bg-white text-gray-800 border border-gray-200 px-4 py-3 rounded font-bold text-sm hover:bg-gray-50 transition-colors"
                     >
-                      {profile.country === 'FR'
-                        ? 'Créer Révision'
-                        : 'Create Revision'}
+                      {lang.createRevision}
                     </button>
                   )}
                   {isOwner && (
@@ -726,7 +716,7 @@ export default function EstimateView() {
                         <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
                         <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                       </svg>
-                      {profile.country === 'FR' ? 'Partager' : 'Share'}
+                      {lang.share}
                     </button>
                   )}
                   {isOwner && estimate.client_email && (
@@ -735,13 +725,7 @@ export default function EstimateView() {
                       onClick={() => handleSend('email')}
                       className="flex-1 bg-gray-800 text-white px-4 py-3 rounded font-bold text-sm disabled:opacity-50"
                     >
-                      {sending
-                        ? profile.country === 'FR'
-                          ? 'Envoi...'
-                          : 'Sending...'
-                        : profile.country === 'FR'
-                          ? 'E-mail'
-                          : 'Email'}
+                      {sending ? lang.sending : lang.emailBtn}
                     </button>
                   )}
                   <button
@@ -749,13 +733,7 @@ export default function EstimateView() {
                     onClick={handleDownloadPDF}
                     className="flex-1 sm:flex-none bg-blue-600 text-white px-6 py-3 rounded font-bold text-sm shadow-md disabled:opacity-50"
                   >
-                    {loading
-                      ? profile.country === 'FR'
-                        ? 'Génération...'
-                        : 'Generating...'
-                      : profile.country === 'FR'
-                        ? 'Télécharger PDF'
-                        : 'Download PDF'}
+                    {loading ? lang.generating : lang.downloadPdf}
                   </button>
                 </>
               ) : (
@@ -765,19 +743,19 @@ export default function EstimateView() {
                       href={`/new-estimate?edit=${id}`}
                       className="flex-1 text-center bg-blue-50 text-blue-600 px-4 py-3 rounded font-bold text-sm"
                     >
-                      {profile.country === 'FR' ? 'Modifier' : 'Edit'}
+                      {lang.edit}
                     </Link>
                     <button
                       onClick={handleCancelDraft}
                       className="flex-1 bg-red-50 text-red-600 font-bold text-sm px-4 py-3 rounded"
                     >
-                      {profile.country === 'FR' ? 'Annuler' : 'Cancel'}
+                      {lang.cancel}
                     </button>
                     <button
                       onClick={handleFinalize}
                       className="flex-1 bg-green-600 text-white px-4 py-3 rounded font-bold text-sm shadow-md"
                     >
-                      {profile.country === 'FR' ? 'Finaliser' : 'Finalize'}
+                      {lang.finalize}
                     </button>
                   </div>
                 )
@@ -799,27 +777,18 @@ export default function EstimateView() {
               <div className="flex items-center gap-3">
                 {estimate.client_status === 'approved' && (
                   <span className="text-green-700 font-black uppercase tracking-widest text-sm">
-                    ✓{' '}
-                    {profile.country === 'FR'
-                      ? 'Devis Approuvé'
-                      : 'Estimate Approved'}
+                    ✓ {lang.estimateApproved}
                   </span>
                 )}
                 {estimate.client_status === 'rejected' && (
                   <span className="text-red-700 font-black uppercase tracking-widest text-sm">
-                    ✕{' '}
-                    {profile.country === 'FR'
-                      ? 'Devis Refusé'
-                      : 'Estimate Rejected'}
+                    ✕ {lang.estimateRejected}
                   </span>
                 )}
                 {(estimate.client_status === 'pending' ||
                   !estimate.client_status) && (
                   <span className="text-blue-700 font-black uppercase tracking-widest text-sm">
-                    ⏳{' '}
-                    {profile.country === 'FR'
-                      ? 'En attente de validation'
-                      : 'Pending Client Approval'}
+                    ⏳ {lang.pendingApproval}
                   </span>
                 )}
               </div>
@@ -832,15 +801,13 @@ export default function EstimateView() {
                       onClick={() => handleStatusChange('rejected')}
                       className="flex-1 sm:flex-none px-6 py-3 bg-white text-red-600 border border-red-200 hover:bg-red-50 font-bold rounded text-sm transition-colors"
                     >
-                      {profile.country === 'FR' ? 'Refuser' : 'Reject'}
+                      {lang.reject}
                     </button>
                     <button
                       onClick={() => handleStatusChange('approved')}
                       className="flex-1 sm:flex-none px-6 py-3 bg-green-600 text-white hover:bg-green-700 font-bold rounded shadow-md text-sm transition-colors"
                     >
-                      {profile.country === 'FR'
-                        ? 'Approuver le Devis'
-                        : 'Approve Estimate'}
+                      {lang.approveEstimate}
                     </button>
                   </div>
                 )}
@@ -853,13 +820,13 @@ export default function EstimateView() {
               <div className="min-w-0 space-y-6 sm:space-y-12 flex flex-col text-left">
                 <div>
                   <h1 className="text-2xl sm:text-5xl font-black uppercase tracking-tighter break-words text-gray-900">
-                    {profile.country === 'FR' ? 'Devis' : 'Estimate'}
+                    {lang.estimateLabel}
                   </h1>
                 </div>
 
                 <div className="space-y-1">
                   <span className="block text-[9px] uppercase tracking-wider font-black text-gray-300">
-                    {profile.country === 'FR' ? 'Client' : 'Client'}
+                    {lang.clientLabel}
                   </span>
                   <p className="text-sm sm:text-lg font-black text-gray-800 break-words">
                     {estimate.client_name}
@@ -895,13 +862,13 @@ export default function EstimateView() {
                   {profile.business_name}
                 </h2>
                 <p className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-widest">
-                  {profile.country === 'FR' ? 'Date :' : 'Date:'}{' '}
+                  {lang.dateLabel}{' '}
                   {new Date(estimate.created_at).toLocaleDateString(
                     profile.country === 'FR' ? 'fr-FR' : 'en-US'
                   )}
                 </p>
                 <p className="text-[10px] sm:text-xs text-gray-300 font-mono mt-0.5 sm:mt-1 break-all max-w-full">
-                  {profile.country === 'FR' ? 'Réf :' : 'Ref:'}{' '}
+                  {lang.refLabel}{' '}
                   {estimate.custom_id || estimate.id.slice(0, 8)}
                 </p>
               </div>
@@ -911,13 +878,9 @@ export default function EstimateView() {
               <thead className="border-b-4 border-black text-[10px] uppercase font-black tracking-[0.3em] text-gray-300">
                 <tr>
                   <th className="py-4 text-left w-3/4">
-                    {profile.country === 'FR'
-                      ? 'Etape du Service / Catégorie'
-                      : 'Service Category / Step'}
+                    {lang.serviceCategoryHeader}
                   </th>
-                  <th className="py-4 text-right w-1/4">
-                    {profile.country === 'FR' ? 'Montant' : 'Amount'}
-                  </th>
+                  <th className="py-4 text-right w-1/4">{lang.amountHeader}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -925,10 +888,7 @@ export default function EstimateView() {
                   <tr key={idx}>
                     <td className="py-8 pr-4 sm:pr-12 min-w-0 alignment-safe">
                       <p className="font-bold text-xl text-gray-800 mb-1 break-words">
-                        {sec.title ||
-                          (profile.country === 'FR'
-                            ? 'Services Professionnels'
-                            : 'Professional Services')}
+                        {sec.title || lang.professionalServices}
                       </p>
                       <p className="text-xs text-gray-400 font-medium leading-relaxed mb-3 whitespace-pre-wrap break-words max-w-2xl">
                         {generateDescription(sec)}
@@ -938,15 +898,9 @@ export default function EstimateView() {
                         <div className="text-[10px] text-gray-500 font-mono bg-gray-50 p-3 rounded border border-gray-100 space-y-1.5 max-w-2xl">
                           {sec.laborHours > 0 && (
                             <p className="break-words">
-                              &rarr;{' '}
-                              {profile.country === 'FR'
-                                ? "Main-d'œuvre"
-                                : 'Labor'}
-                              : {sec.laborHours}
+                              &rarr; {lang.laborLabel}: {sec.laborHours}
                               {sec.laborType === 'daily'
-                                ? profile.country === 'FR'
-                                  ? 'j'
-                                  : 'd'
+                                ? lang.laborDayUnit
                                 : 'h'}{' '}
                               @{' '}
                               {(getEffectiveLaborRateCents(sec) / 100)
@@ -957,9 +911,7 @@ export default function EstimateView() {
                                 )}
                               {profile.currency === 'EUR' ? '€' : '$'}
                               {sec.laborType === 'daily'
-                                ? profile.country === 'FR'
-                                  ? '/j'
-                                  : '/d'
+                                ? lang.laborDayPerUnit
                                 : '/h'}{' '}
                               (Tax:{' '}
                               {sec.laborTaxRate !== undefined
@@ -969,9 +921,7 @@ export default function EstimateView() {
                             </p>
                           )}
                           {sec.items.map((item: any, i: number) => {
-                            const m = materials.find(
-                              (mat) => mat.id === item.materialId
-                            );
+                            const m = materialsById.get(item.materialId);
                             const displayName =
                               item.name || m?.name || 'Material Item';
                             const displayCostCents = getEffectiveItemCostCents(
@@ -1019,9 +969,7 @@ export default function EstimateView() {
                         sec.items.length > 0 && (
                           <div className="text-[10px] text-gray-400 font-mono mt-2 space-y-1 max-w-2xl">
                             {sec.items.map((item: any, i: number) => {
-                              const m = materials.find(
-                                (mat) => mat.id === item.materialId
-                              );
+                              const m = materialsById.get(item.materialId);
                               const displayName =
                                 item.name || m?.name || 'Material Item';
                               const rawUnit = item.unit || m?.unit || '';
@@ -1062,9 +1010,7 @@ export default function EstimateView() {
             <div className="flex justify-end pt-10 border-t-2 border-gray-100">
               <div className="w-full sm:w-72 space-y-4">
                 <div className="flex justify-between text-[10px] font-black text-gray-300 uppercase tracking-widest">
-                  <span>
-                    {profile.country === 'FR' ? 'Sous-total HT' : 'Subtotal'}
-                  </span>
+                  <span>{lang.subtotalHT}</span>
                   <span className="text-gray-600 font-mono whitespace-nowrap">
                     {profile.currency === 'EUR' ? '€' : '$'}
                     {(subtotal / 100)
@@ -1080,7 +1026,7 @@ export default function EstimateView() {
                       className="flex justify-between text-[10px] font-black text-gray-300 uppercase tracking-widest"
                     >
                       <span>
-                        {profile.country === 'FR' ? 'TVA' : 'Tax'} ({rate}%)
+                        {lang.tax} ({rate}%)
                       </span>
                       <span className="text-gray-600 font-mono whitespace-nowrap">
                         {profile.currency === 'EUR' ? '€' : '$'}
@@ -1092,7 +1038,7 @@ export default function EstimateView() {
                   ))}
                 <div className="flex justify-between border-t-4 border-black pt-6 items-baseline">
                   <span className="text-2xl font-black uppercase tracking-tighter">
-                    {profile.country === 'FR' ? 'Total TTC' : 'Grand Total'}
+                    {lang.grandTotalLabel}
                   </span>
                   <span className="text-3xl font-black font-mono text-blue-600 whitespace-nowrap">
                     {profile.currency === 'EUR' ? '€' : '$'}
@@ -1107,9 +1053,7 @@ export default function EstimateView() {
                   <div className="pt-4 border-t border-dashed border-gray-200 space-y-3">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50/50 p-2 rounded">
                       <span>
-                        {profile.country === 'FR'
-                          ? `Acompte (${estimate.deposit_percentage}%)`
-                          : `Deposit (${estimate.deposit_percentage}%)`}
+                        {lang.depositLabel} ({estimate.deposit_percentage}%)
                       </span>
                       <span className="font-mono font-bold whitespace-nowrap">
                         {profile.currency === 'EUR' ? '€' : '$'}
@@ -1123,11 +1067,7 @@ export default function EstimateView() {
                       </span>
                     </div>
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">
-                      <span>
-                        {profile.country === 'FR'
-                          ? 'Solde Restant'
-                          : 'Balance Due'}
-                      </span>
+                      <span>{lang.balanceDue}</span>
                       <span className="font-mono text-gray-700 whitespace-nowrap">
                         {profile.currency === 'EUR' ? '€' : '$'}
                         {(
@@ -1148,47 +1088,33 @@ export default function EstimateView() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
-                    {profile.country === 'FR'
-                      ? 'Conformité & Mentions Légales'
-                      : 'Compliance & Legal'}
+                    {lang.complianceLegal}
                   </p>
                   <p className="text-[10px] text-gray-400 leading-relaxed italic break-words">
-                    {profile.country === 'FR'
-                      ? "Document généré conformément à l'article 286 du code général des impôts (Loi Anti-Fraude TVA). Ce document est inaltérable une fois finalisé."
-                      : 'Standard business estimate. Certified digital record. Valid for 30 days from issuance.'}
+                    {lang.complianceText}
                   </p>
                 </div>
                 <div className="text-left sm:text-right min-w-0 sm:pl-16">
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
-                    {profile.country === 'FR'
-                      ? 'Conditions de Paiement'
-                      : 'Terms'}
+                    {lang.termsHeader}
                   </p>
                   <p
                     className="text-[10px] text-gray-400 leading-relaxed font-bold break-words"
                     style={{ paddingLeft: '64px' }}
                   >
-                    {profile.country === 'FR' ? (
-                      <>
-                        {estimate.deposit_enabled
-                          ? `Acompte de ${estimate.deposit_percentage || 0}% exigible à la signature pour le lancement du projet. Solde dû ${
-                              isUponReceipt
-                                ? 'dès réception.'
-                                : `sous ${displayPaymentDays} jours.`
-                            }`
-                          : `Règlement ${isUponReceipt ? 'dès réception.' : `sous ${displayPaymentDays} jours.`}`}
-                      </>
-                    ) : (
-                      <>
-                        {estimate.deposit_enabled
-                          ? `Deposit of ${estimate.deposit_percentage || 0}% due upon acceptance to initiate work. Balance due ${
-                              isUponReceipt
-                                ? 'upon receipt.'
-                                : `within ${displayPaymentDays} days.`
-                            }`
-                          : `Payment due ${isUponReceipt ? 'upon receipt.' : `within ${displayPaymentDays} days.`}`}
-                      </>
-                    )}
+                    {(() => {
+                      const balanceText = isUponReceipt
+                        ? lang.termsBalanceUponReceipt
+                        : t(lang.termsBalanceWithinDays, {
+                            days: displayPaymentDays
+                          });
+                      return estimate.deposit_enabled
+                        ? t(lang.termsWithDeposit, {
+                            pct: estimate.deposit_percentage || 0,
+                            balance: balanceText
+                          })
+                        : t(lang.termsNoDeposit, { balance: balanceText });
+                    })()}
                   </p>
                 </div>
               </div>
@@ -1199,18 +1125,14 @@ export default function EstimateView() {
           {estimate.is_locked && (
             <div className="mt-8 bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:hidden">
               <h3 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-900 border-b-2 border-black pb-2">
-                {profile.country === 'FR'
-                  ? 'Discussions & Modifications'
-                  : 'Discussion & Modifications'}
+                {lang.discussionMods}
               </h3>
 
               {/* Messages Wrapper */}
               <div className="space-y-4 max-h-96 overflow-y-auto mb-6 pr-2">
                 {comments.length === 0 ? (
                   <p className="text-xs text-gray-400 font-medium italic">
-                    {profile.country === 'FR'
-                      ? 'Aucun message pour le moment. Utilisez le formulaire ci-dessous pour demander des ajustements.'
-                      : 'No messages yet. Use the field below to request adjustment notes.'}
+                    {lang.noMessagesYet}
                   </p>
                 ) : (
                   comments.map((comm) => (
@@ -1249,20 +1171,14 @@ export default function EstimateView() {
                 className="mt-4 border-t border-gray-100 pt-4"
               >
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                  {profile.country === 'FR'
-                    ? 'Ajouter un message'
-                    : 'Add a message'}
+                  {lang.addMessage}
                 </label>
                 <div className="flex flex-col sm:flex-row gap-2 items-stretch">
                   <textarea
                     rows={2}
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
-                    placeholder={
-                      profile.country === 'FR'
-                        ? "Demandez des modifications sur les quantités, la main-d'œuvre ou les matériaux..."
-                        : 'Request revisions regarding service quantities, labor rates, or material phases...'
-                    }
+                    placeholder={lang.requestRevisions}
                     className="flex-1 p-3 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-600 resize-none text-black placeholder-gray-300 bg-white"
                   />
                   <button
@@ -1270,13 +1186,7 @@ export default function EstimateView() {
                     disabled={submittingComment || !commentInput.trim()}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-3 rounded tracking-wide transition-colors disabled:opacity-40 self-end sm:self-stretch flex items-center justify-center w-full sm:w-auto min-w-[120px]"
                   >
-                    {submittingComment
-                      ? profile.country === 'FR'
-                        ? 'Envoi...'
-                        : 'Sending...'
-                      : profile.country === 'FR'
-                        ? 'Envoyer'
-                        : 'Send'}
+                    {submittingComment ? lang.sending : lang.send}
                   </button>
                 </div>
               </form>
@@ -1285,38 +1195,15 @@ export default function EstimateView() {
         </div>
 
         {/* --- POPUP DIALOGS --- */}
-        {dialog && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
-            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100">
-              <h3 className="text-lg font-black uppercase tracking-tighter mb-3 text-gray-900 break-words">
-                {dialog.title ||
-                  (profile?.country === 'FR' ? 'Notification' : 'Notice')}
-              </h3>
-              <p className="text-sm text-gray-500 font-medium mb-8 break-words">
-                {dialog.message}
-              </p>
-              <div className="flex gap-3 justify-end">
-                {dialog.type === 'confirm' && (
-                  <button
-                    onClick={() => setDialog(null)}
-                    className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    if (dialog.onConfirm) dialog.onConfirm();
-                    else setDialog(null);
-                  }}
-                  className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
-                >
-                  {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          dialog={dialog}
+          onClose={() => setDialog(null)}
+          labels={{
+            notice: lang.notice,
+            cancel: lang.cancel,
+            confirmOk: lang.confirmOk
+          }}
+        />
       </main>
     </div>
   );

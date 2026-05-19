@@ -29,8 +29,8 @@ export async function POST(req: Request) {
           quantity: 1
         }
       ],
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/upgrade`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/upgrade?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/upgrade?canceled=true`,
       metadata: {
         type: type
       }

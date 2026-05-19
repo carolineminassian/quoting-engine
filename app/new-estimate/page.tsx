@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
+import LoadingDots from '@/components/LoadingDots';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import MaterialCombobox from '@/components/MaterialCombobox';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import {
@@ -17,14 +19,6 @@ import {
   RadioGroup,
   Radio
 } from '@headlessui/react';
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
 
 interface EstimateItem {
   materialId: string;
@@ -499,10 +493,7 @@ function NewEstimateContent() {
     if (hasZeroQty) {
       setDialog({
         type: 'alert',
-        message:
-          profile?.country === 'FR'
-            ? "La quantité de chaque matériau doit être supérieure à 0. Supprimez la ligne si l'article n'est pas nécessaire."
-            : 'The quantity of each material must be greater than 0. Remove the row if the item is not needed.'
+        message: lang.qtyZeroError
       });
       return;
     }
@@ -530,24 +521,22 @@ function NewEstimateContent() {
       );
       setDialog({
         type: 'confirm',
-        title:
-          profile?.country === 'FR'
-            ? 'Inscription Requise'
-            : 'Sign Up Required',
-        message:
-          profile?.country === 'FR'
-            ? 'Créez un compte gratuit pour enregistrer et générer ce devis.'
-            : 'Create a free account to save and generate this estimate.',
+        title: lang.signUpRequired,
+        message: lang.signUpDesc,
         onConfirm: () => router.push('/login?view=signup')
       });
       return;
     }
 
     if (businessName && businessName !== profile?.business_name) {
-      await supabase
+      const { error: bizNameError } = await supabase
         .from('profiles')
         .update({ business_name: businessName })
         .eq('id', user.id);
+      if (bizNameError) {
+        console.error('Failed to update business name:', bizNameError);
+        // Non-blocking — continue with estimate save even if name update failed
+      }
     }
 
     const totals = calculateTotals();
@@ -624,7 +613,7 @@ function NewEstimateContent() {
       if (client.name) {
         const existing = pastClients.find((c) => c.name === client.name);
         if (existing) {
-          await supabase
+          const { error: clientUpdateError } = await supabase
             .from('clients')
             .update({
               email: client.email,
@@ -635,32 +624,51 @@ function NewEstimateContent() {
               country: client.country
             })
             .eq('id', existing.id);
+          if (clientUpdateError) {
+            console.error('Failed to update client record:', clientUpdateError);
+            // Non-blocking — estimate is already saved
+          }
         } else {
-          await supabase.from('clients').insert([
-            {
-              user_id: user?.id,
-              name: client.name,
-              email: client.email,
-              phone: client.phone,
-              address: client.address,
-              city: client.city,
-              zip: client.zip,
-              country: client.country
-            }
-          ]);
+          const { error: clientInsertError } = await supabase
+            .from('clients')
+            .insert([
+              {
+                user_id: user?.id,
+                name: client.name,
+                email: client.email,
+                phone: client.phone,
+                address: client.address,
+                city: client.city,
+                zip: client.zip,
+                country: client.country
+              }
+            ]);
+          if (clientInsertError) {
+            console.error('Failed to insert client record:', clientInsertError);
+            // Non-blocking — estimate is already saved
+          }
         }
       }
-
       if (
         !editId &&
         profile.subscription_tier === 'free' &&
         monthlyCount >= 5 &&
         profile.estimate_credits > 0
       ) {
-        await supabase
-          .from('profiles')
-          .update({ estimate_credits: profile.estimate_credits - 1 })
-          .eq('id', profile.id);
+        // Atomic decrement to prevent race conditions when creating estimates rapidly
+        const { data: newBalance, error: creditsError } = await supabase.rpc(
+          'decrement_credits',
+          { p_user_id: profile.id, p_amount: 1 }
+        );
+        if (creditsError) {
+          console.error('Failed to decrement credits:', creditsError);
+          // Non-blocking — user got their estimate, support can manually correct
+        } else if (typeof newBalance === 'number') {
+          // Update profile state so dashboard shows correct credit count immediately
+          setProfile((prev: any) =>
+            prev ? { ...prev, estimate_credits: newBalance } : prev
+          );
+        }
       }
 
       localStorage.removeItem('pactestim_pending_estimate');
@@ -717,16 +725,14 @@ function NewEstimateContent() {
               <div className="flex justify-between items-center w-full sm:w-auto">
                 <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-tight max-w-[70%] sm:max-w-none">
                   {editId
-                    ? profile?.country === 'FR'
-                      ? 'Modifier le Projet'
-                      : 'Edit Project'
+                    ? lang.editProjectTitle
                     : lang.newEstimate?.replace('+', '') || 'New Estimate'}
                 </h1>
                 <Link
                   href="/dashboard"
                   className="sm:hidden text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors shrink-0 text-right ml-4"
                 >
-                  {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
+                  {lang.cancel}
                 </Link>
               </div>
 
@@ -745,9 +751,7 @@ function NewEstimateContent() {
               href={isGuest ? '/' : '/dashboard'}
               className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
             >
-              {profile?.country === 'FR'
-                ? 'Annuler et Quitter'
-                : 'Cancel & Exit'}
+              {lang.cancelExit}
             </Link>
           </div>
           {/* Guest Lock Context Overlay */}
@@ -755,19 +759,15 @@ function NewEstimateContent() {
             <div className="bg-blue-50 p-6 sm:p-8 rounded-xl border border-blue-100 mb-8 flex flex-col gap-4">
               <div>
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-1">
-                  {profile?.country === 'FR' ? 'Mode Invité' : 'Guest Mode'}
+                  {lang.guestMode}
                 </p>
                 <p className="text-sm font-bold text-gray-700 leading-relaxed">
-                  {profile?.country === 'FR'
-                    ? 'Vous pouvez rédiger votre devis maintenant. Pour générer le PDF, nous vous demanderons de créer un compte gratuit.'
-                    : 'You can draft your estimate now. To generate the final PDF, we will ask you to create a free account.'}
+                  {lang.guestModeDesc}
                 </p>
               </div>
               <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                  {profile?.country === 'FR'
-                    ? 'Nom de votre entreprise'
-                    : 'Your Business Name'}
+                  {lang.yourBusinessName}
                 </label>
                 <input
                   required
@@ -783,9 +783,7 @@ function NewEstimateContent() {
           <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
-                {profile?.country === 'FR'
-                  ? 'Coordonnées du Client'
-                  : 'Customer Contact Details'}
+                {lang.customerContactDetails}
               </p>
               {pastClients.length > 0 && (
                 <Listbox
@@ -921,10 +919,10 @@ function NewEstimateContent() {
               <div className="group relative">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                   <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    {profile?.country === 'FR' ? 'V' : 'C'}
+                    {lang.cityShort}
                   </div>
                   <input
-                    placeholder={profile?.country === 'FR' ? 'Ville' : 'City'}
+                    placeholder={lang.city}
                     maxLength={100}
                     className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
                     value={client.city}
@@ -938,14 +936,10 @@ function NewEstimateContent() {
               <div className="group relative">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                   <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-[10px] tracking-tighter">
-                    {profile?.country === 'FR' ? 'CP' : 'Z'}
+                    {lang.zipShort}
                   </div>
                   <input
-                    placeholder={
-                      profile?.country === 'FR'
-                        ? 'Code Postal'
-                        : 'Zip / Postal Code'
-                    }
+                    placeholder={lang.zip}
                     maxLength={20}
                     className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
                     value={client.zip}
@@ -962,7 +956,7 @@ function NewEstimateContent() {
                     🌐
                   </div>
                   <input
-                    placeholder={profile?.country === 'FR' ? 'Pays' : 'Country'}
+                    placeholder={lang.country}
                     maxLength={100}
                     className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
                     value={client.country}
@@ -979,9 +973,7 @@ function NewEstimateContent() {
             {/* Margin Settings Column */}
             <div className="flex flex-col gap-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-                {profile?.country === 'FR'
-                  ? 'Stratégie de Marge'
-                  : 'Margin Strategy'}
+                {lang.marginStrategy}
               </label>
               <div className="flex flex-row gap-3 items-center w-full">
                 <Listbox
@@ -991,26 +983,10 @@ function NewEstimateContent() {
                   <div className="relative flex-1">
                     <ListboxButton className="w-full p-3 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer h-[44px]">
                       <span className="block truncate">
-                        {marginMode === 'none'
-                          ? profile?.country === 'FR'
-                            ? 'Aucune'
-                            : 'None'
-                          : ''}
-                        {marginMode === 'global'
-                          ? profile?.country === 'FR'
-                            ? 'Marge Globale'
-                            : 'Global Margin'
-                          : ''}
-                        {marginMode === 'service'
-                          ? profile?.country === 'FR'
-                            ? 'Marge par Service'
-                            : 'Per Service Margin'
-                          : ''}
-                        {marginMode === 'granular'
-                          ? profile?.country === 'FR'
-                            ? 'Marge Granulaire'
-                            : 'Granular (Line Item)'
-                          : ''}
+                        {marginMode === 'none' && lang.marginNone}
+                        {marginMode === 'global' && lang.marginGlobal}
+                        {marginMode === 'service' && lang.marginService}
+                        {marginMode === 'granular' && lang.marginGranular}
                       </span>
                       <span className="pointer-events-none text-gray-400 text-[10px]">
                         ▼
@@ -1029,7 +1005,7 @@ function NewEstimateContent() {
                             `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                           }
                         >
-                          {profile?.country === 'FR' ? 'Aucune' : 'None'}
+                          {lang.marginNone}
                         </ListboxOption>
                         <ListboxOption
                           value="global"
@@ -1037,9 +1013,7 @@ function NewEstimateContent() {
                             `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                           }
                         >
-                          {profile?.country === 'FR'
-                            ? 'Marge Globale'
-                            : 'Global Margin'}
+                          {lang.marginGlobal}
                         </ListboxOption>
                         <ListboxOption
                           value="service"
@@ -1047,9 +1021,7 @@ function NewEstimateContent() {
                             `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                           }
                         >
-                          {profile?.country === 'FR'
-                            ? 'Marge par Service'
-                            : 'Per Service Margin'}
+                          {lang.marginService}
                         </ListboxOption>
                         <ListboxOption
                           value="granular"
@@ -1057,9 +1029,7 @@ function NewEstimateContent() {
                             `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                           }
                         >
-                          {profile?.country === 'FR'
-                            ? 'Marge Granulaire'
-                            : 'Granular (Line Item)'}
+                          {lang.marginGranular}
                         </ListboxOption>
                       </ListboxOptions>
                     </Transition>
@@ -1109,18 +1079,12 @@ function NewEstimateContent() {
                 <div className="flex flex-col gap-4 mb-6 items-stretch">
                   <div className="relative flex-1 w-full flex flex-col">
                     <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1 pointer-events-none">
-                      {profile?.country === 'FR'
-                        ? 'Catégorie / Étape de Service'
-                        : 'Service Category / Step'}
+                      {lang.serviceCategoryStep}
                     </label>
 
                     <div className="relative flex items-center border-b-2 border-gray-100 focus-within:border-blue-500 transition-colors w-full">
                       <input
-                        placeholder={
-                          profile?.country === 'FR'
-                            ? 'Ex: Démolition, Peinture...'
-                            : 'e.g. Demolition, Painting...'
-                        }
+                        placeholder={lang.servicePlaceholder}
                         maxLength={50}
                         className="text-2xl font-black text-gray-900 outline-none w-full pb-2 italic tracking-tight bg-transparent pr-8 uppercase placeholder:normal-case placeholder:not-italic placeholder:text-gray-300 select-text"
                         value={sec.title}
@@ -1165,12 +1129,8 @@ function NewEstimateContent() {
 
                         <span>
                           {isDescVisible(sec, sIdx)
-                            ? profile?.country === 'FR'
-                              ? 'Masquer la description'
-                              : 'Hide Description'
-                            : profile?.country === 'FR'
-                              ? 'Ajouter une description'
-                              : 'Add Description'}
+                            ? lang.hideDescription
+                            : lang.addDescription}
                         </span>
                       </button>
                     </div>
@@ -1221,7 +1181,7 @@ function NewEstimateContent() {
                                           ...prev,
                                           step
                                         ]);
-                                        await supabase
+                                        const { error } = await supabase
                                           .from('hidden_categories')
                                           .insert([
                                             {
@@ -1229,13 +1189,19 @@ function NewEstimateContent() {
                                               category_name: step
                                             }
                                           ]);
+                                        if (error) {
+                                          console.error(
+                                            'Failed to hide category:',
+                                            error
+                                          );
+                                          // Roll back local state if DB write failed
+                                          setHiddenCategories((prev) =>
+                                            prev.filter((c) => c !== step)
+                                          );
+                                        }
                                       }}
                                       className="p-2 text-gray-300 hover:text-red-500 rounded text-xs font-bold transition-colors cursor-pointer"
-                                      title={
-                                        profile?.country === 'FR'
-                                          ? 'Supprimer de la liste'
-                                          : 'Remove from list'
-                                      }
+                                      title={lang.removeFromList}
                                     >
                                       ×
                                     </button>
@@ -1252,9 +1218,7 @@ function NewEstimateContent() {
                                   onClick={() => setActiveDropdownIdx(null)}
                                   className="w-full text-left p-3 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg uppercase tracking-wider italic cursor-pointer block"
                                 >
-                                  {profile?.country === 'FR'
-                                    ? '✨ Raccourci : Entrée pour valider la nouvelle catégorie'
-                                    : '✨ Shortcut: Press Enter to save new category'}
+                                  {lang.enterToSaveCategory}
                                 </button>
                               );
                             }
@@ -1284,7 +1248,7 @@ function NewEstimateContent() {
                                         ...prev,
                                         step
                                       ]);
-                                      await supabase
+                                      const { error } = await supabase
                                         .from('hidden_categories')
                                         .insert([
                                           {
@@ -1292,13 +1256,19 @@ function NewEstimateContent() {
                                             category_name: step
                                           }
                                         ]);
+                                      if (error) {
+                                        console.error(
+                                          'Failed to hide category:',
+                                          error
+                                        );
+                                        // Roll back local state if DB write failed
+                                        setHiddenCategories((prev) =>
+                                          prev.filter((c) => c !== step)
+                                        );
+                                      }
                                     }}
                                     className="p-2 text-gray-300 hover:text-red-500 rounded text-xs font-bold transition-colors cursor-pointer"
-                                    title={
-                                      profile?.country === 'FR'
-                                        ? 'Supprimer de la liste'
-                                        : 'Remove from list'
-                                    }
+                                    title={lang.removeFromList}
                                   >
                                     ×
                                   </button>
@@ -1315,11 +1285,8 @@ function NewEstimateContent() {
                 {marginMode === 'service' && !isDescVisible(sec, sIdx) && (
                   <div className="flex items-center gap-2 mb-6 animate-fade-in">
                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
-                      {profile?.country === 'FR'
-                        ? 'Marge Service:'
-                        : 'Service Margin:'}
+                      {lang.serviceMargin}
                     </span>
-
                     <div className="relative w-24">
                       <input
                         type="number"
@@ -1346,19 +1313,13 @@ function NewEstimateContent() {
                 {isDescVisible(sec, sIdx) && (
                   <div className="mb-6 transition-all animate-fade-in">
                     <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1 pointer-events-none">
-                      {profile?.country === 'FR'
-                        ? 'Description du Service'
-                        : 'Service Description'}
+                      {lang.serviceDescription}
                     </label>
 
                     <input
                       type="text"
                       maxLength={500}
-                      placeholder={
-                        profile?.country === 'FR'
-                          ? 'Détails ou description des travaux pour ce service...'
-                          : 'Details or description of work for this service...'
-                      }
+                      placeholder={lang.serviceDescPlaceholder}
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/20 text-gray-700 shadow-sm transition-colors"
                       value={sec.description || ''}
                       onChange={(e) =>
@@ -1369,9 +1330,7 @@ function NewEstimateContent() {
                     {marginMode === 'service' && (
                       <div className="flex items-center gap-2 mt-4 animate-fade-in">
                         <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 shrink-0">
-                          {profile?.country === 'FR'
-                            ? 'Marge Service:'
-                            : 'Service Margin:'}
+                          {lang.serviceMargin}
                         </span>
 
                         <div className="relative w-24">
@@ -1404,9 +1363,7 @@ function NewEstimateContent() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
                   <div className="col-span-2 sm:col-span-4 lg:col-span-5 mb-2 flex justify-between items-center border-b border-slate-200/50 pb-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      {profile?.country === 'FR'
-                        ? "Main-d'œuvre"
-                        : 'Labor Settings'}
+                      {lang.laborSettings}
                     </p>
 
                     <Listbox
@@ -1417,12 +1374,8 @@ function NewEstimateContent() {
                         <ListboxButton className="w-full p-2 border border-slate-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors shadow-sm text-[9px] uppercase tracking-widest text-slate-500 flex justify-between items-center cursor-pointer">
                           <span className="block truncate">
                             {sec.laborType === 'daily'
-                              ? profile?.country === 'FR'
-                                ? 'Taux Journalier'
-                                : 'Daily Rate'
-                              : profile?.country === 'FR'
-                                ? 'Taux Horaire'
-                                : 'Hourly Rate'}
+                              ? lang.dailyRate
+                              : lang.hourlyRate}
                           </span>
 
                           <span className="pointer-events-none text-slate-400 text-[10px]">
@@ -1443,9 +1396,7 @@ function NewEstimateContent() {
                                 `cursor-pointer select-none relative p-2.5 text-[9px] uppercase tracking-widest font-bold ${active ? 'bg-blue-50 text-blue-900' : 'text-slate-600'}`
                               }
                             >
-                              {profile?.country === 'FR'
-                                ? 'Taux Horaire'
-                                : 'Hourly Rate'}
+                              {lang.hourlyRate}
                             </ListboxOption>
 
                             <ListboxOption
@@ -1454,9 +1405,7 @@ function NewEstimateContent() {
                                 `cursor-pointer select-none relative p-2.5 text-[9px] uppercase tracking-widest font-bold ${active ? 'bg-blue-50 text-blue-900' : 'text-slate-600'}`
                               }
                             >
-                              {profile?.country === 'FR'
-                                ? 'Taux Journalier'
-                                : 'Daily Rate'}
+                              {lang.dailyRate}
                             </ListboxOption>
                           </ListboxOptions>
                         </Transition>
@@ -1466,13 +1415,7 @@ function NewEstimateContent() {
 
                   <div className="col-span-1">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
-                      {sec.laborType === 'daily'
-                        ? profile?.country === 'FR'
-                          ? 'Jours estimés'
-                          : 'Est. Days'
-                        : profile?.country === 'FR'
-                          ? 'Heures estimées'
-                          : 'Est. Hours'}
+                      {sec.laborType === 'daily' ? lang.estDays : lang.estHours}
                     </label>
 
                     <input
@@ -1493,13 +1436,7 @@ function NewEstimateContent() {
 
                   <div className="col-span-1">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
-                      {sec.laborType === 'daily'
-                        ? profile?.country === 'FR'
-                          ? 'Taux/Jour'
-                          : 'Rate/Day'
-                        : profile?.country === 'FR'
-                          ? 'Taux/Heure'
-                          : 'Rate/Hour'}
+                      {sec.laborType === 'daily' ? lang.rateDay : lang.rateHour}{' '}
                       ({profile?.currency === 'EUR' ? '€' : '$'})
                     </label>
 
@@ -1521,7 +1458,7 @@ function NewEstimateContent() {
 
                   <div className="col-span-1">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
-                      {profile?.country === 'FR' ? 'Taxe (%)' : 'Tax Rate (%)'}
+                      {lang.taxRatePct}
                     </label>
 
                     <div className="relative">
@@ -1549,9 +1486,7 @@ function NewEstimateContent() {
                   {marginMode === 'granular' && (
                     <div className="col-span-1 sm:col-span-1 lg:col-span-2">
                       <label className="block text-[10px] font-black text-blue-500 uppercase mb-1.5 tracking-widest truncate">
-                        {profile?.country === 'FR'
-                          ? 'Marge Travail'
-                          : 'Labor Margin'}
+                        {lang.laborMargin}
                       </label>
 
                       <div className="relative">
@@ -1609,7 +1544,7 @@ function NewEstimateContent() {
                                 }
                                 className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 bg-blue-50/50 px-2 py-1 rounded shrink-0 transition-colors"
                               >
-                                {lang.edit || 'Edit'}
+                                {lang.edit}
                               </button>
                             </div>
                           ) : (
@@ -1643,14 +1578,8 @@ function NewEstimateContent() {
                                 lang.selectMaterial ||
                                 'Select or create material...'
                               }
-                              createLabel={
-                                profile?.country === 'FR' ? 'Créer' : 'Create'
-                              }
-                              emptyStateLabel={
-                                profile?.country === 'FR'
-                                  ? 'Aucun résultat'
-                                  : 'No materials found.'
-                              }
+                              createLabel={lang.create}
+                              emptyStateLabel={lang.noMaterialsFound}
                               currencySymbol={
                                 profile?.currency === 'EUR' ? '€' : '$'
                               }
@@ -1665,7 +1594,7 @@ function NewEstimateContent() {
 
                           <div className="flex-1 min-w-[80px] sm:w-20 sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
-                              {profile?.country === 'FR' ? 'Qté' : 'Qty'}
+                              {lang.qtyShort}
                             </span>
 
                             <input
@@ -1688,7 +1617,7 @@ function NewEstimateContent() {
 
                           <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none z-10 transition-colors group-focus-within:text-blue-500">
-                              {profile?.country === 'FR' ? 'Unité' : 'Unit'}
+                              {lang.unitShort}
                             </span>
 
                             <Listbox
@@ -1736,7 +1665,7 @@ function NewEstimateContent() {
 
                           <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
-                              {profile?.country === 'FR' ? 'Prix' : 'Cost'}
+                              {lang.costShort}
                             </span>
 
                             <input
@@ -1769,7 +1698,7 @@ function NewEstimateContent() {
 
                           <div className="flex-1 min-w-[90px] sm:w-[100px] sm:flex-none relative shrink-0 group">
                             <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
-                              {profile?.country === 'FR' ? 'Taxe' : 'Tax'}
+                              {lang.taxShort}
                             </span>
 
                             <input
@@ -1884,16 +1813,14 @@ function NewEstimateContent() {
             }}
             className="w-full mt-4 p-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase tracking-widest text-[10px] hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/40 transition-all cursor-pointer"
           >
-            +{profile?.country === 'FR' ? 'Ajouter un Service' : 'Add Service'}
+            +{lang.addService}
           </button>
           {/* Commercial Terms Block */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 mt-8">
             {/* Payment Terms Column */}
             <div className="flex flex-col gap-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-                {profile?.country === 'FR'
-                  ? 'Conditions de Règlement'
-                  : 'Payment Terms'}
+                {lang.paymentTerms}
               </label>
               <div className="flex flex-row gap-3 items-center w-full h-[44px]">
                 <div className="flex flex-1 border border-gray-200 rounded-xl h-full overflow-hidden p-1 bg-gray-50/50">
@@ -1906,9 +1833,7 @@ function NewEstimateContent() {
                         : 'text-gray-400 hover:text-gray-600'
                     }`}
                   >
-                    {profile?.country === 'FR'
-                      ? 'Dès réception'
-                      : 'Upon Receipt'}
+                    {lang.uponReceipt}
                   </button>
                   <button
                     type="button"
@@ -1919,7 +1844,7 @@ function NewEstimateContent() {
                         : 'text-gray-400 hover:text-gray-600'
                     }`}
                   >
-                    {profile?.country === 'FR' ? 'Jours Net' : 'Net Days'}
+                    {lang.netDays}
                   </button>
                 </div>
 
@@ -1952,15 +1877,11 @@ function NewEstimateContent() {
             {/* Deposit Column */}
             <div className="flex flex-col gap-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block h-4 flex items-center select-none">
-                {profile?.country === 'FR' ? 'Acompte' : 'Deposit'}
+                {lang.deposit}
               </label>
               <div className="flex flex-row gap-3 items-center w-full h-[44px]">
                 <div className="flex-1 h-full px-4 border border-gray-200 rounded-xl bg-white text-xs font-bold text-gray-700 flex justify-between items-center shadow-sm hover:bg-gray-50/50 transition-all select-none">
-                  <span>
-                    {profile?.country === 'FR'
-                      ? 'Exiger un acompte'
-                      : 'Require Deposit'}
-                  </span>
+                  <span>{lang.requireDeposit}</span>
                   <Switch
                     checked={depositEnabled}
                     onChange={setDepositEnabled}
@@ -2051,49 +1972,22 @@ function NewEstimateContent() {
                 onClick={handleSave}
                 className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-blue-600/10 hover:bg-blue-700 hover:shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] h-[40px] flex items-center justify-center"
               >
-                {editId
-                  ? lang.save || 'Save'
-                  : profile?.country === 'FR'
-                    ? 'Générer le Devis'
-                    : 'Generate Estimate'}
+                {editId ? lang.save : lang.generateEstimate}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
-            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
-              {dialog.title ||
-                (profile?.country === 'FR' ? 'Notification' : 'Notice')}
-            </h3>
-            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
-              {dialog.message}
-            </p>
-            <div className="flex gap-2 justify-end">
-              {dialog.type === 'confirm' && (
-                <button
-                  onClick={() => setDialog(null)}
-                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
-                >
-                  {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (dialog.onConfirm) dialog.onConfirm();
-                  else setDialog(null);
-                }}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
-              >
-                {profile?.country === 'FR' ? 'Confirmer' : 'OK'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        labels={{
+          notice: lang.notice,
+          cancel: lang.cancel,
+          confirmOk: lang.confirmOk
+        }}
+      />
     </main>
   );
 }

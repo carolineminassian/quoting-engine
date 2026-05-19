@@ -5,14 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
+import LoadingDots from '@/components/LoadingDots';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 function UpgradeContent() {
   const router = useRouter();
@@ -23,13 +17,24 @@ function UpgradeContent() {
   const [profile, setProfile] = useState<any>(null);
   const [lang, setLang] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
+  const [dialog, setDialog] = useState<{
+    type: 'alert';
+    title?: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
-    async function fetchData() {
+    let pollIntervalId: NodeJS.Timeout | null = null;
+    let redirectTimeoutId: NodeJS.Timeout | null = null;
+
+    async function fetchProfile() {
       const {
         data: { user }
       } = await supabase.auth.getUser();
-      if (!user) return router.push('/');
+      if (!user) {
+        router.push('/');
+        return null;
+      }
 
       const { data: prof } = await supabase
         .from('profiles')
@@ -41,9 +46,58 @@ function UpgradeContent() {
         setProfile(prof);
         setLang(prof.country === 'FR' ? translations.FR : translations.US);
       }
+      return prof;
     }
-    fetchData();
-  }, [router]);
+
+    async function init() {
+      const prof = await fetchProfile();
+
+      // Successful Stripe checkout return path
+      if (success && prof) {
+        // Notify navbar/footer to refresh
+        window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+        // If the webhook hasn't updated the profile yet, poll briefly
+        const isProAlready = prof.subscription_tier === 'pro';
+        const isCreditsBumped = (prof.estimate_credits || 0) > 0;
+
+        if (!isProAlready && !isCreditsBumped) {
+          // Poll every 1.5s for up to ~12s waiting for webhook to apply
+          let pollCount = 0;
+          pollIntervalId = setInterval(async () => {
+            pollCount++;
+            const updated = await fetchProfile();
+            const ready =
+              updated?.subscription_tier === 'pro' ||
+              (updated?.estimate_credits || 0) > 0;
+
+            if (ready || pollCount >= 8) {
+              if (pollIntervalId) clearInterval(pollIntervalId);
+              pollIntervalId = null;
+              window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+              // Auto-redirect to dashboard 3s after we confirm ready
+              redirectTimeoutId = setTimeout(() => {
+                router.push('/dashboard');
+              }, 3000);
+            }
+          }, 1500);
+        } else {
+          // Already updated — redirect to dashboard after 3s
+          redirectTimeoutId = setTimeout(() => {
+            router.push('/dashboard');
+          }, 3000);
+        }
+      }
+    }
+
+    init();
+
+    return () => {
+      if (pollIntervalId) clearInterval(pollIntervalId);
+      if (redirectTimeoutId) clearTimeout(redirectTimeoutId);
+    };
+  }, [router, success]);
 
   const handleCheckout = async (type: 'pro' | 'credits') => {
     setProcessing(true);
@@ -68,15 +122,20 @@ function UpgradeContent() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || 'Error');
+        setDialog({
+          type: 'alert',
+          message: data.error || lang.errorOccurred
+        });
         setProcessing(false);
       }
     } catch (err) {
-      alert('Connection error');
+      setDialog({
+        type: 'alert',
+        message: lang.connectionError
+      });
       setProcessing(false);
     }
   };
-
   const handleManageBilling = async () => {
     setProcessing(true);
     try {
@@ -107,16 +166,12 @@ function UpgradeContent() {
         {/* Feedback Banners */}
         {success && (
           <div className="mb-8 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-xs font-bold text-center">
-            {profile.country === 'FR'
-              ? 'Paiement réussi ! Bienvenue dans Pro.'
-              : 'Payment successful! Welcome to Pro.'}
+            {lang.paymentSuccessful}
           </div>
         )}
         {canceled && (
           <div className="mb-8 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-bold text-center">
-            {profile.country === 'FR'
-              ? 'Paiement annulé.'
-              : 'Payment canceled.'}
+            {lang.paymentCanceled}
           </div>
         )}
 
@@ -144,7 +199,7 @@ function UpgradeContent() {
             </div>
             <div className="text-right sm:text-center">
               <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">
-                Credits
+                {lang.creditsLabel}
               </p>
               <p className="text-sm font-black">
                 {profile.estimate_credits || 0}
@@ -235,6 +290,16 @@ function UpgradeContent() {
           </Link>
         </div>
       </div>
+
+      <ConfirmDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        labels={{
+          notice: lang.notice,
+          cancel: lang.cancel,
+          confirmOk: lang.confirmOk
+        }}
+      />
     </main>
   );
 }

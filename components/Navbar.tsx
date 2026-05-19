@@ -51,7 +51,7 @@ export default function Navbar() {
   const [session, setSession] = useState<any>(null);
   const [hasBusinessProfile, setHasBusinessProfile] = useState<boolean>(false);
 
-  // 1. Fetch Session & Profile Data
+  // 1. Fetch Session & Profile Data (re-runs on path change OR custom 'profileUpdated' event)
   useEffect(() => {
     async function fetchAuthAndLang() {
       const {
@@ -78,6 +78,13 @@ export default function Navbar() {
       }
     }
     fetchAuthAndLang();
+
+    // Listen for profile updates from anywhere in the app (e.g. profile page save)
+    const handleProfileUpdate = () => fetchAuthAndLang();
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
   }, [pathname]);
 
   // 2. Sync Tab Title and Favicon Using Translation File Schema
@@ -147,7 +154,7 @@ export default function Navbar() {
                     : 'text-gray-400 hover:text-gray-900'
                 }`}
               >
-                Clients
+                {lang.clientsNav}
               </Link>
               <Link
                 href="/analytics"
@@ -157,7 +164,7 @@ export default function Navbar() {
                     : 'text-gray-400 hover:text-gray-900'
                 }`}
               >
-                {country === 'FR' ? 'Analytique' : 'Analytics'}
+                {lang.analytics}
               </Link>
               <Link
                 href="/profile"
@@ -177,7 +184,7 @@ export default function Navbar() {
               onClick={handleSignOut}
               className="text-[10px] font-black uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
             >
-              {country === 'FR' ? 'Déconnexion' : 'Sign Out'}
+              {lang.signOut}
             </button>
           </div>
 
@@ -235,14 +242,14 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className={`py-4 ${pathname === '/clients' ? 'text-black' : ''}`}
             >
-              Clients
+              {lang.clientsNav}
             </Link>
             <Link
               href="/analytics"
               onClick={() => setMobileMenuOpen(false)}
               className={`py-4 ${pathname === '/analytics' ? 'text-black' : ''}`}
             >
-              {country === 'FR' ? 'Analytique' : 'Analytics'}
+              {lang.analytics}
             </Link>
             <Link
               href="/profile"
@@ -255,7 +262,7 @@ export default function Navbar() {
               onClick={handleSignOut}
               className="text-left text-red-500 py-4 mt-2 border-t border-gray-100"
             >
-              {country === 'FR' ? 'Déconnexion' : 'Sign Out'}
+              {lang.signOut}
             </button>
           </div>
         </div>

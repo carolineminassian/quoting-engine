@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { translations } from '@/lib/translations';
 
 export default function Footer() {
-  const [lang, setLang] = useState<'EN' | 'FR'>('EN');
+  const [lang, setLang] = useState<any>(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -23,33 +24,44 @@ export default function Footer() {
           .single();
 
         if (prof?.country) {
-          const dbLang = prof.country === 'FR' ? 'FR' : 'EN';
-          setTimeout(() => setLang(dbLang), 0);
-          localStorage.setItem('public_lang', dbLang);
+          const country = prof.country === 'FR' ? 'FR' : 'US';
+          setLang(country === 'FR' ? translations.FR : translations.US);
+          localStorage.setItem('public_lang', country);
           return;
         }
       }
 
-      // Fallback for logged-out users
+      // Fallback for logged-out users — read stored language preference
       const storedLang = localStorage.getItem('public_lang');
-      if (storedLang === 'FR') {
-        setTimeout(() => setLang('FR'), 0);
-      }
+      const country = storedLang === 'FR' ? 'FR' : 'US';
+      setLang(country === 'FR' ? translations.FR : translations.US);
     };
 
     syncLanguage();
 
-    const handleLangChange = () => {
-      const newLang = localStorage.getItem('public_lang');
-      if (newLang) setLang(newLang as 'EN' | 'FR');
-    };
+    // Listen for profile updates from anywhere in the app (e.g. profile page save)
+    const handleProfileUpdate = () => syncLanguage();
+    window.addEventListener('profileUpdated', handleProfileUpdate);
 
+    // Legacy event name still supported for logged-out language switches
+    const handleLangChange = () => {
+      const storedLang = localStorage.getItem('public_lang');
+      const country = storedLang === 'FR' ? 'FR' : 'US';
+      setLang(country === 'FR' ? translations.FR : translations.US);
+    };
     window.addEventListener('langChange', handleLangChange);
-    return () => window.removeEventListener('langChange', handleLangChange);
-  }, []);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+      window.removeEventListener('langChange', handleLangChange);
+    };
+  }, [pathname]);
 
   // Hide footer on the estimate view so it doesn't print on client PDFs
   if (pathname?.startsWith('/estimates/')) return null;
+
+  // Don't render until language is loaded (prevents English flash for FR users)
+  if (!lang) return null;
 
   return (
     <footer className="w-full py-6 flex justify-center gap-8 border-t border-gray-200 bg-white z-10 mt-auto">
@@ -57,13 +69,13 @@ export default function Footer() {
         href="/privacy"
         className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-colors"
       >
-        {lang === 'FR' ? 'Politique de Confidentialité' : 'Privacy Policy'}
+        {lang.privacyPolicy}
       </Link>
       <Link
         href="/terms"
         className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-colors"
       >
-        {lang === 'FR' ? 'Conditions Générales' : 'Terms of Service'}
+        {lang.termsOfService}
       </Link>
     </footer>
   );

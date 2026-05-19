@@ -43,10 +43,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Query the user's profile to extract subscription markers
+    // 2. Query the user's profile to extract Stripe identifiers
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('subscription_tier, stripe_subscription_id') // Adjust column names if different
+      .select('stripe_customer_id, stripe_subscription_id')
       .eq('id', user.id)
       .single();
 
@@ -57,17 +57,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. If the user is on the Pro plan and has a subscription ID, cancel it via Stripe
-    if (
-      profile?.subscription_tier === 'pro' &&
-      profile?.stripe_subscription_id
-    ) {
+    // 3. Delete the Stripe customer entirely (this also cancels all subscriptions
+    // and removes stored payment methods — required for GDPR compliance)
+    if (profile?.stripe_customer_id) {
       try {
-        // Cancel the subscription immediately
+        await stripe.customers.del(profile.stripe_customer_id);
+      } catch (stripeError: any) {
+        console.error('Stripe Customer Deletion Error:', stripeError);
+        // Don't block account deletion if customer is already gone on Stripe's side
+        if (stripeError.code !== 'resource_missing') {
+          return NextResponse.json(
+            { error: `Stripe cleanup failed: ${stripeError.message}` },
+            { status: 500 }
+          );
+        }
+      }
+    } else if (profile?.stripe_subscription_id) {
+      // Fallback: if we somehow have a subscription ID but no customer ID,
+      // at least cancel the subscription so they stop being billed
+      try {
         await stripe.subscriptions.cancel(profile.stripe_subscription_id);
       } catch (stripeError: any) {
-        console.error('Stripe Cancellation Error:', stripeError);
-        // We catch the error but don't block account deletion if the subscription is already dead on Stripe's end
+        console.error('Stripe Subscription Cancellation Error:', stripeError);
         if (stripeError.code !== 'resource_missing') {
           return NextResponse.json(
             { error: `Billing cancellation failed: ${stripeError.message}` },
@@ -84,8 +95,13 @@ export async function POST(request: Request) {
     );
 
     if (deleteError) {
+      console.error('User auth deletion failed:', deleteError);
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
+
+    console.log(
+      `Account fully deleted for user ${user.id} (Stripe customer: ${profile?.stripe_customer_id || 'none'})`
+    );
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err: any) {

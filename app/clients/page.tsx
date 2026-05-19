@@ -3,61 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
-
-const dict = {
-  EN: {
-    title: 'Client Roster',
-    subtitle: 'Manage and reference your saved client records.',
-    addBtn: 'Add New Client',
-    createEstimate: 'Create New Estimate',
-    edit: 'Edit Profile',
-    delete: 'Delete',
-    name: 'Client Name',
-    email: 'Email Address',
-    phone: 'Phone Number',
-    address: 'Billing Address',
-    cancel: 'Cancel',
-    save: 'Save Client',
-    confirmDelete:
-      'Are you sure you want to permanently delete this client? This action cannot be undone.',
-    noClients: 'No clients saved yet.',
-    notice: 'Notice'
-  },
-  FR: {
-    title: 'Répertoire Clients',
-    subtitle: 'Gerez et référencez les coordonnées de vos clients.',
-    addBtn: 'Ajouter un Client',
-    createEstimate: 'Créer un Devis',
-    edit: 'Modifier',
-    delete: 'Supprimer',
-    name: 'Nom du Client',
-    email: 'Adresse E-mail',
-    phone: 'Numéro de Téléphone',
-    address: 'Adresse de Facturation',
-    cancel: 'Annuler',
-    save: 'Enregistrer',
-    confirmDelete:
-      'Voulez-vous vraiment supprimer définitivement ce client ? Cette action est irréversible.',
-    noClients: 'Aucun client enregistré.',
-    notice: 'Notification'
-  }
-};
+import LoadingDots from '@/components/LoadingDots';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import { translations } from '@/lib/translations';
 
 export default function ClientsPage() {
   const router = useRouter();
-  const [lang, setLang] = useState<'EN' | 'FR'>('EN');
+  const [lang, setLang] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [dialog, setDialog] = useState<{
+    type?: 'alert' | 'confirm' | 'danger';
     title?: string;
     message: string;
     onConfirm: () => void;
@@ -75,11 +32,13 @@ export default function ClientsPage() {
         .select('country')
         .eq('id', session.user.id)
         .single();
-      if (prof?.country === 'FR') setLang('FR');
+
+      setLang(prof?.country === 'FR' ? translations.FR : translations.US);
 
       const { data: clientData } = await supabase
         .from('clients')
         .select('*')
+        .eq('user_id', session.user.id)
         .order('name');
       if (clientData) setClients(clientData);
 
@@ -90,12 +49,21 @@ export default function ClientsPage() {
 
   const triggerDeleteConfirm = (id: string) => {
     setDialog({
-      title: t.delete,
-      message: t.confirmDelete,
+      type: 'danger',
+      title: lang.delete,
+      message: lang.confirmDeleteClient,
       onConfirm: async () => {
         setDialog(null);
-        await supabase.from('clients').delete().eq('id', id);
-        setClients(clients.filter((c) => c.id !== id));
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) {
+          setDialog({
+            type: 'alert',
+            message: error.message,
+            onConfirm: () => setDialog(null)
+          });
+          return;
+        }
+        setClients((prev) => prev.filter((c) => c.id !== id));
       }
     });
   };
@@ -107,7 +75,7 @@ export default function ClientsPage() {
     } = await supabase.auth.getUser();
 
     if (editingClient.id) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('clients')
         .update({
           name: editingClient.name,
@@ -119,9 +87,19 @@ export default function ClientsPage() {
         .select()
         .single();
 
-      if (data) setClients(clients.map((c) => (c.id === data.id ? data : c)));
+      if (error) {
+        setDialog({
+          type: 'alert',
+          message: error.message,
+          onConfirm: () => setDialog(null)
+        });
+        return;
+      }
+      if (data) {
+        setClients((prev) => prev.map((c) => (c.id === data.id ? data : c)));
+      }
     } else {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('clients')
         .insert([
           {
@@ -135,17 +113,23 @@ export default function ClientsPage() {
         .select()
         .single();
 
-      if (data)
-        setClients(
-          [...clients, data].sort((a, b) => a.name.localeCompare(b.name))
+      if (error) {
+        setDialog({
+          type: 'alert',
+          message: error.message,
+          onConfirm: () => setDialog(null)
+        });
+        return;
+      }
+      if (data) {
+        setClients((prev) =>
+          [...prev, data].sort((a, b) => a.name.localeCompare(b.name))
         );
+      }
     }
     setEditingClient(null);
   };
-
-  const t = dict[lang];
-
-  if (loading) return <LoadingDots />;
+  if (loading || !lang) return <LoadingDots />;
 
   return (
     <main className="min-h-screen bg-gray-50 p-6 sm:p-12 pb-40 text-black font-sans">
@@ -154,10 +138,10 @@ export default function ClientsPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-12 border-b border-gray-100 pb-8">
           <div>
             <h1 className="text-4xl font-black uppercase tracking-tighter italic leading-none mb-2">
-              {t.title}
+              {lang.clientRoster}
             </h1>
             <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
-              {t.subtitle}
+              {lang.clientRosterSubtitle}
             </p>
           </div>
           <button
@@ -177,14 +161,14 @@ export default function ClientsPage() {
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
-            <span>{t.addBtn}</span>
+            <span>{lang.addNewClient}</span>
           </button>
         </div>
 
         {/* Client Listing Grid */}
         {clients.length === 0 ? (
           <div className="bg-white p-16 text-center rounded-2xl border border-gray-200/60 text-gray-400 font-black uppercase tracking-widest text-xs shadow-sm">
-            {t.noClients}
+            {lang.noClientsSaved}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -202,7 +186,7 @@ export default function ClientsPage() {
                     {c.email && (
                       <div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 block mb-0.5">
-                          {t.email}
+                          {lang.email}
                         </span>
                         <p className="text-sm font-bold text-gray-600 truncate">
                           {c.email}
@@ -212,7 +196,7 @@ export default function ClientsPage() {
                     {c.phone && (
                       <div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 block mb-0.5">
-                          {t.phone}
+                          {lang.phone}
                         </span>
                         <p className="text-sm font-bold text-gray-600 font-mono">
                           {c.phone}
@@ -222,7 +206,7 @@ export default function ClientsPage() {
                     {c.address && (
                       <div className="pt-4 border-t border-gray-50">
                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 block mb-1">
-                          {t.address}
+                          {lang.billingAddress}
                         </span>
                         <p className="text-xs font-bold text-gray-500 leading-relaxed whitespace-pre-wrap">
                           {c.address}
@@ -240,7 +224,7 @@ export default function ClientsPage() {
                     }
                     className="w-full flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-blue-200 group/btn"
                   >
-                    <span>{t.createEstimate}</span>
+                    <span>{lang.createNewEstimate}</span>
                     <svg
                       className="w-3.5 h-3.5 transform transition-transform duration-200 group-hover/btn:translate-x-0.5 stroke-[2.5]"
                       viewBox="0 0 24 24"
@@ -258,13 +242,13 @@ export default function ClientsPage() {
                       onClick={() => setEditingClient(c)}
                       className="flex-1 flex items-center justify-center bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200"
                     >
-                      {t.edit}
+                      {lang.editProfile}
                     </button>
                     <button
                       onClick={() => triggerDeleteConfirm(c.id)}
                       className="flex-1 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200"
                     >
-                      {t.delete}
+                      {lang.delete}
                     </button>
                   </div>
                 </div>
@@ -279,12 +263,12 @@ export default function ClientsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-100">
             <h3 className="text-2xl font-black uppercase tracking-tighter mb-6">
-              {editingClient.id ? t.edit : t.addBtn}
+              {editingClient.id ? lang.editProfile : lang.addNewClient}
             </h3>
             <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
-                  {t.name}
+                  {lang.clientNameLabel}
                 </label>
                 <input
                   required
@@ -298,7 +282,7 @@ export default function ClientsPage() {
 
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
-                  {t.email}
+                  {lang.email}
                 </label>
                 <input
                   type="email"
@@ -315,7 +299,7 @@ export default function ClientsPage() {
 
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
-                  {t.phone}
+                  {lang.phone}
                 </label>
                 <input
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors shadow-inner bg-gray-50/30"
@@ -331,7 +315,7 @@ export default function ClientsPage() {
 
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
-                  {t.address}
+                  {lang.billingAddress}
                 </label>
                 <textarea
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors h-24 resize-none shadow-inner bg-gray-50/30"
@@ -351,13 +335,13 @@ export default function ClientsPage() {
                   onClick={() => setEditingClient(null)}
                   className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 hover:text-gray-700 transition-all duration-200"
                 >
-                  {t.cancel}
+                  {lang.cancel}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-blue-700 transition-all duration-200 active:scale-95"
                 >
-                  {t.save}
+                  {lang.saveClient}
                 </button>
               </div>
             </form>
@@ -366,32 +350,16 @@ export default function ClientsPage() {
       )}
 
       {/* Native In-App Confirmation Modal System */}
-      {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
-            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-red-600">
-              {dialog.title || t.notice}
-            </h3>
-            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
-              {dialog.message}
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setDialog(null)}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 hover:text-gray-700 rounded-md transition-all duration-200 border border-gray-200"
-              >
-                {t.cancel}
-              </button>
-              <button
-                onClick={dialog.onConfirm}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white rounded-md shadow-sm hover:bg-red-700 transition-all duration-200"
-              >
-                {t.delete}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        labels={{
+          notice: lang.notice,
+          cancel: lang.cancel,
+          confirmOk: lang.confirmOk,
+          deletePermanently: lang.delete
+        }}
+      />
     </main>
   );
 }

@@ -3,8 +3,10 @@
 import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { translations } from '@/lib/translations';
+import { translations, t } from '@/lib/translations';
 import Link from 'next/link';
+import LoadingDots from '@/components/LoadingDots';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import {
   Listbox,
   ListboxButton,
@@ -12,14 +14,6 @@ import {
   ListboxOption,
   Transition
 } from '@headlessui/react';
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -102,6 +96,7 @@ export default function ProfilePage() {
     } = await supabase.auth.getUser();
     let finalLogoUrl = profile.logo_url;
 
+    // Step 1: Upload logo if a new file was selected
     if (selectedFile && user) {
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${user.id}.${fileExt}`;
@@ -110,17 +105,25 @@ export default function ProfilePage() {
         .from('logos')
         .upload(fileName, selectedFile, { upsert: true });
 
-      if (!uploadError) {
-        const { data: publicUrlData } = supabase.storage
-          .from('logos')
-          .getPublicUrl(fileName);
-        finalLogoUrl = publicUrlData.publicUrl;
+      if (uploadError) {
+        setSavingProfile(false);
+        setDialog({
+          type: 'alert',
+          message: uploadError.message
+        });
+        return;
       }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('logos')
+        .getPublicUrl(fileName);
+      finalLogoUrl = publicUrlData.publicUrl;
     }
 
+    // Step 2: Update profile fields
     const currency = country === 'FR' ? 'EUR' : 'USD';
 
-    await supabase
+    const { error: profileUpdateError } = await supabase
       .from('profiles')
       .update({
         business_name: businessName,
@@ -135,28 +138,43 @@ export default function ProfilePage() {
       })
       .eq('id', profile.id);
 
+    setSavingProfile(false);
+
+    if (profileUpdateError) {
+      setDialog({
+        type: 'alert',
+        message: profileUpdateError.message
+      });
+      return;
+    }
+
+    // Step 3: Update local state on success
     setProfile((prev: any) => ({
       ...prev,
       country: country,
-      currency: currency
+      currency: currency,
+      logo_url: finalLogoUrl,
+      business_name: businessName,
+      default_tax_rate: taxRate,
+      default_hourly_rate: hourlyRate,
+      default_daily_rate: dailyRate,
+      default_deposit_enabled: depositEnabled,
+      default_deposit_percentage: depositPercentage
     }));
     setLang(country === 'FR' ? translations.FR : translations.US);
-    localStorage.setItem('public_lang', country === 'FR' ? 'FR' : 'EN');
-    setSavingProfile(false);
+    localStorage.setItem('public_lang', country === 'FR' ? 'FR' : 'US');
+
+    // Notify navbar (and any other listening component) that the profile changed
+    window.dispatchEvent(new CustomEvent('profileUpdated'));
 
     setDialog({
       type: 'alert',
-      message:
-        country === 'FR'
-          ? 'Paramètres du profil mis à jour.'
-          : 'Profile settings updated.',
+      message: lang.profileUpdated,
       onConfirm: () => {
         setDialog(null);
-        window.location.reload();
       }
     });
   };
-
   const handleSaveSecurity = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingSecurity(true);
@@ -173,12 +191,11 @@ export default function ProfilePage() {
       setDialog({ type: 'alert', message: error.message });
     } else {
       setNewPassword('');
+      // Notify navbar/footer in case email or auth-related UI needs to refresh
+      window.dispatchEvent(new CustomEvent('profileUpdated'));
       setDialog({
         type: 'alert',
-        message:
-          country === 'FR'
-            ? 'Sécurité mise à jour. Si vous avez modifié votre email, veuillez vérifier votre boîte de réception pour le lien de confirmation.'
-            : 'Security updated. If you changed your email, please check your inbox to verify the change.'
+        message: lang.securityUpdated
       });
     }
   };
@@ -186,17 +203,132 @@ export default function ProfilePage() {
   const handleCancelSubClick = () => {
     setDialog({
       type: 'confirm',
-      message:
-        profile?.country === 'FR'
-          ? 'Annuler votre abonnement Pro ?'
-          : 'Cancel your Pro subscription?',
+      message: lang.cancelSubConfirm,
       onConfirm: async () => {
         setDialog(null);
-        await supabase
-          .from('profiles')
-          .update({ subscription_tier: 'free' })
-          .eq('id', profile.id);
-        location.reload();
+
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+
+          if (!session) {
+            setDialog({
+              type: 'alert',
+              message: lang.sessionExpired
+            });
+            return;
+          }
+
+          const response = await fetch('/api/cancel-subscription', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            setDialog({
+              type: 'alert',
+              message: result.error || lang.cancelSubFailed
+            });
+            return;
+          }
+
+          // Update local state with the cancellation date — KEEP subscription_tier as 'pro'
+          // because the user retains Pro access until the period actually ends
+          const cancelAt = result.cancelAt
+            ? new Date(result.cancelAt * 1000).toISOString()
+            : null;
+
+          setProfile((prev: any) =>
+            prev ? { ...prev, subscription_cancel_at: cancelAt } : prev
+          );
+
+          // Notify other components in case they show cancellation status
+          window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+          // Format the period-end date for the user's locale
+          const formattedDate = cancelAt
+            ? new Date(cancelAt).toLocaleDateString(
+                country === 'FR' ? 'fr-FR' : 'en-US',
+                { year: 'numeric', month: 'long', day: 'numeric' }
+              )
+            : '';
+
+          setDialog({
+            type: 'alert',
+            message: result.alreadyCanceled
+              ? lang.subAlreadyCanceled
+              : t(lang.cancellationScheduled, { date: formattedDate })
+          });
+        } catch (err: any) {
+          setDialog({
+            type: 'alert',
+            message: lang.connectionError
+          });
+        }
+      }
+    });
+  };
+
+  const handleResumeSubClick = () => {
+    setDialog({
+      type: 'confirm',
+      message: lang.resumeSubConfirm,
+      onConfirm: async () => {
+        setDialog(null);
+
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+
+          if (!session) {
+            setDialog({
+              type: 'alert',
+              message: lang.sessionExpired
+            });
+            return;
+          }
+
+          const response = await fetch('/api/resume-subscription', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            setDialog({
+              type: 'alert',
+              message: result.error || lang.resumeSubFailed
+            });
+            return;
+          }
+
+          setProfile((prev: any) =>
+            prev ? { ...prev, subscription_cancel_at: null } : prev
+          );
+
+          window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+          setDialog({
+            type: 'alert',
+            message: lang.subResumed
+          });
+        } catch (err: any) {
+          setDialog({
+            type: 'alert',
+            message: lang.connectionError
+          });
+        }
       }
     });
   };
@@ -229,13 +361,14 @@ export default function ProfilePage() {
 
       await supabase.auth.signOut();
       localStorage.clear();
+      window.dispatchEvent(new CustomEvent('profileUpdated'));
       router.push('/');
       router.refresh();
     } catch (err: any) {
       setProcessingDelete(false);
       setDialog({
         type: 'alert',
-        title: country === 'FR' ? 'Erreur' : 'Error',
+        title: lang.error,
         message: err.message || 'An unexpected connectivity error occurred.'
       });
     }
@@ -244,11 +377,8 @@ export default function ProfilePage() {
   const triggerDeleteAccountFlow = () => {
     setDialog({
       type: 'danger',
-      title: country === 'FR' ? 'Suppression Définitive' : 'Permanent Deletion',
-      message:
-        country === 'FR'
-          ? 'Attention: Cette action est irréversible. Toutes vos données d’entreprise, listes de prix de matériaux, répertoire clients et devis archivés seront définitivement effacés conformément à la politique RGPD. Confirmer la suppression ?'
-          : 'Warning: This action cannot be undone. All your business parameters, material rosters, master price lists, client profiles, and historical finalized estimates will be purged permanently. Confirm account erasure?',
+      title: lang.permanentDeletion,
+      message: lang.deleteAccountConfirm,
       onConfirm: executeAccountDeletion
     });
   };
@@ -265,7 +395,7 @@ export default function ProfilePage() {
         <div className="flex justify-between items-end mb-12 border-b border-gray-100 pb-6">
           <div>
             <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none mb-2">
-              {lang.settings || 'Settings'}
+              {lang.settings || lang.profileSettings}
             </h1>
             {/* <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
               {profile?.country === 'FR'
@@ -284,9 +414,7 @@ export default function ProfilePage() {
         {/* BUSINESS PROFILE SECTION */}
         <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
           <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-50 pb-3">
-            {profile?.country === 'FR'
-              ? "Profil de l'entreprise"
-              : 'Business Profile'}
+            {lang.businessProfile}
           </p>
 
           <form onSubmit={handleSaveProfile} className="space-y-6">
@@ -305,7 +433,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                  {country === 'FR' ? 'Marché Principal' : 'Primary Market'}
+                  {lang.primaryMarket}
                 </label>
                 <Listbox
                   value={country}
@@ -388,9 +516,7 @@ export default function ProfilePage() {
 
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                  {country === 'FR'
-                    ? 'Taux Horaire (Défaut)'
-                    : 'Default Hourly Rate'}
+                  {lang.defaultHourlyRate}
                 </label>
                 <div className="relative">
                   <input
@@ -413,9 +539,7 @@ export default function ProfilePage() {
 
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                  {country === 'FR'
-                    ? 'Taux Journalier (Défaut)'
-                    : 'Default Daily Rate'}
+                  {lang.defaultDailyRate}
                 </label>
                 <div className="relative">
                   <input
@@ -438,9 +562,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
               <div className="flex flex-col justify-center">
                 <span className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                  {country === 'FR'
-                    ? 'Acompte Automatique (Défaut)'
-                    : 'Default Down Payment'}
+                  {lang.defaultDownPayment}
                 </span>
                 <div className="flex items-center gap-3 h-full pt-1">
                   <button
@@ -453,22 +575,14 @@ export default function ProfilePage() {
                     />
                   </button>
                   <span className="text-xs font-black text-gray-700 uppercase tracking-wider select-none">
-                    {depositEnabled
-                      ? country === 'FR'
-                        ? 'Activé'
-                        : 'Enabled'
-                      : country === 'FR'
-                        ? 'Désactivé'
-                        : 'Disabled'}
+                    {depositEnabled ? lang.enabled : lang.disabled}
                   </span>
                 </div>
               </div>
 
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                  {country === 'FR'
-                    ? "Pourcentage d'acompte (%)"
-                    : 'Deposit Percentage (%)'}
+                  {lang.depositPercentage}
                 </label>
                 <div className="relative">
                   <input
@@ -545,13 +659,13 @@ export default function ProfilePage() {
         {/* ACCOUNT SECURITY SECTION */}
         <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
           <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-50 pb-3">
-            {country === 'FR' ? 'Sécurité du compte' : 'Account Security'}
+            {lang.accountSecurity}
           </p>
 
           <form onSubmit={handleSaveSecurity} className="space-y-6">
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                {country === 'FR' ? 'Adresse E-mail' : 'Email Address'}
+                {lang.emailAddressLabel}
               </label>
               <input
                 type="email"
@@ -564,7 +678,7 @@ export default function ProfilePage() {
 
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                {country === 'FR' ? 'Nouveau Mot de Passe' : 'New Password'}
+                {lang.newPasswordLabel}
               </label>
               <input
                 type="password"
@@ -574,9 +688,7 @@ export default function ProfilePage() {
                 onChange={(e) => setNewPassword(e.target.value)}
               />
               <p className="text-[11px] font-bold text-gray-400 mt-2">
-                {country === 'FR'
-                  ? 'Laissez vide pour conserver votre mot de passe actuel.'
-                  : 'Leave blank to keep your current password.'}
+                {lang.keepCurrentPassword}
               </p>
             </div>
 
@@ -585,11 +697,7 @@ export default function ProfilePage() {
               disabled={savingSecurity}
               className="bg-gray-100 text-gray-700 border border-gray-200 px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-transform active:scale-95"
             >
-              {savingSecurity
-                ? '...'
-                : country === 'FR'
-                  ? 'Mettre à jour la sécurité'
-                  : 'Update Security'}
+              {savingSecurity ? '...' : lang.updateSecurity}
             </button>
           </form>
         </div>
@@ -608,7 +716,22 @@ export default function ProfilePage() {
               </p>
               {isFreePlan && profile?.estimate_credits > 0 && (
                 <p className="text-xs font-black uppercase font-mono text-blue-600 tracking-wider mt-1.5">
-                  {profile.estimate_credits} Credits remaining
+                  {t(lang.creditsRemaining, {
+                    count: profile.estimate_credits
+                  })}
+                </p>
+              )}
+              {!isFreePlan && profile?.subscription_cancel_at && (
+                <p className="text-xs font-black uppercase font-mono text-orange-500 tracking-wider mt-1.5">
+                  {t(lang.cancellationScheduledFor, {
+                    date: new Date(
+                      profile.subscription_cancel_at
+                    ).toLocaleDateString(country === 'FR' ? 'fr-FR' : 'en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })
+                  })}
                 </p>
               )}
             </div>
@@ -620,6 +743,13 @@ export default function ProfilePage() {
                 >
                   {lang.upgradeToPro || 'Upgrade to Pro'}
                 </Link>
+              ) : profile?.subscription_cancel_at ? (
+                <button
+                  onClick={handleResumeSubClick}
+                  className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:text-blue-800 transition-colors"
+                >
+                  {lang.resumeSubscription}
+                </button>
               ) : (
                 <button
                   onClick={handleCancelSubClick}
@@ -634,18 +764,16 @@ export default function ProfilePage() {
 
         {/* COMPLIANCE DANGER ZONE - ACCOUNT ERASURE BLOCK */}
         <div className="bg-red-50/10 p-6 sm:p-8 rounded-2xl border border-red-200/60">
-          <p className="text-[10px] font-black uppercase text-red-500/80 mb-4 tracking-[0.2em] border-b border-red-100/40 playbook pb-3">
-            {country === 'FR' ? 'Zone de Danger' : 'Danger Zone'}
+          <p className="text-[10px] font-black uppercase text-red-500/80 mb-4 tracking-[0.2em] border-b border-red-100/40 pb-3">
+            {lang.dangerZone}
           </p>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
             <div className="max-w-md">
               <p className="font-black text-base text-gray-900 tracking-tight uppercase mb-1">
-                {country === 'FR' ? 'Supprimer le compte' : 'Delete Account'}
+                {lang.deleteAccount}
               </p>
               <p className="text-xs text-gray-400 font-bold leading-relaxed">
-                {country === 'FR'
-                  ? 'Supprimez définitivement votre profil, tous les devis archivés, listes de prix et données clients. Cette opération est immédiate et irréversible.'
-                  : 'Permanently eliminate your account authentication profile, all historical estimates, materials, and clients records.'}
+                {lang.deleteAccountDesc}
               </p>
             </div>
             <button
@@ -653,61 +781,23 @@ export default function ProfilePage() {
               disabled={processingDelete}
               className="w-full sm:w-auto text-center bg-red-600 text-white px-6 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-red-700 transition-colors shrink-0 disabled:opacity-40"
             >
-              {processingDelete
-                ? '...'
-                : country === 'FR'
-                  ? 'Supprimer le compte'
-                  : 'Delete Account'}
+              {processingDelete ? '...' : lang.deleteAccount}
             </button>
           </div>
         </div>
       </div>
 
       {/* Dialog Overlay Component Wrapper */}
-      {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
-            <h3
-              className={`text-sm font-black uppercase tracking-widest mb-3 ${dialog.type === 'danger' ? 'text-red-600' : 'text-gray-900'}`}
-            >
-              {dialog.title ||
-                (profile?.country === 'FR' ? 'Notification' : 'Notice')}
-            </h3>
-            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
-              {dialog.message}
-            </p>
-            <div className="flex gap-2 justify-end">
-              {(dialog.type === 'confirm' || dialog.type === 'danger') && (
-                <button
-                  onClick={() => setDialog(null)}
-                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
-                >
-                  {profile?.country === 'FR' ? 'Annuler' : 'Cancel'}
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (dialog.onConfirm) dialog.onConfirm();
-                  else setDialog(null);
-                }}
-                className={`px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-white rounded-lg shadow-sm transition-colors ${
-                  dialog.type === 'danger'
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {dialog.type === 'danger'
-                  ? profile?.country === 'FR'
-                    ? 'Supprimer Définitivement'
-                    : 'Delete Permanently'
-                  : profile?.country === 'FR'
-                    ? 'Confirmer'
-                    : 'OK'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        labels={{
+          notice: lang.notice,
+          cancel: lang.cancel,
+          confirmOk: lang.confirmOk,
+          deletePermanently: lang.deletePermanently
+        }}
+      />
     </main>
   );
 }

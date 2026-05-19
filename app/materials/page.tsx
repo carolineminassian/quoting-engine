@@ -4,6 +4,8 @@ import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
+import LoadingDots from '@/components/LoadingDots';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import {
   Listbox,
   ListboxButton,
@@ -11,14 +13,6 @@ import {
   ListboxOption,
   Transition
 } from '@headlessui/react';
-
-const LoadingDots = () => (
-  <div className="flex items-center justify-center space-x-2 p-12 mt-20">
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-  </div>
-);
 
 export default function MaterialsPage() {
   const [materials, setMaterials] = useState<any[]>([]);
@@ -43,52 +37,42 @@ export default function MaterialsPage() {
   const [editUnit, setEditUnit] = useState('');
 
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    async function fetchInitialData() {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
-  async function fetchInitialData() {
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+      // Fetch profile and materials in parallel
+      const [profRes, matsRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase
+          .from('materials')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name', { ascending: true })
+      ]);
 
-    if (prof) {
-      setProfile(prof);
-      setLang(prof.country === 'FR' ? translations.FR : translations.US);
+      if (profRes.data) {
+        setProfile(profRes.data);
+        setLang(
+          profRes.data.country === 'FR' ? translations.FR : translations.US
+        );
+      }
+
+      setMaterials(matsRes.data || []);
+      setLoading(false);
     }
 
-    await fetchMaterials();
-    setLoading(false);
-  }
-
-  async function fetchMaterials() {
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-
-    const { data } = await supabase
-      .from('materials')
-      .select('*')
-      .eq('user_id', user?.id)
-      .order('name', { ascending: true });
-
-    setMaterials(data || []);
-  }
+    fetchInitialData();
+  }, []);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUnit) {
       setDialog({
         type: 'alert',
-        message:
-          profile?.country === 'FR'
-            ? 'Veuillez choisir une unité.'
-            : 'Please select a unit.'
+        message: lang.selectUnitError
       });
       return;
     }
@@ -96,20 +80,35 @@ export default function MaterialsPage() {
     const {
       data: { user }
     } = await supabase.auth.getUser();
-    const { error } = await supabase.from('materials').insert([
-      {
-        user_id: user?.id,
-        name: newName,
-        unit: newUnit,
-        cost_per_unit_cents: Math.max(0, Math.round(parseFloat(newPrice) * 100))
-      }
-    ]);
 
-    if (!error) {
+    const { data, error } = await supabase
+      .from('materials')
+      .insert([
+        {
+          user_id: user?.id,
+          name: newName,
+          unit: newUnit,
+          cost_per_unit_cents: Math.max(
+            0,
+            Math.round(parseFloat(newPrice) * 100)
+          )
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      setDialog({ type: 'alert', message: error.message });
+      return;
+    }
+
+    if (data) {
+      setMaterials((prev) =>
+        [...prev, data].sort((a, b) => a.name.localeCompare(b.name))
+      );
       setNewName('');
       setNewPrice('');
       setNewUnit('');
-      fetchMaterials();
     }
   };
 
@@ -117,14 +116,12 @@ export default function MaterialsPage() {
     if (!editUnit) {
       setDialog({
         type: 'alert',
-        message:
-          profile?.country === 'FR'
-            ? 'Veuillez choisir une unité.'
-            : 'Please select a unit.'
+        message: lang.selectUnitError
       });
       return;
     }
-    const { error } = await supabase
+
+    const { data, error } = await supabase
       .from('materials')
       .update({
         name: editName,
@@ -134,29 +131,45 @@ export default function MaterialsPage() {
           Math.round(parseFloat(editPrice) * 100)
         )
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select()
+      .single();
 
-    if (!error) {
+    if (error) {
+      setDialog({ type: 'alert', message: error.message });
+      return;
+    }
+
+    if (data) {
+      setMaterials((prev) =>
+        prev
+          .map((m) => (m.id === data.id ? data : m))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
       setEditingId(null);
-      fetchMaterials();
     }
   };
 
   const handleDelete = (id: string) => {
     setDialog({
       type: 'confirm',
-      message:
-        profile?.country === 'FR'
-          ? 'Supprimer cet article ?'
-          : 'Delete this item?',
+      message: lang.deleteItemConfirm,
       onConfirm: async () => {
         setDialog(null);
-        await supabase.from('materials').delete().eq('id', id);
-        fetchMaterials();
+        const { error } = await supabase
+          .from('materials')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          setDialog({ type: 'alert', message: error.message });
+          return;
+        }
+
+        setMaterials((prev) => prev.filter((m) => m.id !== id));
       }
     });
   };
-
   if (loading) return <LoadingDots />;
 
   const currencySymbol = profile?.currency === 'EUR' ? '€' : '$';
@@ -515,38 +528,15 @@ export default function MaterialsPage() {
       </div>
 
       {/* SYNC INTERCEPTOR CONTEXT SYSTEM DIALOG */}
-      {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
-            <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
-              {dialog.title ||
-                (profile?.country === 'FR' ? 'Notification' : 'Notice')}
-            </h3>
-            <p className="text-xs text-gray-500 font-bold mb-6 leading-relaxed">
-              {dialog.message}
-            </p>
-            <div className="flex gap-2 justify-end">
-              {dialog.type === 'confirm' && (
-                <button
-                  onClick={() => setDialog(null)}
-                  className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 hover:text-gray-700 rounded-md transition-all duration-200 border border-gray-200 cursor-pointer"
-                >
-                  {lang.cancel}
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (dialog.onConfirm) dialog.onConfirm();
-                  else setDialog(null);
-                }}
-                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition-all duration-200 cursor-pointer"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        labels={{
+          notice: lang.notice,
+          cancel: lang.cancel,
+          confirmOk: lang.confirmOk
+        }}
+      />
     </main>
   );
 }
