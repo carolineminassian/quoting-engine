@@ -223,6 +223,7 @@ interface EstimatePDFProps {
   taxGroups: [string, number][];
   grandTotal: number;
   sections: any[];
+  // materials: any[];
 }
 
 export default function EstimatePDF({

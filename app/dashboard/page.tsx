@@ -257,7 +257,7 @@ export default function DashboardPage() {
               show_details_snapshot: isDetailsEnabled,
               sections: preparedSections
             }}
-            materials={materials}
+            // materials={materials}
             profile={{
               ...profile,
               country,
