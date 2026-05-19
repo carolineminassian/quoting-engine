@@ -236,8 +236,15 @@ export default function DashboardPage() {
     });
   };
 
+  const query = searchQuery.toLowerCase();
   const processedEstimates = [...estimates]
     .filter((est) => {
+      // Combined status + search filter in single pass
+      const matchesSearch = (est.client_name || '')
+        .toLowerCase()
+        .includes(query);
+      if (!matchesSearch) return false;
+
       if (filterStatus === 'draft') return !est.is_locked;
       if (filterStatus === 'pending')
         return (
@@ -250,9 +257,6 @@ export default function DashboardPage() {
         return est.is_locked && est.client_status === 'rejected';
       return true;
     })
-    .filter((est) =>
-      (est.client_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-    )
     .sort((a, b) => {
       if (sortBy === 'date_desc')
         return (

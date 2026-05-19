@@ -7,8 +7,7 @@ import { useRouter } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import {
   getRawLaborRateCents,
-  getRawItemCostCents,
-  buildMaterialsMap
+  getRawItemCostCents
 } from '@/lib/estimateCalculations';
 import LoadingDots from '@/components/LoadingDots';
 import {
