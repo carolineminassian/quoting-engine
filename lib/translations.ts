@@ -76,6 +76,7 @@ export const translations = {
       '✓ Unlimited Estimates',
       '✓ Custom Company Logo',
       '✓ Excel Data Export',
+      '✓ Bulk PDF Download (ZIP)',
       '✓ Full Analytics Dashboard',
       '✓ Priority Support'
     ],
@@ -85,6 +86,7 @@ export const translations = {
       '✓ Credits never expire',
       '✗ No Custom Logo',
       '✗ No Excel Export',
+      '✗ No Bulk PDF Download',
       '✗ No Analytics Dashboard'
     ],
     tabTitle: 'PactEstim | Professional Estimate Software',
@@ -469,6 +471,7 @@ export const translations = {
       '✓ Devis Illimités',
       "✓ Logo d'Entreprise Personnalisé",
       '✓ Exportation de Données Excel',
+      '✓ Téléchargement PDF Groupé (ZIP)',
       '✓ Tableau de bord Analytique complet',
       '✓ Support Prioritaire'
     ],
@@ -478,6 +481,7 @@ export const translations = {
       "✓ Les crédits n'expirent jamais",
       '✗ Pas de Logo Personnalisé',
       "✗ Pas d'Exportation Excel",
+      '✗ Pas de Téléchargement PDF Groupé',
       '✗ Pas de Tableau de Bord Analytique'
     ],
     tabTitle: 'PactEstim | Logiciel de Devis Professionnel',

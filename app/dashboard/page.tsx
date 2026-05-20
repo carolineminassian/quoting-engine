@@ -665,25 +665,10 @@ export default function DashboardPage() {
                     setProLockModal('csv');
                   }
                 }}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-center px-5 border border-green-200 bg-green-50/60 text-green-700 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-green-100/70 transition-colors cursor-pointer"
+                className="flex-1 sm:flex-none flex items-center justify-center text-center px-5 border border-green-200 bg-green-50/60 text-green-700 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-green-100/70 transition-colors cursor-pointer"
                 style={{ height: '31px' }}
               >
                 Excel (CSV)
-                {profile.subscription_tier !== 'pro' && (
-                  <svg
-                    className="w-3 h-3 text-green-600/70"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-                    />
-                  </svg>
-                )}
               </button>
 
               <button
@@ -698,35 +683,19 @@ export default function DashboardPage() {
                 className="flex-1 sm:flex-none bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-40 font-black uppercase tracking-widest text-[10px] px-5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                 style={{ height: '31px' }}
               >
-                {profile.subscription_tier === 'pro' ? (
-                  <svg
-                    className="w-3.5 h-3.5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-3.5 h-3.5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-                    />
-                  </svg>
-                )}
+                <svg
+                  className="w-3.5 h-3.5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                  />
+                </svg>
                 {isZipping
                   ? lang.archiving
                   : t(lang.downloadPdfsZip, {
