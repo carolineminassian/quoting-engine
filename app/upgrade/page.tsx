@@ -174,8 +174,28 @@ function UpgradeContent() {
         )}
 
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">
-            {lang.upgradeTitle}
+          <h1 className="text-5xl uppercase tracking-tighter mb-4">
+            {/* Match navbar branding: "Pact" in black, "Estim" in light blue */}
+            {(() => {
+              const title = lang.upgradeTitle || 'Upgrade PactEstim';
+              // Find the "PactEstim" word and split it for two-tone styling
+              const parts = title.split(/(PactEstim)/i);
+              return parts.map((part, i) => {
+                if (part.toLowerCase() === 'pactestim') {
+                  return (
+                    <span key={i} className="font-sans antialiased">
+                      <span className="font-black text-gray-900">Pact</span>
+                      <span className="font-light text-blue-600">Estim</span>
+                    </span>
+                  );
+                }
+                return (
+                  <span key={i} className="font-black text-gray-900">
+                    {part}
+                  </span>
+                );
+              });
+            })()}
           </h1>
           <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
             {lang.upgradeSubtitle}
