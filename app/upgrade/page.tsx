@@ -100,23 +100,18 @@ function UpgradeContent() {
   }, [router, success]);
 
   const handleCheckout = async (type: 'pro' | 'credits') => {
-    setProcessing(true);
-    const priceId =
-      type === 'pro'
-        ? 'price_1TW2dOQOMlHkT3tX4YL6Pn2C'
-        : 'price_1TW2aHQOMlHkT3tXV1ITlTHt';
+  setProcessing(true);
 
-    try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceId: priceId,
-          userId: profile.id,
-          type: type,
-          currency: profile.currency
-        })
-      });
+  try {
+    const res = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: profile.id,
+        type: type,
+        currency: profile.currency
+      })
+    });
 
       const data = await res.json();
       if (data.url) {
