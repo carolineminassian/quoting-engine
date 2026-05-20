@@ -180,7 +180,7 @@ function UpgradeContent() {
               const title = lang.upgradeTitle || 'Upgrade PactEstim';
               // Find the "PactEstim" word and split it for two-tone styling
               const parts = title.split(/(PactEstim)/i);
-              return parts.map((part, i) => {
+              return parts.map((part: string, i: number) => {
                 if (part.toLowerCase() === 'pactestim') {
                   return (
                     <span key={i} className="font-sans antialiased">
