@@ -333,6 +333,123 @@ export default function ProfilePage() {
     });
   };
 
+  const handleSwitchToAnnualClick = () => {
+    setDialog({
+      type: 'confirm',
+      message: lang.upgradeToAnnualConfirm,
+      onConfirm: async () => {
+        setDialog(null);
+
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+
+          if (!session) {
+            setDialog({
+              type: 'alert',
+              message: lang.sessionExpired
+            });
+            return;
+          }
+
+          const response = await fetch('/api/switch-to-annual', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            setDialog({
+              type: 'alert',
+              message: result.error || lang.upgradeToAnnualFailed
+            });
+            return;
+          }
+
+          // Update local state to show "Switching to annual" status
+          setProfile((prev: any) =>
+            prev ? { ...prev, pending_plan_switch: 'annual' } : prev
+          );
+
+          window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+          setDialog({
+            type: 'alert',
+            message: lang.upgradeToAnnualSuccess
+          });
+        } catch (err: any) {
+          setDialog({
+            type: 'alert',
+            message: lang.connectionError
+          });
+        }
+      }
+    });
+  };
+
+  const handleCancelAnnualSwitchClick = () => {
+    setDialog({
+      type: 'confirm',
+      message: lang.cancelAnnualSwitchConfirm,
+      onConfirm: async () => {
+        setDialog(null);
+
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+
+          if (!session) {
+            setDialog({
+              type: 'alert',
+              message: lang.sessionExpired
+            });
+            return;
+          }
+
+          const response = await fetch('/api/cancel-annual-switch', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            setDialog({
+              type: 'alert',
+              message: result.error || lang.upgradeToAnnualFailed
+            });
+            return;
+          }
+
+          setProfile((prev: any) =>
+            prev ? { ...prev, pending_plan_switch: null } : prev
+          );
+
+          window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+          setDialog({
+            type: 'alert',
+            message: lang.annualSwitchCanceled
+          });
+        } catch (err: any) {
+          setDialog({
+            type: 'alert',
+            message: lang.connectionError
+          });
+        }
+      }
+    });
+  };
+
   const executeAccountDeletion = async () => {
     setDialog(null);
     setProcessingDelete(true);
@@ -714,6 +831,16 @@ export default function ProfilePage() {
                   ? lang.proPlan || 'Pro Plan'
                   : lang.freePlan || 'Free Plan'}
               </p>
+
+              {/* Show interval (monthly/annual) for Pro users */}
+              {!isFreePlan && profile?.subscription_interval && (
+                <p className="text-[10px] font-black uppercase font-mono text-gray-400 tracking-widest mt-1">
+                  {profile.subscription_interval === 'annual'
+                    ? lang.youAreOnAnnual
+                    : lang.youAreOnMonthly}
+                </p>
+              )}
+
               {isFreePlan && profile?.estimate_credits > 0 && (
                 <p className="text-xs font-black uppercase font-mono text-blue-600 tracking-wider mt-1.5">
                   {t(lang.creditsRemaining, {
@@ -721,6 +848,7 @@ export default function ProfilePage() {
                   })}
                 </p>
               )}
+
               {!isFreePlan && profile?.subscription_cancel_at && (
                 <p className="text-xs font-black uppercase font-mono text-orange-500 tracking-wider mt-1.5">
                   {t(lang.cancellationScheduledFor, {
@@ -734,8 +862,18 @@ export default function ProfilePage() {
                   })}
                 </p>
               )}
+
+              {/* Pending plan switch status */}
+              {!isFreePlan &&
+                profile?.pending_plan_switch === 'annual' &&
+                !profile?.subscription_cancel_at && (
+                  <p className="text-xs font-black uppercase font-mono text-blue-500 tracking-wider mt-1.5">
+                    ↗ {lang.upgradeToAnnual}
+                  </p>
+                )}
             </div>
-            <div className="w-full sm:w-auto">
+
+            <div className="w-full sm:w-auto flex flex-col sm:items-end gap-2">
               {isFreePlan ? (
                 <Link
                   href="/upgrade"
@@ -746,17 +884,41 @@ export default function ProfilePage() {
               ) : profile?.subscription_cancel_at ? (
                 <button
                   onClick={handleResumeSubClick}
-                  className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:text-blue-800 transition-colors"
+                  className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:text-blue-800 transition-colors cursor-pointer"
                 >
                   {lang.resumeSubscription}
                 </button>
               ) : (
-                <button
-                  onClick={handleCancelSubClick}
-                  className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors"
-                >
-                  {lang.cancelSub || 'Cancel Subscription'}
-                </button>
+                <>
+                  {/* Switch to Annual (only for monthly users without scheduled cancellation) */}
+                  {profile?.subscription_interval === 'monthly' &&
+                    !profile?.pending_plan_switch && (
+                      <button
+                        onClick={handleSwitchToAnnualClick}
+                        className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:text-blue-800 transition-colors cursor-pointer"
+                      >
+                        ↗ {lang.upgradeToAnnual}
+                      </button>
+                    )}
+
+                  {/* Cancel pending annual switch */}
+                  {profile?.pending_plan_switch === 'annual' && (
+                    <button
+                      onClick={handleCancelAnnualSwitchClick}
+                      className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors cursor-pointer"
+                    >
+                      {lang.cancelAnnualSwitch}
+                    </button>
+                  )}
+
+                  {/* Cancel subscription (always available) */}
+                  <button
+                    onClick={handleCancelSubClick}
+                    className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors cursor-pointer"
+                  >
+                    {lang.cancelSub || 'Cancel Subscription'}
+                  </button>
+                </>
               )}
             </div>
           </div>
