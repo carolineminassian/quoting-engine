@@ -17,6 +17,7 @@ import {
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import ProLockModal from '@/components/ProLockModal';
 import {
   Listbox,
   ListboxButton,
@@ -41,6 +42,7 @@ export default function DashboardPage() {
     'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
   >('date_desc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
   // Modal States
@@ -51,6 +53,7 @@ export default function DashboardPage() {
     onConfirm?: () => void;
   } | null>(null);
   const [exportModal, setExportModal] = useState(false);
+  const [proLockModal, setProLockModal] = useState<null | 'csv' | 'zip'>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -237,6 +240,34 @@ export default function DashboardPage() {
   };
 
   const query = searchQuery.toLowerCase();
+  // Build the client list from estimates that match the current STATUS filter
+  // (so the dropdown only shows clients you'd actually see on the dashboard).
+  // Important: we apply only the status filter, not the search filter — otherwise
+  // typing would shrink the list to nothing once your query no longer matches.
+  const clientsMatchingStatus = estimates.filter((est) => {
+    if (filterStatus === 'draft') return !est.is_locked;
+    if (filterStatus === 'pending')
+      return (
+        est.is_locked && (!est.client_status || est.client_status === 'pending')
+      );
+    if (filterStatus === 'approved')
+      return est.is_locked && est.client_status === 'approved';
+    if (filterStatus === 'rejected')
+      return est.is_locked && est.client_status === 'rejected';
+    return true;
+  });
+
+  const uniqueClientNames = Array.from(
+    new Set(
+      clientsMatchingStatus
+        .map((e) => e.client_name)
+        .filter((name): name is string => Boolean(name?.trim()))
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const filteredClientNames = uniqueClientNames.filter((name) =>
+    name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   const processedEstimates = [...estimates]
     .filter((est) => {
       // Combined status + search filter in single pass
@@ -537,58 +568,165 @@ export default function DashboardPage() {
         {/* UNIFIED ACTION & CONTROL PANEL */}
         {estimates.length > 0 && (
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center mb-4">
-            {/* Live Text Filter input */}
-            <div className="relative flex-1 max-w-md flex items-center">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={lang.filterByClient}
-                className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-xl text-xs font-bold focus:outline-none focus:border-blue-500 bg-white text-black placeholder-gray-400 shadow-sm"
-                style={{ height: '52px' }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 text-gray-400 hover:text-gray-600 text-xs font-bold h-full flex items-center justify-center top-0"
-                >
-                  ✕
-                </button>
+            {/* Live Text Filter input — also acts as a dropdown of past clients */}
+            <div className="relative flex-1 max-w-md">
+              {/* Input group: input + buttons in a single row that looks like one input */}
+              <div className="flex items-center h-[52px] border border-gray-200 rounded-xl bg-white shadow-sm focus-within:border-blue-500 transition-colors px-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (e.target.value.length > 0) {
+                      setShowClientDropdown(true);
+                    } else {
+                      setShowClientDropdown(false);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      setShowClientDropdown(false);
+                    }
+                    if (e.key === 'Escape') {
+                      setShowClientDropdown(false);
+                    }
+                  }}
+                  placeholder={lang.filterByClient}
+                  className="flex-1 min-w-0 h-full px-2 bg-transparent outline-none text-xs font-bold text-black placeholder-gray-400"
+                />
+
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setShowClientDropdown(false);
+                    }}
+                    className="shrink-0 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
+                    type="button"
+                    aria-label="Clear filter"
+                  >
+                    ✕
+                  </button>
+                )}
+
+                {uniqueClientNames.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowClientDropdown((prev) => !prev)}
+                    className="shrink-0 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 rounded-md text-[10px] transition-colors cursor-pointer"
+                    aria-label="Toggle client list"
+                  >
+                    ▼
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown panel */}
+              {showClientDropdown && uniqueClientNames.length > 0 && (
+                <>
+                  {/* Click-outside overlay */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowClientDropdown(false)}
+                  />
+
+                  <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto p-1">
+                    {filteredClientNames.length > 0 ? (
+                      filteredClientNames.map((name, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery(name);
+                            setShowClientDropdown(false);
+                          }}
+                          className="w-full text-left p-2 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg cursor-pointer block truncate transition-colors"
+                        >
+                          {name}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="p-3 text-[10px] font-bold text-gray-400 italic uppercase tracking-widest">
+                        {lang.noEstimatesMatch}
+                      </p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
-
             {/* Utility operational downloads row */}
             <div className="flex items-center gap-2">
-              {profile.subscription_tier === 'pro' && (
-                <button
-                  onClick={() => setExportModal(true)}
-                  className="flex-1 sm:flex-none flex items-center justify-center text-center px-5 border border-green-200 bg-green-50/60 text-green-700 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-green-100/70 transition-colors"
-                  style={{ height: '31px' }}
-                >
-                  {profile.country === 'FR' ? 'Excel (CSV)' : 'Excel (CSV)'}
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (profile.subscription_tier === 'pro') {
+                    setExportModal(true);
+                  } else {
+                    setProLockModal('csv');
+                  }
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-center px-5 border border-green-200 bg-green-50/60 text-green-700 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-green-100/70 transition-colors cursor-pointer"
+                style={{ height: '31px' }}
+              >
+                Excel (CSV)
+                {profile.subscription_tier !== 'pro' && (
+                  <svg
+                    className="w-3 h-3 text-green-600/70"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                    />
+                  </svg>
+                )}
+              </button>
 
               <button
                 disabled={isZipping || processedEstimates.length === 0}
-                onClick={handleExportZip}
-                className="flex-1 sm:flex-none bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-40 font-black uppercase tracking-widest text-[10px] px-5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                onClick={() => {
+                  if (profile.subscription_tier !== 'pro') {
+                    setProLockModal('zip');
+                    return;
+                  }
+                  handleExportZip();
+                }}
+                className="flex-1 sm:flex-none bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-40 font-black uppercase tracking-widest text-[10px] px-5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                 style={{ height: '31px' }}
               >
-                <svg
-                  className="w-3.5 h-3.5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                </svg>
-
+                {profile.subscription_tier === 'pro' ? (
+                  <svg
+                    className="w-3.5 h-3.5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-3.5 h-3.5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                    />
+                  </svg>
+                )}
                 {isZipping
                   ? lang.archiving
                   : t(lang.downloadPdfsZip, {
@@ -935,6 +1073,23 @@ export default function DashboardPage() {
           notice: lang.notice,
           cancel: lang.cancel,
           confirmOk: lang.confirmOk
+        }}
+      />
+
+      {/* PRO LOCK MODAL */}
+      <ProLockModal
+        open={proLockModal !== null}
+        onClose={() => setProLockModal(null)}
+        labels={{
+          title: lang.proLockTitle,
+          message:
+            proLockModal === 'csv'
+              ? lang.proLockCsvMessage
+              : proLockModal === 'zip'
+                ? lang.proLockZipMessage
+                : '',
+          upgrade: lang.proLockUpgradeBtn,
+          cancel: lang.cancel
         }}
       />
     </main>

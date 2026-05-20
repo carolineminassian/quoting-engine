@@ -46,23 +46,31 @@ export async function POST(req: Request) {
     const userId = session.client_reference_id;
     const type = session.metadata?.type;
 
-    // For Pro subscriptions, also save the Stripe customer/subscription IDs
-    // so we can cancel/manage later via the portal
-    if (userId && type === 'pro' && session.customer && session.subscription) {
+    // For Pro subscriptions (monthly OR annual), save the Stripe IDs and interval
+    if (
+      userId &&
+      (type === 'pro' || type === 'pro_annual') &&
+      session.customer &&
+      session.subscription
+    ) {
       await supabaseAdmin
         .from('profiles')
         .update({
           subscription_tier: 'pro',
+          subscription_interval: type === 'pro_annual' ? 'annual' : 'monthly',
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: session.subscription as string
         })
         .eq('id', userId);
     } else if (userId && type) {
-      if (type === 'pro') {
-        // Mise à niveau Pro
+      if (type === 'pro' || type === 'pro_annual') {
+        // Fallback if customer/subscription IDs missing for some reason
         await supabaseAdmin
           .from('profiles')
-          .update({ subscription_tier: 'pro' })
+          .update({
+            subscription_tier: 'pro',
+            subscription_interval: type === 'pro_annual' ? 'annual' : 'monthly'
+          })
           .eq('id', userId);
       } else if (type === 'credits') {
         // Atomic increment to prevent race conditions
@@ -86,8 +94,10 @@ export async function POST(req: Request) {
       .from('profiles')
       .update({
         subscription_tier: 'free',
+        subscription_interval: null,
         stripe_subscription_id: null,
-        subscription_cancel_at: null
+        subscription_cancel_at: null,
+        pending_plan_switch: null
       })
       .eq('stripe_customer_id', customerId);
   }
@@ -103,16 +113,19 @@ export async function POST(req: Request) {
       (subscription as any).current_period_end ??
       null;
 
-    // If they un-canceled (cancel_at_period_end flipped back to false), clear the date
-    // If they canceled (cancel_at_period_end is true), record the period end
-    const cancelAt =
-      subscription.cancel_at_period_end && periodEnd
-        ? new Date(periodEnd * 1000).toISOString()
-        : null;
+    // Detect scheduled cancellation via either field for compatibility:
+    // - Modern path: cancel_at is a unix timestamp
+    // - Legacy path: cancel_at_period_end is true (combined with periodEnd)
+    let cancelAtIso: string | null = null;
+    if (subscription.cancel_at) {
+      cancelAtIso = new Date(subscription.cancel_at * 1000).toISOString();
+    } else if (subscription.cancel_at_period_end && periodEnd) {
+      cancelAtIso = new Date(periodEnd * 1000).toISOString();
+    }
 
     await supabaseAdmin
       .from('profiles')
-      .update({ subscription_cancel_at: cancelAt })
+      .update({ subscription_cancel_at: cancelAtIso })
       .eq('stripe_customer_id', customerId);
   }
 

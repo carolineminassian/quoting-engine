@@ -78,18 +78,31 @@ export async function POST(request: Request) {
     }
 
     // 4. Schedule cancellation at period end (user keeps Pro until they're billed next)
-    // The webhook (customer.subscription.deleted) will downgrade them when period actually ends
+    // The webhook (customer.subscription.deleted) will downgrade them when period actually ends.
+    // We use explicit cancel_at timestamp (works for both classic AND flexible billing modes)
+    // instead of the deprecated cancel_at_period_end parameter.
     let periodEnd: number | null = null;
     try {
-      const updated = await stripe.subscriptions.update(
-        profile.stripe_subscription_id,
-        { cancel_at_period_end: true }
+      // Step 1: Retrieve the subscription to get the current period end timestamp
+      const existing = await stripe.subscriptions.retrieve(
+        profile.stripe_subscription_id
       );
-      // Stripe moved current_period_end to the subscription items level (Basil/Dahlia API)
       periodEnd =
-        updated.items?.data?.[0]?.current_period_end ??
-        (updated as any).current_period_end ??
+        existing.items?.data?.[0]?.current_period_end ??
+        (existing as any).current_period_end ??
         null;
+
+      if (!periodEnd) {
+        return NextResponse.json(
+          { error: 'Could not determine subscription period end' },
+          { status: 500 }
+        );
+      }
+
+      // Step 2: Schedule cancellation at that exact timestamp
+      await stripe.subscriptions.update(profile.stripe_subscription_id, {
+        cancel_at: periodEnd
+      });
     } catch (stripeError: any) {
       console.error('Stripe Cancellation Error:', stripeError);
       if (stripeError.code === 'resource_missing') {

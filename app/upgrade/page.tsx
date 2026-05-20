@@ -17,6 +17,9 @@ function UpgradeContent() {
   const [profile, setProfile] = useState<any>(null);
   const [lang, setLang] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>(
+    'annual' // Default to annual since it's the better value
+  );
   const [dialog, setDialog] = useState<{
     type: 'alert';
     title?: string;
@@ -99,19 +102,19 @@ function UpgradeContent() {
     };
   }, [router, success]);
 
-  const handleCheckout = async (type: 'pro' | 'credits') => {
-  setProcessing(true);
+  const handleCheckout = async (type: 'pro' | 'pro_annual' | 'credits') => {
+    setProcessing(true);
 
-  try {
-    const res = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: profile.id,
-        type: type,
-        currency: profile.currency
-      })
-    });
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.id,
+          type: type,
+          currency: profile.currency
+        })
+      });
 
       const data = await res.json();
       if (data.url) {
@@ -215,18 +218,80 @@ function UpgradeContent() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Pro Subscription Tier */}
+          {/* Pro Subscription Tier — with Monthly/Annual toggle */}
           <div className="bg-white p-10 rounded-2xl shadow-xl border-2 border-blue-600 relative">
             <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-bl-lg rounded-tr-xl">
-              {lang.bestValue}
+              {lang.bestValueBadge}
             </div>
-            <h2 className="text-3xl font-black uppercase mb-2">
+            <h2 className="text-3xl font-black uppercase mb-4">
               {lang.proPlanName}
             </h2>
-            <p className="text-4xl font-mono font-black mb-8">
-              {profile.currency === 'EUR' ? '7€' : '$9'}
-              <span className="text-sm text-gray-400">{lang.perMonth}</span>
-            </p>
+
+            {/* Monthly/Annual toggle pill */}
+            <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl mb-6 relative">
+              <button
+                type="button"
+                onClick={() => setBillingInterval('monthly')}
+                className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
+                  billingInterval === 'monthly'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {lang.monthlyLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingInterval('annual')}
+                className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer relative ${
+                  billingInterval === 'annual'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {lang.annualLabel}
+                {billingInterval !== 'annual' && (
+                  <span className="absolute -top-2 -right-1 bg-emerald-500 text-white text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                    -17%
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Price display — switches based on interval */}
+            <div className="mb-8">
+              {billingInterval === 'annual' ? (
+                <>
+                  <p className="text-4xl font-mono font-black">
+                    {profile.currency === 'EUR' ? '70€' : '$90'}
+                    <span className="text-sm text-gray-400">
+                      {lang.perYearShort}
+                    </span>
+                  </p>
+                  <p className="text-[11px] font-bold text-emerald-600 mt-1.5 uppercase tracking-widest">
+                    ✓ {lang.save2Months}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                    {profile.currency === 'EUR'
+                      ? '5,83€/mois équivalent'
+                      : '$7.50/mo equivalent'}{' '}
+                    · {lang.billedAnnually}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-4xl font-mono font-black">
+                    {profile.currency === 'EUR' ? '7€' : '$9'}
+                    <span className="text-sm text-gray-400">
+                      {lang.perMonthShort}
+                    </span>
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-2 font-medium">
+                    {lang.billedMonthly}
+                  </p>
+                </>
+              )}
+            </div>
 
             <ul className="space-y-4 mb-10 text-sm font-bold text-gray-600">
               {lang.proFeatures.map((f: string, i: number) => (
@@ -241,8 +306,12 @@ function UpgradeContent() {
 
             <button
               disabled={processing}
-              onClick={() => handleCheckout('pro')}
-              className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-transform active:scale-95"
+              onClick={() =>
+                handleCheckout(
+                  billingInterval === 'annual' ? 'pro_annual' : 'pro'
+                )
+              }
+              className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-transform active:scale-95 cursor-pointer"
             >
               {processing ? '...' : lang.upgradeToPro}
             </button>

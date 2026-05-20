@@ -1044,10 +1044,7 @@ export default function EstimateView() {
                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
                     {lang.termsHeader}
                   </p>
-                  <p
-                    className="text-[10px] text-gray-400 leading-relaxed font-bold break-words"
-                    style={{ paddingLeft: '64px' }}
-                  >
+                  <p className="text-[10px] text-gray-400 leading-relaxed font-bold break-words sm:pl-16">
                     {(() => {
                       const balanceText = isUponReceipt
                         ? lang.termsBalanceUponReceipt

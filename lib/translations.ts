@@ -349,6 +349,39 @@ export const translations = {
     unspecified: 'UNSPECIFIED',
     finalizedEstimate: 'finalized estimate',
     finalizedEstimates: 'finalized estimates',
+
+    // Pro lock modal
+    proLockTitle: 'Pro Feature',
+    proLockCsvMessage:
+      'Excel CSV exports are available exclusively on the Pro plan. Upgrade to unlock detailed reporting and bulk data exports.',
+    proLockZipMessage:
+      'Bulk PDF downloads are available exclusively on the Pro plan. Upgrade to download all your estimates at once.',
+    proLockUpgradeBtn: 'Upgrade to Pro',
+
+    // Annual plan
+    monthlyLabel: 'Monthly',
+    annualLabel: 'Annual',
+    perMonthShort: '/mo',
+    perYearShort: '/yr',
+    save2Months: 'Save 2 months',
+    bestValueBadge: 'Best Value',
+    billedAnnually: 'billed annually',
+    billedMonthly: 'billed monthly',
+    annualEquivalent: '{price}/mo equivalent',
+    upgradeToAnnual: 'Switch to Annual',
+    upgradeToAnnualConfirm:
+      'Switch to annual billing at the end of your current monthly period? You will keep Pro access until then, after which you will be charged annually at our discounted rate.',
+    upgradeToAnnualSuccess:
+      'Switch scheduled. Your annual plan will activate at the end of your current period.',
+    upgradeToAnnualFailed:
+      'Failed to schedule annual switch. Please try again.',
+    annualScheduledFor: 'Switching to annual on {date}',
+    cancelAnnualSwitch: 'Cancel annual switch',
+    cancelAnnualSwitchConfirm:
+      'Cancel the scheduled switch to annual billing? You will remain on monthly.',
+    annualSwitchCanceled: 'Annual switch canceled.',
+    youAreOnAnnual: 'Annual subscription',
+    youAreOnMonthly: 'Monthly subscription',
     paymentCanceled: 'Payment canceled.',
     creditsLabel: 'Credits',
     errorOccurred: 'An error occurred.',
@@ -712,6 +745,38 @@ export const translations = {
     unspecified: 'INDÉTERMINÉ',
     finalizedEstimate: 'devis validé',
     finalizedEstimates: 'devis validés',
+
+    // Pro lock modal
+    proLockTitle: 'Fonctionnalité Pro',
+    proLockCsvMessage:
+      'Les exports Excel CSV sont exclusivement disponibles sur le plan Pro. Passez à la version Pro pour débloquer les rapports détaillés et les exports en masse.',
+    proLockZipMessage:
+      'Les téléchargements PDF groupés sont exclusivement disponibles sur le plan Pro. Passez à la version Pro pour télécharger tous vos devis en une fois.',
+    proLockUpgradeBtn: 'Passer à la version Pro',
+
+    // Annual plan
+    monthlyLabel: 'Mensuel',
+    annualLabel: 'Annuel',
+    perMonthShort: '/mois',
+    perYearShort: '/an',
+    save2Months: 'Économisez 2 mois',
+    bestValueBadge: 'Meilleure offre',
+    billedAnnually: 'facturé annuellement',
+    billedMonthly: 'facturé mensuellement',
+    annualEquivalent: '{price}/mois équivalent',
+    upgradeToAnnual: "Passer à l'annuel",
+    upgradeToAnnualConfirm:
+      "Passer à la facturation annuelle à la fin de votre période mensuelle en cours ? Vous gardez l'accès Pro jusque-là, puis serez facturé annuellement à notre tarif préférentiel.",
+    upgradeToAnnualSuccess:
+      'Changement programmé. Votre plan annuel sera activé à la fin de votre période en cours.',
+    upgradeToAnnualFailed: 'Échec de la programmation. Veuillez réessayer.',
+    annualScheduledFor: "Passage à l'annuel le {date}",
+    cancelAnnualSwitch: "Annuler le passage à l'annuel",
+    cancelAnnualSwitchConfirm:
+      'Annuler le passage programmé à la facturation annuelle ? Vous resterez sur le plan mensuel.',
+    annualSwitchCanceled: "Passage à l'annuel annulé.",
+    youAreOnAnnual: 'Abonnement annuel',
+    youAreOnMonthly: 'Abonnement mensuel',
     paymentCanceled: 'Paiement annulé.',
     creditsLabel: 'Crédits',
     errorOccurred: 'Une erreur est survenue.',

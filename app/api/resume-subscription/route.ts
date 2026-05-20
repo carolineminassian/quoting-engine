@@ -68,10 +68,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Reverse the scheduled cancellation
+    // Reverse the scheduled cancellation by clearing cancel_at
+    // This works for both modern subscriptions (using cancel_at timestamp)
+    // and legacy ones (using cancel_at_period_end). Setting cancel_at to null
+    // also clears cancel_at_period_end automatically.
     try {
       await stripe.subscriptions.update(profile.stripe_subscription_id, {
-        cancel_at_period_end: false
+        cancel_at: null
       });
     } catch (stripeError: any) {
       console.error('Stripe Resume Error:', stripeError);
