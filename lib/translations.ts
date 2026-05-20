@@ -385,6 +385,15 @@ export const translations = {
     youAreOnAnnual: 'Annual subscription',
     youAreOnMonthly: 'Monthly subscription',
 
+    // Pro → Credits switch
+    switchToPayAsYouGo: 'Switch to Pay-as-you-go',
+    switchToPayAsYouGoConfirm:
+      'This will cancel your Pro subscription at the end of the current billing period. You will keep Pro access until then. After that, you can use credits you purchase. Continue?',
+    switchToPayAsYouGoSuccess:
+      'Your Pro subscription will end on {date}. You can now purchase credits to use after that date.',
+    switchToPayAsYouGoFailed:
+      'Failed to schedule cancellation. Please try again.',
+
     // Email notification preferences
     notificationSettings: 'Email Notifications',
     notificationSettingsDesc:
@@ -791,6 +800,15 @@ export const translations = {
     annualSwitchCanceled: "Passage à l'annuel annulé.",
     youAreOnAnnual: 'Abonnement annuel',
     youAreOnMonthly: 'Abonnement mensuel',
+
+    // Pro → Credits switch
+    switchToPayAsYouGo: "Passer aux crédits à l'unité",
+    switchToPayAsYouGoConfirm:
+      "Cela annulera votre abonnement Pro à la fin de la période de facturation en cours. Vous conserverez l'accès Pro jusque-là. Ensuite, vous pourrez utiliser les crédits achetés. Continuer ?",
+    switchToPayAsYouGoSuccess:
+      'Votre abonnement Pro prendra fin le {date}. Vous pouvez maintenant acheter des crédits à utiliser après cette date.',
+    switchToPayAsYouGoFailed:
+      "Échec de la programmation de l'annulation. Veuillez réessayer.",
 
     // Email notification preferences
     notificationSettings: 'Notifications E-mail',

@@ -311,6 +311,86 @@ export default function ProfilePage() {
     });
   };
 
+  const handleSwitchToPayAsYouGoClick = () => {
+    setDialog({
+      type: 'confirm',
+      message: lang.switchToPayAsYouGoConfirm,
+      onConfirm: async () => {
+        setDialog(null);
+
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+
+          if (!session) {
+            setDialog({
+              type: 'alert',
+              message: lang.sessionExpired
+            });
+            return;
+          }
+
+          // Reuse the existing cancel-subscription endpoint —
+          // it already handles both plain subs and scheduled subs at period end
+          const response = await fetch('/api/cancel-subscription', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            setDialog({
+              type: 'alert',
+              message: result.error || lang.switchToPayAsYouGoFailed
+            });
+            return;
+          }
+
+          // Update local state with the cancellation date
+          const cancelAt = result.cancelAt
+            ? new Date(result.cancelAt * 1000).toISOString()
+            : null;
+
+          setProfile((prev: any) =>
+            prev ? { ...prev, subscription_cancel_at: cancelAt } : prev
+          );
+
+          window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+          // Format the period-end date for the user's locale
+          const formattedDate = cancelAt
+            ? new Date(cancelAt).toLocaleDateString(
+                country === 'FR' ? 'fr-FR' : 'en-US',
+                { year: 'numeric', month: 'long', day: 'numeric' }
+              )
+            : '';
+
+          // Show success message + redirect to upgrade page after they dismiss it
+          setDialog({
+            type: 'alert',
+            message: t(lang.switchToPayAsYouGoSuccess, {
+              date: formattedDate
+            }),
+            onConfirm: () => {
+              setDialog(null);
+              router.push('/upgrade');
+            }
+          });
+        } catch (err: any) {
+          setDialog({
+            type: 'alert',
+            message: lang.connectionError
+          });
+        }
+      }
+    });
+  };
+
   const handleResumeSubClick = () => {
     setDialog({
       type: 'confirm',
@@ -1036,6 +1116,14 @@ export default function ProfilePage() {
                       {lang.cancelAnnualSwitch}
                     </button>
                   )}
+
+                  {/* Switch to Pay-as-you-go (cancels Pro at period end + redirects to credits) */}
+                  <button
+                    onClick={handleSwitchToPayAsYouGoClick}
+                    className="text-gray-500 text-[10px] font-black uppercase tracking-widest hover:text-blue-600 transition-colors cursor-pointer"
+                  >
+                    ⇄ {lang.switchToPayAsYouGo}
+                  </button>
 
                   {/* Cancel subscription (always available) */}
                   <button
