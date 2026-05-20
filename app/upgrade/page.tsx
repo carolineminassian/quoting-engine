@@ -174,8 +174,9 @@ function UpgradeContent() {
         )}
 
         <div className="text-center mb-12">
-          <h1 className="text-5xl uppercase tracking-tighter mb-4">
-            {/* Match navbar branding: "Pact" in black, "Estim" in light blue */}
+          <h1 className="text-5xl tracking-tighter mb-4">
+            {/* Match navbar branding: "Pact" in black, "Estim" in light blue.
+        Note: parent h1 has NO `uppercase` class so PactEstim renders as-is. */}
             {(() => {
               const title = lang.upgradeTitle || 'Upgrade PactEstim';
               // Find the "PactEstim" word and split it for two-tone styling
@@ -189,8 +190,9 @@ function UpgradeContent() {
                     </span>
                   );
                 }
+                // Surrounding text (e.g. "Upgrade ") gets uppercase treatment
                 return (
-                  <span key={i} className="font-black text-gray-900">
+                  <span key={i} className="font-black text-gray-900 uppercase">
                     {part}
                   </span>
                 );
