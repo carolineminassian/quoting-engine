@@ -7,6 +7,8 @@ import { translations } from '@/lib/translations';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import Button from '@/components/Button';
+import LinkButton from '@/components/LinkButton';
 
 function UpgradeContent() {
   const router = useRouter();
@@ -227,13 +229,15 @@ function UpgradeContent() {
             </div>
             {profile.subscription_tier === 'pro' && (
               <div className="col-span-2 sm:col-span-1 pt-4 sm:pt-0 border-t sm:border-none border-gray-50 flex justify-center sm:justify-end">
-                <button
+                <Button
                   onClick={handleManageBilling}
                   disabled={processing}
-                  className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="!text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
                 >
                   {lang.manageBilling}
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -326,17 +330,20 @@ function UpgradeContent() {
               ))}
             </ul>
 
-            <button
-              disabled={processing}
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={processing}
+              loadingText="..."
               onClick={() =>
                 handleCheckout(
                   billingInterval === 'annual' ? 'pro_annual' : 'pro'
                 )
               }
-              className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-transform active:scale-95 cursor-pointer"
             >
-              {processing ? '...' : lang.upgradeToPro}
-            </button>
+              {lang.upgradeToPro}
+            </Button>
           </div>
 
           {/* Pay As You Go Tier */}
@@ -357,23 +364,23 @@ function UpgradeContent() {
                 </li>
               ))}
             </ul>
-            <button
-              disabled={processing}
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
+              loading={processing}
+              loadingText="..."
               onClick={() => handleCheckout('credits')}
-              className="w-full bg-gray-100 text-gray-800 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-transform active:scale-95"
             >
-              {processing ? '...' : lang.buyCredits}
-            </button>
+              {lang.buyCredits}
+            </Button>
           </div>
         </div>
 
         <div className="text-center mt-12">
-          <Link
-            href="/dashboard"
-            className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black"
-          >
+          <LinkButton href="/dashboard" variant="ghost" size="sm">
             ← {lang.cancel}
-          </Link>
+          </LinkButton>
         </div>
       </div>
 

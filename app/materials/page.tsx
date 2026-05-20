@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
-import { translations } from '@/lib/translations';
 import Link from 'next/link';
+import { translations } from '@/lib/translations';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import Button from '@/components/Button';
+import LinkButton from '@/components/LinkButton';
 import {
   Listbox,
   ListboxButton,
@@ -188,12 +190,9 @@ export default function MaterialsPage() {
               {profile?.currency === 'EUR' ? 'Euro (€)' : 'US Dollar ($)'}
             </p>
           </div>
-          <Link
-            href="/dashboard"
-            className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors cursor-pointer"
-          >
+          <LinkButton href="/dashboard" variant="ghost" size="sm">
             ← {lang.dashboard}
-          </Link>
+          </LinkButton>
         </div>
 
         {/* Create reference item form panel */}
@@ -279,12 +278,11 @@ export default function MaterialsPage() {
             </div>
 
             <div className="col-span-12 sm:col-span-2">
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center bg-gray-900 text-white hover:bg-blue-600 px-5 py-3.5 rounded-lg font-black uppercase tracking-[0.14em] text-[10px] shadow-sm hover:shadow transition-all duration-200 active:scale-95 cursor-pointer"
-              >
-                {lang.addItem}
-              </button>
+              <div className="col-span-12 sm:col-span-2">
+                <Button type="submit" variant="dark" size="md" fullWidth>
+                  {lang.addItem}
+                </Button>
+              </div>
             </div>
           </form>
         </div>
@@ -401,18 +399,22 @@ export default function MaterialsPage() {
                     </div>
 
                     <div className="w-full sm:col-span-4 flex sm:justify-end gap-2 mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-gray-100 sm:border-0">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setEditingId(null)}
-                        className="flex-1 sm:flex-none flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] hover:bg-gray-100 hover:text-gray-700 transition-all duration-200 cursor-pointer"
+                        className="flex-1 sm:flex-none"
                       >
                         {lang.cancel}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="soft-primary"
+                        size="sm"
                         onClick={() => handleUpdate(m.id)}
-                        className="flex-1 sm:flex-none flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
+                        className="flex-1 sm:flex-none"
                       >
                         {lang.save}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -451,7 +453,10 @@ export default function MaterialsPage() {
                         </div>
                       </div>
                       <div className="flex gap-2 pt-4 border-t border-gray-100">
-                        <button
+                        <Button
+                          variant="soft-secondary"
+                          size="sm"
+                          fullWidth
                           onClick={() => {
                             setEditingId(m.id);
                             setEditName(m.name);
@@ -460,16 +465,17 @@ export default function MaterialsPage() {
                             );
                             setEditUnit(isOutOfRegion ? '' : m.unit);
                           }}
-                          className="flex-1 flex items-center justify-center bg-gray-50 text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200 cursor-pointer"
                         >
                           {lang.edit}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="soft-danger"
+                          size="sm"
+                          fullWidth
                           onClick={() => handleDelete(m.id)}
-                          className="flex-1 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200 cursor-pointer"
                         >
                           {lang.delete}
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -499,7 +505,9 @@ export default function MaterialsPage() {
                     </div>
 
                     <div className="hidden sm:flex sm:col-span-4 justify-end items-center gap-2">
-                      <button
+                      <Button
+                        variant="soft-secondary"
+                        size="sm"
                         onClick={() => {
                           setEditingId(m.id);
                           setEditName(m.name);
@@ -508,16 +516,16 @@ export default function MaterialsPage() {
                           );
                           setEditUnit(isOutOfRegion ? '' : m.unit);
                         }}
-                        className="bg-gray-50 text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 px-3 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200 cursor-pointer"
                       >
                         {lang.edit}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="soft-danger"
+                        size="sm"
                         onClick={() => handleDelete(m.id)}
-                        className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200 cursor-pointer"
                       >
                         {lang.delete}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )}

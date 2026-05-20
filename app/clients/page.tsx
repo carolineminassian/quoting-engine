@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { translations } from '@/lib/translations';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { translations } from '@/lib/translations';
+import Button from '@/components/Button';
 
 export default function ClientsPage() {
   const router = useRouter();
@@ -144,25 +145,30 @@ export default function ClientsPage() {
               {lang.clientRosterSubtitle}
             </p>
           </div>
-          <button
+          <Button
+            variant="dark"
+            size="md"
             onClick={() =>
               setEditingClient({ name: '', email: '', phone: '', address: '' })
             }
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white hover:bg-blue-600 px-5 py-3.5 rounded-lg font-black uppercase tracking-[0.14em] text-[10px] shadow-sm hover:shadow transition-all duration-200 active:scale-95 group"
+            className="w-full sm:w-auto"
+            icon={
+              <svg
+                className="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            }
           >
-            <svg
-              className="w-3.5 h-3.5 text-gray-400 group-hover:text-white transition-colors duration-200 stroke-[3]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>{lang.addNewClient}</span>
-          </button>
+            {lang.addNewClient}
+          </Button>
         </div>
 
         {/* Client Listing Grid */}
@@ -218,38 +224,48 @@ export default function ClientsPage() {
 
                 {/* Grid Item Card Actions */}
                 <div className="mt-8 pt-4 border-t border-gray-100 space-y-2">
-                  <button
+                  <Button
+                    variant="soft-primary"
+                    size="sm"
+                    fullWidth
                     onClick={() =>
                       router.push(`/new-estimate?clientId=${c.id}`)
                     }
-                    className="w-full flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-blue-200 group/btn"
+                    iconPosition="right"
+                    icon={
+                      <svg
+                        className="w-3.5 h-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                      </svg>
+                    }
                   >
-                    <span>{lang.createNewEstimate}</span>
-                    <svg
-                      className="w-3.5 h-3.5 transform transition-transform duration-200 group-hover/btn:translate-x-0.5 stroke-[2.5]"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                      <polyline points="12 5 19 12 12 19"></polyline>
-                    </svg>
-                  </button>
+                    {lang.createNewEstimate}
+                  </Button>
                   <div className="flex gap-2">
-                    <button
+                    <Button
+                      variant="soft-secondary"
+                      size="sm"
+                      fullWidth
                       onClick={() => setEditingClient(c)}
-                      className="flex-1 flex items-center justify-center bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-gray-200"
                     >
                       {lang.editProfile}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="soft-danger"
+                      size="sm"
+                      fullWidth
                       onClick={() => triggerDeleteConfirm(c.id)}
-                      className="flex-1 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.12em] transition-all duration-200 border border-red-200"
                     >
                       {lang.delete}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -330,19 +346,18 @@ export default function ClientsPage() {
               </div>
 
               <div className="flex gap-3 pt-6 border-t border-gray-100">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="md"
+                  fullWidth
                   onClick={() => setEditingClient(null)}
-                  className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 hover:text-gray-700 transition-all duration-200"
                 >
                   {lang.cancel}
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-blue-700 transition-all duration-200 active:scale-95"
-                >
+                </Button>
+                <Button type="submit" variant="primary" size="md" fullWidth>
                   {lang.saveClient}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
