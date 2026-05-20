@@ -384,6 +384,16 @@ export const translations = {
     annualSwitchCanceled: 'Annual switch canceled.',
     youAreOnAnnual: 'Annual subscription',
     youAreOnMonthly: 'Monthly subscription',
+
+    // Email notification preferences
+    notificationSettings: 'Email Notifications',
+    notificationSettingsDesc:
+      'Choose which email alerts you want to receive about your estimates.',
+    notifyOnComment: 'When a client posts a comment',
+    notifyOnApproved: 'When a client approves an estimate',
+    notifyOnRejected: 'When a client rejects an estimate',
+    notificationUpdateError:
+      'Failed to update notification preference. Please try again.',
     paymentCanceled: 'Payment canceled.',
     creditsLabel: 'Credits',
     errorOccurred: 'An error occurred.',
@@ -781,6 +791,15 @@ export const translations = {
     annualSwitchCanceled: "Passage à l'annuel annulé.",
     youAreOnAnnual: 'Abonnement annuel',
     youAreOnMonthly: 'Abonnement mensuel',
+
+    // Email notification preferences
+    notificationSettings: 'Notifications E-mail',
+    notificationSettingsDesc:
+      'Choisissez les alertes e-mail que vous souhaitez recevoir concernant vos devis.',
+    notifyOnComment: 'Quand un client laisse un commentaire',
+    notifyOnApproved: 'Quand un client approuve un devis',
+    notifyOnRejected: 'Quand un client refuse un devis',
+    notificationUpdateError: 'Échec de la mise à jour. Veuillez réessayer.',
     paymentCanceled: 'Paiement annulé.',
     creditsLabel: 'Crédits',
     errorOccurred: 'Une erreur est survenue.',

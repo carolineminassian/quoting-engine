@@ -43,6 +43,11 @@ export default function ProfilePage() {
   const [depositEnabled, setDepositEnabled] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState<number>(20);
 
+  // Email notification preferences (default: all on)
+  const [notifyOnComment, setNotifyOnComment] = useState(true);
+  const [notifyOnApproved, setNotifyOnApproved] = useState(true);
+  const [notifyOnRejected, setNotifyOnRejected] = useState(true);
+
   // Security Profile State
   const [authEmail, setAuthEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -72,6 +77,10 @@ export default function ProfilePage() {
         setCountry(prof.country || 'US');
         setDepositEnabled(prof.default_deposit_enabled ?? false);
         setDepositPercentage(prof.default_deposit_percentage ?? 20);
+        // Notification preferences (default to true if column is null/missing)
+        setNotifyOnComment(prof.notify_on_comment ?? true);
+        setNotifyOnApproved(prof.notify_on_approved ?? true);
+        setNotifyOnRejected(prof.notify_on_rejected ?? true);
         if (prof.logo_url) {
           setSelectedFileName('Uploaded Logo');
         }
@@ -175,6 +184,33 @@ export default function ProfilePage() {
       }
     });
   };
+  // Auto-save toggle for notification preferences
+  const handleNotificationToggle = async (
+    field: 'notify_on_comment' | 'notify_on_approved' | 'notify_on_rejected',
+    newValue: boolean
+  ) => {
+    // Optimistically update local state for instant UI feedback
+    if (field === 'notify_on_comment') setNotifyOnComment(newValue);
+    if (field === 'notify_on_approved') setNotifyOnApproved(newValue);
+    if (field === 'notify_on_rejected') setNotifyOnRejected(newValue);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ [field]: newValue })
+      .eq('id', profile.id);
+
+    if (error) {
+      // Revert local state on error
+      if (field === 'notify_on_comment') setNotifyOnComment(!newValue);
+      if (field === 'notify_on_approved') setNotifyOnApproved(!newValue);
+      if (field === 'notify_on_rejected') setNotifyOnRejected(!newValue);
+      setDialog({
+        type: 'alert',
+        message: lang.notificationUpdateError
+      });
+    }
+  };
+
   const handleSaveSecurity = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingSecurity(true);
@@ -817,6 +853,96 @@ export default function ProfilePage() {
               {savingSecurity ? '...' : lang.updateSecurity}
             </button>
           </form>
+        </div>
+
+        {/* EMAIL NOTIFICATIONS SECTION */}
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
+          <p className="text-[10px] font-black uppercase text-gray-300 mb-2 tracking-[0.2em]">
+            {lang.notificationSettings}
+          </p>
+          <p className="text-xs text-gray-400 font-medium mb-6 leading-relaxed border-b border-gray-50 pb-4">
+            {lang.notificationSettingsDesc}
+          </p>
+
+          <div className="space-y-3">
+            {/* Comment notification */}
+            <div className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+              <span className="text-xs font-bold text-gray-700 pr-4">
+                {lang.notifyOnComment}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  handleNotificationToggle(
+                    'notify_on_comment',
+                    !notifyOnComment
+                  )
+                }
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                  notifyOnComment ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+                aria-label={lang.notifyOnComment}
+              >
+                <span
+                  className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                    notifyOnComment ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Approved notification */}
+            <div className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+              <span className="text-xs font-bold text-gray-700 pr-4">
+                {lang.notifyOnApproved}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  handleNotificationToggle(
+                    'notify_on_approved',
+                    !notifyOnApproved
+                  )
+                }
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                  notifyOnApproved ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+                aria-label={lang.notifyOnApproved}
+              >
+                <span
+                  className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                    notifyOnApproved ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Rejected notification */}
+            <div className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+              <span className="text-xs font-bold text-gray-700 pr-4">
+                {lang.notifyOnRejected}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  handleNotificationToggle(
+                    'notify_on_rejected',
+                    !notifyOnRejected
+                  )
+                }
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                  notifyOnRejected ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+                aria-label={lang.notifyOnRejected}
+              >
+                <span
+                  className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                    notifyOnRejected ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* SUBSCRIPTION PLAN SECTION */}

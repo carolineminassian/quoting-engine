@@ -31,10 +31,12 @@ export async function POST(request: Request) {
 
     if (updateError) throw updateError;
 
-    // 2. Fetch Owner's profile and auth email
+    // 2. Fetch Owner's profile and auth email (including notification preferences)
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('business_name, country, logo_url')
+      .select(
+        'business_name, country, logo_url, notify_on_approved, notify_on_rejected'
+      )
       .eq('id', estimate.user_id)
       .single();
 
@@ -65,32 +67,39 @@ export async function POST(request: Request) {
     // Format a safe fallback ID using the estimateId from the request payload
     const displayId = estimate.custom_id || estimateId.slice(0, 8);
 
-    // 3. Email 1: Notification to Business Owner (PactEstim Branding)
-    const ownerSubject = isFr
-      ? `[PactEstim] Devis ${status === 'approved' ? 'Approuvé' : 'Refusé'} par ${estimate.client_name}`
-      : `[PactEstim] Estimate ${status === 'approved' ? 'Approved' : 'Rejected'} by ${estimate.client_name}`;
+    // 3. Email 1: Notification to Business Owner — only if they haven't opted out
+    const ownerWantsNotification =
+      status === 'approved'
+        ? profile.notify_on_approved !== false
+        : profile.notify_on_rejected !== false;
 
-    const ownerHtml = isFr
-      ? `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
+    if (ownerWantsNotification) {
+      const ownerSubject = isFr
+        ? `[PactEstim] Devis ${status === 'approved' ? 'Approuvé' : 'Refusé'} par ${estimate.client_name}`
+        : `[PactEstim] Estimate ${status === 'approved' ? 'Approved' : 'Rejected'} by ${estimate.client_name}`;
+
+      const ownerHtml = isFr
+        ? `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
           ${pactEstimLogoHtml}
           <p style="font-size: 16px;">Bonjour,</p>
           <p style="font-size: 16px; line-height: 1.5;">Votre client <strong>${estimate.client_name}</strong> a <strong>${status === 'approved' ? 'approuvé' : 'refusé'}</strong> le devis #${displayId}.</p>
           <a href="${estimateUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: bold; font-size: 14px;">Voir le devis</a>
         </div>`
-      : `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
+        : `<div style="font-family: sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
           ${pactEstimLogoHtml}
           <p style="font-size: 16px;">Hello,</p>
           <p style="font-size: 16px; line-height: 1.5;">Your client <strong>${estimate.client_name}</strong> has <strong>${status}</strong> estimate #${displayId}.</p>
           <a href="${estimateUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: bold; font-size: 14px;">View Estimate</a>
         </div>`;
-    emailPromises.push(
-      resend.emails.send({
-        from: 'PactEstim <noreply@pactestim.com>',
-        to: ownerEmail,
-        subject: ownerSubject,
-        html: ownerHtml
-      })
-    );
+      emailPromises.push(
+        resend.emails.send({
+          from: 'PactEstim <noreply@pactestim.com>',
+          to: ownerEmail,
+          subject: ownerSubject,
+          html: ownerHtml
+        })
+      );
+    }
 
     // 4. Email 2: Confirmation to Client (Business Owner Branding - ONLY if approved)
     if (status === 'approved' && estimate.client_email) {

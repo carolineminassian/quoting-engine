@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing owner ID' }, { status: 400 });
     }
 
-    // 1. Securely resolve the business owner's email
+    // 1. Securely resolve the business owner's email + check notification preferences
     const {
       data: { user },
       error: userError
@@ -36,6 +36,20 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Could not resolve owner email account' },
         { status: 400 }
+      );
+    }
+
+    // Check if owner has opted out of comment notifications
+    const { data: ownerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('notify_on_comment')
+      .eq('id', ownerId)
+      .single();
+
+    if (ownerProfile?.notify_on_comment === false) {
+      return NextResponse.json(
+        { skipped: 'owner opted out of comment notifications' },
+        { status: 200 }
       );
     }
 

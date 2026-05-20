@@ -77,16 +77,19 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Schedule cancellation at period end (user keeps Pro until they're billed next)
-    // The webhook (customer.subscription.deleted) will downgrade them when period actually ends.
-    // We use explicit cancel_at timestamp (works for both classic AND flexible billing modes)
-    // instead of the deprecated cancel_at_period_end parameter.
+    // 4. Schedule cancellation at period end. Two paths:
+    //   (a) Subscription is managed by a schedule (e.g. user switched to annual) →
+    //       must update the SCHEDULE, not the subscription directly.
+    //   (b) Plain subscription → use cancel_at on the subscription itself.
     let periodEnd: number | null = null;
+
     try {
-      // Step 1: Retrieve the subscription to get the current period end timestamp
+      // Retrieve the subscription with schedule expanded
       const existing = await stripe.subscriptions.retrieve(
-        profile.stripe_subscription_id
+        profile.stripe_subscription_id,
+        { expand: ['schedule'] }
       );
+
       periodEnd =
         existing.items?.data?.[0]?.current_period_end ??
         (existing as any).current_period_end ??
@@ -99,10 +102,35 @@ export async function POST(request: Request) {
         );
       }
 
-      // Step 2: Schedule cancellation at that exact timestamp
-      await stripe.subscriptions.update(profile.stripe_subscription_id, {
-        cancel_at: periodEnd
-      });
+      const scheduleId = existing.schedule
+        ? typeof existing.schedule === 'string'
+          ? existing.schedule
+          : existing.schedule.id
+        : null;
+
+      if (scheduleId) {
+        // Path A: subscription is managed by a schedule
+        // Set end_behavior to 'cancel' so the subscription terminates when the
+        // current phase ends (= period end of the active phase = periodEnd)
+        await stripe.subscriptionSchedules.update(scheduleId, {
+          end_behavior: 'cancel',
+          phases: [
+            {
+              items: existing.items.data.map((item) => ({
+                price: item.price.id,
+                quantity: item.quantity || 1
+              })),
+              start_date: (existing.items.data[0] as any).current_period_start,
+              end_date: periodEnd
+            } as any
+          ]
+        });
+      } else {
+        // Path B: plain subscription — use cancel_at directly
+        await stripe.subscriptions.update(profile.stripe_subscription_id, {
+          cancel_at: periodEnd
+        });
+      }
     } catch (stripeError: any) {
       console.error('Stripe Cancellation Error:', stripeError);
       if (stripeError.code === 'resource_missing') {
@@ -112,7 +140,8 @@ export async function POST(request: Request) {
           .update({
             subscription_tier: 'free',
             stripe_subscription_id: null,
-            subscription_cancel_at: null
+            subscription_cancel_at: null,
+            pending_plan_switch: null
           })
           .eq('id', user.id);
         return NextResponse.json({ success: true, alreadyCanceled: true });
@@ -122,7 +151,6 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
     // 5. Mark the cancellation date in DB but keep them on 'pro' until period end
     // The webhook will flip subscription_tier to 'free' when the time actually arrives
     await supabaseAdmin
