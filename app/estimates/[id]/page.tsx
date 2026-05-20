@@ -305,6 +305,7 @@ export default function EstimateView() {
       setCommentInput('');
 
       if (!currentIsOwner && estimate?.is_locked) {
+        // CLIENT posted → notify the OWNER
         try {
           await fetch('/api/send-comment-notification', {
             method: 'POST',
@@ -322,6 +323,32 @@ export default function EstimateView() {
         } catch (notificationError) {
           console.error(
             'Notification email failed to dispatch:',
+            notificationError
+          );
+        }
+      } else if (
+        currentIsOwner &&
+        estimate?.is_locked &&
+        estimate?.client_email
+      ) {
+        // OWNER posted → notify the CLIENT (only if client_email exists)
+        try {
+          await fetch('/api/send-owner-comment-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customId: estimate.custom_id || estimate.id.slice(0, 8),
+              ownerName: payload.author_name,
+              commentContent: cleanCommentText,
+              ownerId: estimate.user_id,
+              clientEmail: estimate.client_email,
+              estimateUrl: window.location.href,
+              country: profile?.country
+            })
+          });
+        } catch (notificationError) {
+          console.error(
+            'Owner→Client notification email failed to dispatch:',
             notificationError
           );
         }
