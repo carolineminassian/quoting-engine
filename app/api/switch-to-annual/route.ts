@@ -172,11 +172,11 @@ export async function POST(request: Request) {
             proration_behavior: 'none'
           },
           {
-            // Phase 2: annual plan, takes over at period end (1 iteration = 1 year)
-            // Note: cast to `any` because Stripe's TS types lag behind the API for
-            // schedule phase properties like `iterations`
+            // Phase 2: annual plan, takes over at period end (1 year duration)
+            // After this phase ends, end_behavior: 'release' detaches the schedule
+            // and the subscription auto-renews as a normal annual subscription.
             items: [{ price: annualPriceId, quantity: 1 }],
-            iterations: 1,
+            duration: { interval: 'year', interval_count: 1 },
             proration_behavior: 'none'
           } as any
         ]

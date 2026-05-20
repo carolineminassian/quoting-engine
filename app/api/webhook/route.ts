@@ -189,14 +189,24 @@ export async function POST(req: Request) {
     // Optional: send an email here, or wait for subscription.deleted to fire
   }
 
-  // Mark event as processed for idempotency — ONLY if it actually did something
-  if (processedSuccessfully) {
-    await supabaseAdmin
-      .from('stripe_events')
-      .insert({ id: event.id, type: event.type });
-  } else {
+ // Mark event as processed for idempotency — ONLY if we actually did something
+if (processedSuccessfully) {
+  await supabaseAdmin
+    .from('stripe_events')
+    .insert({ id: event.id, type: event.type });
+} else {
+  // Only warn for event types we explicitly care about. All other Stripe events
+  // (subscription_schedule.*, charge.*, payment_intent.*, etc.) are received but
+  // intentionally ignored — that's normal and expected.
+  const trackedEventTypes = [
+    'checkout.session.completed',
+    'customer.subscription.deleted',
+    'customer.subscription.updated',
+    'invoice.payment_failed'
+  ];
+  if (trackedEventTypes.includes(event.type)) {
     console.warn(
-      `[webhook] Event ${event.id} (${event.type}) was not processed — skipping idempotency mark so it can retry`
+      `[webhook] Tracked event ${event.id} (${event.type}) was not processed — investigate`
     );
   }
 
