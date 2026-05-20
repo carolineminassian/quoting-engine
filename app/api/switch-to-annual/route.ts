@@ -166,16 +166,19 @@ export async function POST(request: Request) {
           {
             // Phase 1: existing monthly plan, ends at current period end
             items: [{ price: currentPriceId, quantity: 1 }],
-            start_date: subscription.items.data[0].current_period_start as any,
+            start_date: (subscription.items.data[0] as any)
+              .current_period_start,
             end_date: periodEnd as any,
             proration_behavior: 'none'
           },
           {
-            // Phase 2: annual plan, takes over at period end
+            // Phase 2: annual plan, takes over at period end (1 iteration = 1 year)
+            // Note: cast to `any` because Stripe's TS types lag behind the API for
+            // schedule phase properties like `iterations`
             items: [{ price: annualPriceId, quantity: 1 }],
-            iterations: 1, // 1 year duration; will auto-renew via end_behavior: 'release'
+            iterations: 1,
             proration_behavior: 'none'
-          }
+          } as any
         ]
       });
     } catch (err: any) {
