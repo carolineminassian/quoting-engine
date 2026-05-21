@@ -134,7 +134,7 @@ export default function EstimateView() {
 
       // Auto-mark this estimate as "seen" by clearing any pending notifications.
       // Only the OWNER's notifications get cleared — guests don't have any.
-      if (user?.id === est.user_id) {
+      if (user && user.id === est.user_id) {
         const { error: clearError } = await supabase
           .from('estimate_notifications')
           .delete()
