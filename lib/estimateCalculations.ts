@@ -305,13 +305,25 @@ export function getAdditionalChargeAmountCents(
     return Math.round(basisCents * (rate / 100));
   }
 
-  // Flat charge: qty × cost × (1 + margin/100)
+  // Flat charge: qty × cost × margin_multiplier
+  // Margin mode rules:
+  //   - 'none'     → no margin
+  //   - 'global'   → use estimate.global_margin_snapshot
+  //   - 'service'  → no margin (service margins are per-section, charges are project-level)
+  //   - 'granular' → use the charge's own marginRate field
+  // The per-charge marginRate is intentionally ignored unless mode === 'granular',
+  // so switching modes doesn't carry stale margins.
   const qty = charge.qty || 1;
   const cost = charge.costPerUnitCents || 0;
-  const marginMultiplier = 1 + (charge.marginRate || 0) / 100;
+  const mode = estimate.margin_mode_snapshot || 'none';
+  let marginMultiplier = 1;
+  if (mode === 'global') {
+    marginMultiplier = 1 + (estimate.global_margin_snapshot || 0) / 100;
+  } else if (mode === 'granular') {
+    marginMultiplier = 1 + (charge.marginRate || 0) / 100;
+  }
   return Math.round(qty * cost * marginMultiplier);
 }
-
 /**
  * Sum all additional charges in cents. Used for display totals.
  */

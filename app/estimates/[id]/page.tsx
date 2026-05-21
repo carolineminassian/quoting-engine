@@ -15,8 +15,11 @@ import {
   getSectionTotal,
   getTaxSummary,
   generateDescription,
-  buildMaterialsMap
+  buildMaterialsMap,
+  getAdditionalChargeAmountCents,
+  type AdditionalCharge
 } from '@/lib/estimateCalculations';
+import { formatMoney } from '@/lib/formatMoney';
 
 interface BrandLogoProps {
   country: 'US' | 'FR';
@@ -194,6 +197,42 @@ export default function EstimateView() {
     }),
     [lang]
   );
+
+  // Convenience wrapper: bind the helper to the current profile for cleaner call-sites
+  const fmt = (cents: number) =>
+    formatMoney(cents, profile?.currency, profile?.country);
+
+  // Resolve a percentage charge's basis into human-readable text.
+  // Falls back to "project" if a referenced section/item no longer exists.
+  const getChargeBasisLabel = (charge: AdditionalCharge): string => {
+    if (!charge.isPercentage) return '';
+
+    const sectionIdx = charge.basisSectionIdx;
+    const itemIdx = charge.basisItemIdx;
+    const sections = estimate?.sections || [];
+
+    if (
+      charge.basisType === 'item' &&
+      typeof sectionIdx === 'number' &&
+      typeof itemIdx === 'number' &&
+      sections[sectionIdx]?.items?.[itemIdx]
+    ) {
+      const item = sections[sectionIdx].items[itemIdx];
+      const m = materialsById.get(item.materialId);
+      const name = item.name || m?.name;
+      if (name) return name;
+    }
+
+    if (
+      charge.basisType === 'section' &&
+      typeof sectionIdx === 'number' &&
+      sections[sectionIdx]?.title
+    ) {
+      return sections[sectionIdx].title;
+    }
+
+    return lang?.basisProject || 'Project';
+  };
 
   // --- ACTIONS ---
 
@@ -475,8 +514,10 @@ export default function EstimateView() {
           estimate,
           estimate.sections || [],
           profile.tax_rate,
-          materialsById
+          materialsById,
+          estimate.additional_charges || []
         );
+
       const isShowingDetails = estimate.is_locked
         ? estimate.show_details_snapshot === true
         : showDetails;
@@ -515,6 +556,29 @@ export default function EstimateView() {
         })
       }));
 
+      // Pre-compute charges with their resolved amounts + basis labels.
+      // The PDF receives them ready-to-render so it doesn't need access to the calc lib.
+      const preparedCharges = (
+        (estimate.additional_charges || []) as AdditionalCharge[]
+      ).map((charge) => ({
+        name: charge.name || '',
+        isPercentage: !!charge.isPercentage,
+        percentageRate: charge.percentageRate || 0,
+        qty: charge.qty || 1,
+        unit:
+          (charge.unit && lang?.units?.[charge.unit]) || charge.unit || 'ea',
+        costPerUnitCents: charge.costPerUnitCents || 0,
+        taxRate:
+          charge.taxRate !== undefined ? charge.taxRate : profile.tax_rate,
+        amountCents: getAdditionalChargeAmountCents(
+          estimate,
+          charge,
+          estimate.sections || [],
+          materialsById
+        ),
+        basisLabel: getChargeBasisLabel(charge)
+      }));
+
       const blob = await pdf(
         <EstimatePDF
           estimate={estimate}
@@ -524,6 +588,7 @@ export default function EstimateView() {
           taxGroups={Object.entries(pdfTaxGroups) as any}
           grandTotal={estimate.total_amount_cents / 100}
           sections={preparedSections}
+          additionalCharges={preparedCharges}
         />
       ).toBlob();
       const url = URL.createObjectURL(blob);
@@ -613,7 +678,8 @@ export default function EstimateView() {
     estimate,
     estimate.sections || [],
     profile.tax_rate,
-    materialsById
+    materialsById,
+    estimate.additional_charges || []
   );
   const isShowingDetails = estimate.is_locked
     ? estimate.show_details_snapshot === true
@@ -626,7 +692,7 @@ export default function EstimateView() {
     : parseInt(rawTerms.replace('_days', '')) || 30;
 
   return (
-    <div className="min-h-screen bg-gray-100 text-black font-sans print:bg-white flex flex-col">
+    <div className="min-h-screen bg-gray-50 text-black font-sans print:bg-white flex flex-col">
       {/* --- GUEST NAVBAR --- */}
       {!isOwner && (
         <nav className="w-full bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center print:hidden shadow-sm sticky top-0 z-50">
@@ -638,18 +704,19 @@ export default function EstimateView() {
 
       <main className="flex-1 p-4 sm:p-8 relative print:p-0">
         <div className="max-w-4xl mx-auto print:max-w-none print:w-full">
+          {/* === ACTION TOOLBAR (owner controls + buttons) === */}
           <div
-            className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-8 print:hidden ${isOwner ? 'justify-between' : 'justify-end'}`}
+            className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6 print:hidden ${isOwner ? 'justify-between' : 'justify-end'}`}
           >
             {isOwner && (
-              <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full sm:w-auto">
                 <LinkButton href="/dashboard" variant="secondary" size="sm">
-                  &larr; {lang.dashboard}
+                  ← {lang.dashboard}
                 </LinkButton>
 
                 {!estimate.is_locked && (
-                  <div className="flex justify-between sm:justify-start items-center gap-2 bg-white px-3 py-2 rounded border border-gray-200">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                  <div className="flex justify-between sm:justify-start items-center gap-2.5 bg-white px-3.5 py-2 rounded-lg border border-gray-200 shadow-sm">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                       {lang.internalDetails}
                     </span>
                     <button
@@ -764,45 +831,60 @@ export default function EstimateView() {
             </div>
           </div>
 
-          {/* --- CLIENT APPROVAL BANNER --- */}
+          {/* === STATUS BANNER (refined, lighter feel) === */}
           {estimate.is_locked && (
             <div
-              className={`mb-8 p-4 sm:p-6 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden ${
+              className={`mb-6 px-5 py-3.5 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden ${
                 estimate.client_status === 'approved'
-                  ? 'bg-green-50 border-green-200'
+                  ? 'bg-green-50/60 border-green-200'
                   : estimate.client_status === 'rejected'
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-blue-50 border-blue-200'
+                    ? 'bg-red-50/60 border-red-200'
+                    : 'bg-blue-50/60 border-blue-200'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 {estimate.client_status === 'approved' && (
-                  <span className="text-green-700 font-black uppercase tracking-widest text-sm">
-                    ✓ {lang.estimateApproved}
-                  </span>
+                  <>
+                    <span className="text-green-600 text-base leading-none">
+                      ✓
+                    </span>
+                    <span className="text-green-700 font-bold text-sm">
+                      {lang.estimateApproved}
+                    </span>
+                  </>
                 )}
                 {estimate.client_status === 'rejected' && (
-                  <span className="text-red-700 font-black uppercase tracking-widest text-sm">
-                    ✕ {lang.estimateRejected}
-                  </span>
+                  <>
+                    <span className="text-red-600 text-base leading-none">
+                      ✕
+                    </span>
+                    <span className="text-red-700 font-bold text-sm">
+                      {lang.estimateRejected}
+                    </span>
+                  </>
                 )}
                 {(estimate.client_status === 'pending' ||
                   !estimate.client_status) && (
-                  <span className="text-blue-700 font-black uppercase tracking-widest text-sm">
-                    ⏳ {lang.pendingApproval}
-                  </span>
+                  <>
+                    <span className="text-blue-600 text-base leading-none">
+                      ⏳
+                    </span>
+                    <span className="text-blue-700 font-bold text-sm">
+                      {lang.pendingApproval}
+                    </span>
+                  </>
                 )}
               </div>
 
               {!isOwner &&
                 (estimate.client_status === 'pending' ||
                   !estimate.client_status) && (
-                  <div className="flex w-full sm:w-auto gap-3">
+                  <div className="flex w-full sm:w-auto gap-2.5">
                     <Button
                       variant="soft-danger"
                       size="md"
                       onClick={() => handleStatusChange('rejected')}
-                      className="flex-1 sm:flex-none px-6"
+                      className="flex-1 sm:flex-none px-5"
                     >
                       {lang.reject}
                     </Button>
@@ -810,7 +892,7 @@ export default function EstimateView() {
                       variant="success"
                       size="md"
                       onClick={() => handleStatusChange('approved')}
-                      className="flex-1 sm:flex-none px-6"
+                      className="flex-1 sm:flex-none px-5"
                     >
                       {lang.approveEstimate}
                     </Button>
@@ -819,83 +901,100 @@ export default function EstimateView() {
             </div>
           )}
 
-          {/* --- MAIN ESTIMATE BOX --- */}
-          <div className="bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:shadow-none print:border-none print:p-12 min-h-[1056px] print:min-h-0 print:block flex flex-col">
-            <div className="grid grid-cols-2 gap-4 sm:gap-8 mb-16 items-start">
-              <div className="min-w-0 space-y-6 sm:space-y-12 flex flex-col text-left">
-                <div>
-                  <h1 className="text-2xl sm:text-5xl font-black uppercase tracking-tighter break-words text-gray-900">
-                    {lang.estimateLabel}
-                  </h1>
+          {/* === MAIN ESTIMATE DOCUMENT === */}
+          <article className="bg-white shadow-xl border border-gray-200 rounded-xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
+            <div className="p-8 sm:p-14 print:p-12">
+              {/* === LETTERHEAD — stays horizontal at all viewports === */}
+              <header className="flex items-start justify-between gap-4 sm:gap-6 pb-8 mb-12 border-b border-gray-200">
+                {/* Left: business identity */}
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  {profile.subscription_tier === 'pro' && profile.logo_url && (
+                    <img
+                      src={profile.logo_url}
+                      alt=""
+                      className="h-10 sm:h-14 w-auto object-contain shrink-0"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <h2 className="text-base sm:text-2xl font-black text-gray-900 tracking-tight break-words leading-tight">
+                      {profile.business_name}
+                    </h2>
+                  </div>
                 </div>
 
+                {/* Right: document metadata — always right-aligned */}
+                <div className="text-right shrink-0">
+                  <p className="text-[9px] sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] font-bold text-gray-400 mb-1.5 sm:mb-2">
+                    {lang.estimateLabel}
+                  </p>
+                  <p className="font-mono text-xs sm:text-sm font-bold text-gray-900 break-all">
+                    #{estimate.custom_id || estimate.id.slice(0, 8)}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 font-medium whitespace-nowrap">
+                    {new Date(estimate.created_at).toLocaleDateString(
+                      profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                      { year: 'numeric', month: 'short', day: 'numeric' }
+                    )}
+                  </p>
+                </div>
+              </header>
+
+              {/* === BILL TO === */}
+              <section className="mb-12">
+                <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-gray-400 mb-3">
+                  {lang.clientLabel}
+                </p>
                 <div className="space-y-1">
-                  <span className="block text-[9px] uppercase tracking-wider font-black text-gray-300">
-                    {lang.clientLabel}
-                  </span>
-                  <p className="text-sm sm:text-lg font-black text-gray-800 break-words">
+                  <p className="text-lg font-bold text-gray-900 break-words">
                     {estimate.client_name}
                   </p>
                   {estimate.client_address && (
-                    <p className="text-xs sm:text-sm text-gray-400 whitespace-pre-wrap break-words leading-relaxed">
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap break-words leading-relaxed">
                       {estimate.client_address}
                     </p>
                   )}
                   {estimate.client_phone && (
-                    <p className="text-[10px] sm:text-xs text-gray-400 font-medium break-words">
+                    <p className="text-sm text-gray-500 break-words">
                       {estimate.client_phone}
                     </p>
                   )}
                   {estimate.client_email && (
-                    <p className="text-[10px] sm:text-xs text-gray-400 font-medium break-words">
+                    <p className="text-sm text-gray-500 break-words">
                       {estimate.client_email}
                     </p>
                   )}
                 </div>
-              </div>
+              </section>
 
-              <div className="text-right flex flex-col items-end min-w-0 shrink-0">
-                {profile.subscription_tier === 'pro' && profile.logo_url && (
-                  <img
-                    src={profile.logo_url}
-                    alt="Business Logo"
-                    className="h-10 sm:h-16 w-auto object-contain mb-3 sm:mb-4"
-                  />
-                )}
-
-                <h2 className="text-lg sm:text-3xl font-black italic text-blue-600 uppercase tracking-tighter mb-1 sm:mb-2 break-words max-w-full">
-                  {profile.business_name}
-                </h2>
-                <p className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-widest">
-                  {lang.dateLabel}{' '}
-                  {new Date(estimate.created_at).toLocaleDateString(
-                    profile.country === 'FR' ? 'fr-FR' : 'en-US'
-                  )}
-                </p>
-                <p className="text-[10px] sm:text-xs text-gray-300 font-mono mt-0.5 sm:mt-1 break-all max-w-full">
-                  {lang.refLabel}{' '}
-                  {estimate.custom_id || estimate.id.slice(0, 8)}
-                </p>
-              </div>
-            </div>
-
-            <table className="w-full mb-20 table-fixed">
-              <thead className="border-b-4 border-black text-[10px] uppercase font-black tracking-[0.3em] text-gray-300">
-                <tr>
-                  <th className="py-4 text-left w-3/4">
+              {/* === SERVICES === */}
+              <section className="mb-10">
+                <div className="flex items-baseline justify-between pb-3 mb-2 border-b-4 border-black">
+                  <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-700">
                     {lang.serviceCategoryHeader}
-                  </th>
-                  <th className="py-4 text-right w-1/4">{lang.amountHeader}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {estimate.sections.map((sec: any, idx: number) => (
-                  <tr key={idx}>
-                    <td className="py-8 pr-4 sm:pr-12 min-w-0 alignment-safe">
-                      <p className="font-bold text-xl text-gray-800 mb-1 break-words">
-                        {sec.title || lang.professionalServices}
-                      </p>
-                      <p className="text-xs text-gray-400 font-medium leading-relaxed mb-3 whitespace-pre-wrap break-words max-w-2xl">
+                  </p>
+                  <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-400">
+                    {lang.amountHeader}
+                  </p>
+                </div>
+
+                <div>
+                  {estimate.sections.map((sec: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="py-6 border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="flex justify-between items-baseline gap-4 mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 break-words">
+                          {sec.title || lang.professionalServices}
+                        </h3>
+                        <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0">
+                          {fmt(
+                            getSectionTotal(estimate, sec, materialsById) * 100
+                          )}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words max-w-3xl">
                         {generateDescription(
                           estimate,
                           sec,
@@ -904,30 +1003,29 @@ export default function EstimateView() {
                         )}
                       </p>
 
+                      {/* Items — subtle inline list, or detailed breakdown when toggled */}
                       {isShowingDetails ? (
-                        <div className="text-[10px] text-gray-500 font-mono bg-gray-50 p-3 rounded border border-gray-100 space-y-1.5 max-w-2xl">
+                        <div className="mt-4 pl-4 border-l-2 border-gray-100 space-y-1.5 max-w-3xl">
                           {sec.laborHours > 0 && (
-                            <p className="break-words">
-                              &rarr; {lang.laborLabel}: {sec.laborHours}
+                            <p className="text-xs text-gray-500 leading-relaxed break-words">
+                              <span className="text-gray-400">
+                                {lang.laborLabel}:
+                              </span>{' '}
+                              {sec.laborHours}
                               {sec.laborType === 'daily'
                                 ? lang.laborDayUnit
                                 : 'h'}{' '}
-                              @{' '}
-                              {(getEffectiveLaborRateCents(estimate, sec) / 100)
-                                .toFixed(2)
-                                .replace(
-                                  '.',
-                                  profile.currency === 'EUR' ? ',' : '.'
-                                )}
-                              {profile.currency === 'EUR' ? '€' : '$'}
+                              × {fmt(getEffectiveLaborRateCents(estimate, sec))}
                               {sec.laborType === 'daily'
                                 ? lang.laborDayPerUnit
                                 : '/h'}{' '}
-                              (Tax:{' '}
-                              {sec.laborTaxRate !== undefined
-                                ? sec.laborTaxRate
-                                : profile.tax_rate}
-                              %)
+                              <span className="text-gray-400">
+                                ({lang.tax}{' '}
+                                {sec.laborTaxRate !== undefined
+                                  ? sec.laborTaxRate
+                                  : profile.tax_rate}
+                                %)
+                              </span>
                             </p>
                           )}
                           {sec.items.map((item: any, i: number) => {
@@ -944,41 +1042,30 @@ export default function EstimateView() {
                             const displayUnit =
                               lang?.units?.[rawUnit] || rawUnit;
                             return (
-                              <div
+                              <p
                                 key={i}
-                                className="flex flex-wrap items-baseline gap-x-1 break-words"
+                                className="text-xs text-gray-500 leading-relaxed break-words"
                               >
-                                <span>&rarr;</span>
-                                <span className="font-semibold text-gray-700 truncate max-w-[200px] sm:max-w-sm">
-                                  {displayName}
-                                </span>
-                                <span className="shrink-0">
-                                  : {item.qty}
-                                  {displayUnit ? ` ${displayUnit}` : ''} @
-                                </span>
-                                <span className="shrink-0">
-                                  {(displayCostCents / 100)
-                                    .toFixed(2)
-                                    .replace(
-                                      '.',
-                                      profile.currency === 'EUR' ? ',' : '.'
-                                    )}
-                                  {profile.currency === 'EUR' ? '€' : '$'}
-                                </span>
-                                <span className="text-gray-400 shrink-0">
-                                  (Tax:{' '}
+                                <span className="text-gray-700 font-medium">
+                                  {displayName}:
+                                </span>{' '}
+                                {item.qty}
+                                {displayUnit ? ` ${displayUnit}` : ''} ×{' '}
+                                {fmt(displayCostCents)}{' '}
+                                <span className="text-gray-400">
+                                  ({lang.tax}{' '}
                                   {item.taxRate !== undefined
                                     ? item.taxRate
                                     : profile.tax_rate}
                                   %)
                                 </span>
-                              </div>
+                              </p>
                             );
                           })}
                         </div>
                       ) : (
                         sec.items.length > 0 && (
-                          <div className="text-[10px] text-gray-400 font-mono mt-2 space-y-1 max-w-2xl">
+                          <ul className="mt-3 space-y-1 max-w-3xl">
                             {sec.items.map((item: any, i: number) => {
                               const m = materialsById.get(item.materialId);
                               const displayName =
@@ -988,220 +1075,281 @@ export default function EstimateView() {
                                 lang?.units?.[rawUnit] || rawUnit;
 
                               return (
-                                <div
+                                <li
                                   key={i}
-                                  className="flex items-baseline gap-1 break-words"
+                                  className="text-xs text-gray-500 flex items-baseline gap-2 break-words"
                                 >
-                                  <span>&bull;</span>
-                                  <span className="truncate max-w-[220px] sm:max-w-md font-medium">
+                                  <span className="text-gray-300 shrink-0">
+                                    ·
+                                  </span>
+                                  <span>
                                     {displayName}
+                                    {item.qty || displayUnit ? (
+                                      <span className="text-gray-400">
+                                        {' '}
+                                        ({item.qty}
+                                        {displayUnit ? ` ${displayUnit}` : ''})
+                                      </span>
+                                    ) : null}
                                   </span>
-                                  <span className="shrink-0">
-                                    ({item.qty}
-                                    {displayUnit ? ` ${displayUnit}` : ''})
-                                  </span>
-                                </div>
+                                </li>
                               );
                             })}
-                          </div>
+                          </ul>
                         )
                       )}
-                    </td>
-                    <td className="py-8 text-right font-mono font-black text-xl text-gray-700 align-top shrink-0 whitespace-nowrap">
-                      {profile.currency === 'EUR' ? '€' : '$'}
-                      {getSectionTotal(estimate, sec, materialsById)
-                        .toFixed(2)
-                        .replace('.', profile.currency === 'EUR' ? ',' : '.')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="flex justify-end pt-10 border-t-2 border-gray-100">
-              <div className="w-full sm:w-72 space-y-4">
-                <div className="flex justify-between text-[10px] font-black text-gray-300 uppercase tracking-widest">
-                  <span>{lang.subtotalHT}</span>
-                  <span className="text-gray-600 font-mono whitespace-nowrap">
-                    {profile.currency === 'EUR' ? '€' : '$'}
-                    {(subtotalCents / 100)
-                      .toFixed(2)
-                      .replace('.', profile.currency === 'EUR' ? ',' : '.')}
-                  </span>
-                </div>
-                {Object.entries(taxGroups)
-                  .sort((a, b) => Number(b[0]) - Number(a[0]))
-                  .map(([rate, amt]) => (
-                    <div
-                      key={rate}
-                      className="flex justify-between text-[10px] font-black text-gray-300 uppercase tracking-widest"
-                    >
-                      <span>
-                        {lang.tax} ({rate}%)
-                      </span>
-                      <span className="text-gray-600 font-mono whitespace-nowrap">
-                        {profile.currency === 'EUR' ? '€' : '$'}
-                        {(amt / 100)
-                          .toFixed(2)
-                          .replace('.', profile.currency === 'EUR' ? ',' : '.')}
-                      </span>
                     </div>
                   ))}
-                <div className="flex justify-between border-t-4 border-black pt-6 items-baseline">
-                  <span className="text-2xl font-black uppercase tracking-tighter">
-                    {lang.grandTotalLabel}
-                  </span>
-                  <span className="text-3xl font-black font-mono text-blue-600 whitespace-nowrap">
-                    {profile.currency === 'EUR' ? '€' : '$'}
-                    {(estimate.total_amount_cents / 100)
-                      .toFixed(2)
-                      .replace('.', profile.currency === 'EUR' ? ',' : '.')}
-                  </span>
                 </div>
+              </section>
 
-                {/* Conditional Deposit Breakdown */}
-                {estimate.deposit_enabled && (
-                  <div className="pt-4 border-t border-dashed border-gray-200 space-y-3">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50/50 p-2 rounded">
-                      <span>
-                        {lang.depositLabel} ({estimate.deposit_percentage}%)
-                      </span>
-                      <span className="font-mono font-bold whitespace-nowrap">
-                        {profile.currency === 'EUR' ? '€' : '$'}
-                        {(
-                          (estimate.total_amount_cents *
-                            (estimate.deposit_percentage || 20)) /
-                          10000
-                        )
-                          .toFixed(2)
-                          .replace('.', profile.currency === 'EUR' ? ',' : '.')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">
-                      <span>{lang.balanceDue}</span>
-                      <span className="font-mono text-gray-700 whitespace-nowrap">
-                        {profile.currency === 'EUR' ? '€' : '$'}
-                        {(
-                          (estimate.total_amount_cents *
-                            (100 - (estimate.deposit_percentage || 20))) /
-                          10000
-                        )
-                          .toFixed(2)
-                          .replace('.', profile.currency === 'EUR' ? ',' : '.')}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-16 pt-8 border-t border-gray-100 print:mt-16 print:break-inside-avoid">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
-                    {lang.complianceLegal}
-                  </p>
-                  <p className="text-[10px] text-gray-400 leading-relaxed italic break-words">
-                    {lang.complianceText}
-                  </p>
-                </div>
-                <div className="text-left sm:text-right min-w-0 sm:pl-16">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
-                    {lang.termsHeader}
-                  </p>
-                  <p className="text-[10px] text-gray-400 leading-relaxed font-bold break-words sm:pl-16">
-                    {(() => {
-                      const balanceText = isUponReceipt
-                        ? lang.termsBalanceUponReceipt
-                        : t(lang.termsBalanceWithinDays, {
-                            days: displayPaymentDays
-                          });
-                      return estimate.deposit_enabled
-                        ? t(lang.termsWithDeposit, {
-                            pct: estimate.deposit_percentage || 0,
-                            balance: balanceText
-                          })
-                        : t(lang.termsNoDeposit, { balance: balanceText });
-                    })()}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* --- INTERACTIVE SECURE COMMENT THREAD --- */}
-          {estimate.is_locked && (
-            <div className="mt-8 bg-white p-6 sm:p-12 shadow-2xl border border-gray-200 rounded-sm print:hidden">
-              <h3 className="text-xl font-black uppercase tracking-tight mb-6 text-gray-900 border-b-2 border-black pb-2">
-                {lang.discussionMods}
-              </h3>
-
-              {/* Messages Wrapper */}
-              <div className="space-y-4 max-h-96 overflow-y-auto mb-6 pr-2">
-                {comments.length === 0 ? (
-                  <p className="text-xs text-gray-400 font-medium italic">
-                    {lang.noMessagesYet}
-                  </p>
-                ) : (
-                  comments.map((comm) => (
-                    <div
-                      key={comm.id}
-                      className={`flex flex-col max-w-[85%] rounded p-4 border ${
-                        comm.is_owner
-                          ? 'ml-auto bg-blue-50/50 border-blue-100 items-end'
-                          : 'mr-auto bg-gray-50 border-gray-100 items-start'
-                      }`}
-                    >
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <span
-                          className={`text-[10px] font-black uppercase tracking-wider ${comm.is_owner ? 'text-blue-600' : 'text-gray-500'}`}
-                        >
-                          {comm.author_name}
-                        </span>
-                        <span className="text-[9px] text-gray-300 font-mono">
-                          {new Date(comm.created_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
-                        {comm.content}
+              {/* === ADDITIONAL CHARGES === */}
+              {Array.isArray(estimate.additional_charges) &&
+                estimate.additional_charges.length > 0 && (
+                  <section className="mb-10">
+                    <div className="flex items-baseline justify-between pb-3 mb-2 border-b-2 border-gray-300">
+                      <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-700">
+                        {lang.additionalCharges}
+                      </p>
+                      <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-400">
+                        {lang.amountHeader}
                       </p>
                     </div>
-                  ))
-                )}
-              </div>
 
-              {/* Submission Input Block */}
-              <form
-                onSubmit={handlePostComment}
-                className="mt-4 border-t border-gray-100 pt-4"
-              >
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                  {lang.addMessage}
-                </label>
-                <div className="flex flex-col sm:flex-row gap-2 items-stretch">
-                  <textarea
-                    rows={2}
-                    value={commentInput}
-                    onChange={(e) => setCommentInput(e.target.value)}
-                    placeholder={lang.requestRevisions}
-                    className="flex-1 p-3 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-600 resize-none text-black placeholder-gray-300 bg-white"
-                  />
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="md"
-                    loading={submittingComment}
-                    loadingText={lang.sending}
-                    disabled={!commentInput.trim()}
-                    className="self-end sm:self-stretch w-full sm:w-auto min-w-[120px] px-6"
-                  >
-                    {lang.send}
-                  </Button>
+                    <div>
+                      {estimate.additional_charges.map(
+                        (charge: AdditionalCharge, idx: number) => {
+                          const amountCents = getAdditionalChargeAmountCents(
+                            estimate,
+                            charge,
+                            estimate.sections || [],
+                            materialsById
+                          );
+
+                          // Subtitle: percentage charges show "X% · basis"; flat charges
+                          // show "qty unit × post-margin unit price" (matching items style).
+                          let subtitle = '';
+                          if (charge.isPercentage) {
+                            subtitle = `${charge.percentageRate || 0}% · ${getChargeBasisLabel(charge)}`;
+                          } else {
+                            const unitLabel =
+                              lang.units?.[charge.unit || 'ea'] ||
+                              charge.unit ||
+                              '';
+                            const qty = charge.qty || 1;
+                            const effectivePerUnitCents =
+                              qty > 0 ? amountCents / qty : 0;
+                            subtitle = `${qty} ${unitLabel} × ${fmt(effectivePerUnitCents)}`;
+                          }
+
+                          return (
+                            <div
+                              key={idx}
+                              className="py-4 border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="flex justify-between items-baseline gap-4">
+                                <div className="min-w-0">
+                                  <h4 className="text-base font-bold text-gray-900 break-words">
+                                    {charge.name || lang.additionalCharges}
+                                  </h4>
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    {subtitle}
+                                  </p>
+                                </div>
+                                <span className="font-mono font-bold text-base text-gray-900 whitespace-nowrap shrink-0">
+                                  {fmt(amountCents)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
+                  </section>
+                )}
+
+              {/* === TOTALS === */}
+              <section className="flex justify-end pt-10 mb-12 border-t-4 border-gray-200">
+                <div className="w-full sm:w-80 space-y-3">
+                  <div className="flex justify-between items-baseline text-sm">
+                    <span className="text-gray-500 font-medium">
+                      {lang.subtotalHT}
+                    </span>
+                    <span className="font-mono font-bold text-gray-900 whitespace-nowrap">
+                      {fmt(subtotalCents)}
+                    </span>
+                  </div>
+
+                  {Object.entries(taxGroups)
+                    .sort((a, b) => Number(b[0]) - Number(a[0]))
+                    .map(([rate, amt]) => (
+                      <div
+                        key={rate}
+                        className="flex justify-between items-baseline text-sm"
+                      >
+                        <span className="text-gray-500 font-medium">
+                          {lang.tax} ({rate}%)
+                        </span>
+                        <span className="font-mono font-bold text-gray-900 whitespace-nowrap">
+                          {fmt(amt)}
+                        </span>
+                      </div>
+                    ))}
+
+                  <div className="flex justify-between items-baseline pt-6 border-t-4 border-black">
+                    <span className="text-base font-bold text-gray-900 uppercase tracking-wide">
+                      {lang.grandTotalLabel}
+                    </span>
+                    <span className="text-2xl font-black font-mono text-blue-600 whitespace-nowrap">
+                      {fmt(estimate.total_amount_cents)}
+                    </span>
+                  </div>
+
+                  {/* Conditional Deposit Breakdown */}
+                  {estimate.deposit_enabled && (
+                    <div className="pt-4 border-t border-dashed border-gray-200 space-y-2">
+                      <div className="flex justify-between items-baseline text-sm bg-blue-50/50 px-3 py-2 rounded">
+                        <span className="text-blue-600 font-medium">
+                          {lang.depositLabel} ({estimate.deposit_percentage}%)
+                        </span>
+                        <span className="font-mono font-bold text-blue-600 whitespace-nowrap">
+                          {fmt(
+                            (estimate.total_amount_cents *
+                              (estimate.deposit_percentage || 20)) /
+                              100
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-baseline text-sm px-3">
+                        <span className="text-gray-500 font-medium">
+                          {lang.balanceDue}
+                        </span>
+                        <span className="font-mono font-bold text-gray-700 whitespace-nowrap">
+                          {fmt(
+                            (estimate.total_amount_cents *
+                              (100 - (estimate.deposit_percentage || 20))) /
+                              100
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </form>
+              </section>
+
+              {/* === COMPLIANCE / TERMS FOOTER (left untouched per user request) === */}
+              <div className="mt-16 pt-8 border-t border-gray-100 print:mt-16 print:break-inside-avoid">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
+                      {lang.complianceLegal}
+                    </p>
+                    <p className="text-[10px] text-gray-400 leading-relaxed italic break-words">
+                      {lang.complianceText}
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right min-w-0 sm:pl-16">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
+                      {lang.termsHeader}
+                    </p>
+                    <p className="text-[10px] text-gray-400 leading-relaxed font-bold break-words sm:pl-16">
+                      {(() => {
+                        const balanceText = isUponReceipt
+                          ? lang.termsBalanceUponReceipt
+                          : t(lang.termsBalanceWithinDays, {
+                              days: displayPaymentDays
+                            });
+                        return estimate.deposit_enabled
+                          ? t(lang.termsWithDeposit, {
+                              pct: estimate.deposit_percentage || 0,
+                              balance: balanceText
+                            })
+                          : t(lang.termsNoDeposit, { balance: balanceText });
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          {/* === COMMENTS THREAD (refined, separate block) === */}
+          {estimate.is_locked && (
+            <div className="mt-6 bg-white shadow-xl border border-gray-200 rounded-xl overflow-hidden print:hidden">
+              <div className="p-8 sm:p-12">
+                <div className="mb-8 pb-4 border-b border-gray-200">
+                  <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-gray-400 mb-1">
+                    {lang.discussionMods}
+                  </p>
+                </div>
+
+                {/* Messages */}
+                <div className="space-y-3 max-h-96 overflow-y-auto mb-6 pr-2">
+                  {comments.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">
+                      {lang.noMessagesYet}
+                    </p>
+                  ) : (
+                    comments.map((comm) => (
+                      <div
+                        key={comm.id}
+                        className={`flex flex-col max-w-[85%] rounded-lg p-4 ${
+                          comm.is_owner
+                            ? 'ml-auto bg-blue-50/70 border border-blue-100 items-end'
+                            : 'mr-auto bg-gray-50 border border-gray-100 items-start'
+                        }`}
+                      >
+                        <div className="flex items-baseline gap-2 mb-1.5">
+                          <span
+                            className={`text-[10px] font-black uppercase tracking-wider ${comm.is_owner ? 'text-blue-600' : 'text-gray-500'}`}
+                          >
+                            {comm.author_name}
+                          </span>
+                          <span className="text-[9px] text-gray-300 font-mono">
+                            {new Date(comm.created_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
+                          {comm.content}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Submission Input */}
+                <form
+                  onSubmit={handlePostComment}
+                  className="mt-4 pt-4 border-t border-gray-200"
+                >
+                  <label className="block text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400 mb-2">
+                    {lang.addMessage}
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                    <textarea
+                      rows={2}
+                      value={commentInput}
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      placeholder={lang.requestRevisions}
+                      className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-600 resize-none text-gray-900 placeholder-gray-400 bg-white transition-colors"
+                    />
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      loading={submittingComment}
+                      loadingText={lang.sending}
+                      disabled={!commentInput.trim()}
+                      className="self-end sm:self-stretch w-full sm:w-auto min-w-[120px] px-6"
+                    >
+                      {lang.send}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>

@@ -14,6 +14,7 @@ import {
   buildMaterialsMap,
   hydrateSections
 } from '@/lib/estimateCalculations';
+import { formatMoney } from '@/lib/formatMoney';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -1031,13 +1032,11 @@ export default function DashboardPage() {
                     </div>
                     {/* Mobile Price */}
                     <p className="sm:hidden font-mono font-black text-lg text-blue-600">
-                      {est.currency_snapshot === 'EUR' ? '€' : '$'}
-                      {(est.total_amount_cents / 100)
-                        .toFixed(2)
-                        .replace(
-                          '.',
-                          est.currency_snapshot === 'EUR' ? ',' : '.'
-                        )}
+                      {formatMoney(
+                        est.total_amount_cents,
+                        est.currency_snapshot,
+                        est.currency_snapshot === 'EUR' ? 'FR' : 'US'
+                      )}
                     </p>
                   </div>
 
@@ -1082,13 +1081,11 @@ export default function DashboardPage() {
                       {lang.grandTotal}
                     </p>
                     <p className="font-mono font-black text-xl text-gray-800 group-hover:text-blue-600 transition-colors">
-                      {est.currency_snapshot === 'EUR' ? '€' : '$'}
-                      {(est.total_amount_cents / 100)
-                        .toFixed(2)
-                        .replace(
-                          '.',
-                          est.currency_snapshot === 'EUR' ? ',' : '.'
-                        )}
+                      {formatMoney(
+                        est.total_amount_cents,
+                        est.currency_snapshot,
+                        est.currency_snapshot === 'EUR' ? 'FR' : 'US'
+                      )}
                     </p>
                   </div>
 

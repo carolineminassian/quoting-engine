@@ -9,6 +9,7 @@ import {
   getRawLaborRateCents,
   getRawItemCostCents
 } from '@/lib/estimateCalculations';
+import { formatMoney } from '@/lib/formatMoney';
 import LoadingDots from '@/components/LoadingDots';
 import LinkButton from '@/components/LinkButton';
 import {
@@ -115,14 +116,12 @@ export default function AnalyticsPage() {
     return cents;
   };
 
+  // Analytics shows whole-dollar amounts (no cents) for cleaner big numbers.
+  // We use the shared helper but with custom rounding here.
   const formatMoney = (cents: number) => {
     const symbol = targetCurrency === 'EUR' ? '€' : '$';
     const formattedValue = Math.round(cents / 100).toLocaleString(
-      country === 'FR' ? 'fr-FR' : 'en-US',
-      {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }
+      country === 'FR' ? 'fr-FR' : 'en-US'
     );
     return `${symbol}${formattedValue}`;
   };

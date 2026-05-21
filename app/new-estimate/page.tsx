@@ -7,8 +7,10 @@ import { translations } from '@/lib/translations';
 import {
   getTaxSummary,
   type EstimateFinancialContext,
-  type EstimateSection as CalcEstimateSection
+  type EstimateSection as CalcEstimateSection,
+  type AdditionalCharge
 } from '@/lib/estimateCalculations';
+import { formatMoney } from '@/lib/formatMoney';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -138,6 +140,22 @@ function NewEstimateContent() {
     number | null
   >(null);
 
+  // ===== ADDITIONAL CHARGES STATE =====
+  const [additionalCharges, setAdditionalCharges] = useState<
+    AdditionalCharge[]
+  >([]);
+  // Map of charge name → most recent config used for that name (from locked estimates)
+  const [savedChargePresets, setSavedChargePresets] = useState<
+    Record<string, AdditionalCharge>
+  >({});
+  // Set of charge names the user has hidden from suggestions
+  const [hiddenChargeNames, setHiddenChargeNames] = useState<Set<string>>(
+    new Set()
+  );
+  // Tracks which charge row's name dropdown is currently open
+  const [activeChargeDropdownIdx, setActiveChargeDropdownIdx] = useState<
+    number | null
+  >(null);
   useEffect(() => {
     async function fetchData() {
       let cachedBusinessName = '';
@@ -192,28 +210,42 @@ function NewEstimateContent() {
         return;
       }
 
-      const [prof, mats, ests, clientsRes, hiddenRes, hiddenDescRes] =
-        await Promise.all([
-          supabase.from('profiles').select('*').eq('id', user.id).single(),
-          supabase
-            .from('materials')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('name'),
-          supabase
-            .from('estimates')
-            .select('client_name, created_at, sections, is_locked')
-            .eq('user_id', user.id),
-          supabase.from('clients').select('*').eq('user_id', user.id),
-          supabase
-            .from('hidden_categories')
-            .select('category_name')
-            .eq('user_id', user.id),
-          supabase
-            .from('hidden_descriptions')
-            .select('section_title, description')
-            .eq('user_id', user.id)
-        ]);
+      const [
+        prof,
+        mats,
+        ests,
+        clientsRes,
+        hiddenRes,
+        hiddenDescRes,
+        hiddenChargesRes
+      ] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase
+          .from('materials')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name'),
+        supabase
+          .from('estimates')
+          .select(
+            'client_name, created_at, sections, is_locked, additional_charges'
+          )
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase.from('clients').select('*').eq('user_id', user.id),
+        supabase
+          .from('hidden_categories')
+          .select('category_name')
+          .eq('user_id', user.id),
+        supabase
+          .from('hidden_descriptions')
+          .select('section_title, description')
+          .eq('user_id', user.id),
+        supabase
+          .from('hidden_charges')
+          .select('charge_name')
+          .eq('user_id', user.id)
+      ]);
       if (prof.data) {
         let resolvedCountry = prof.data.country;
 
@@ -304,6 +336,44 @@ function NewEstimateContent() {
         );
         setHiddenDescriptions(hiddenSet);
       }
+
+      // Extract additional charge presets — keep MOST RECENT config per unique name.
+      // Only from locked estimates (drafts can have placeholder data).
+      // Note: ests.data is already sorted by created_at DESC, so we just take the first
+      // occurrence of each name to get the most recent.
+      const presetsMap: Record<string, AdditionalCharge> = {};
+      ests.data?.forEach((est: any) => {
+        if (!est.is_locked || !Array.isArray(est.additional_charges)) return;
+        est.additional_charges.forEach((charge: any) => {
+          const trimmedName = charge.name?.trim();
+          if (!trimmedName) return;
+          // Only keep the FIRST one (most recent estimate, since we sorted DESC)
+          if (!presetsMap[trimmedName]) {
+            // Reset basis indexes — they don't carry over to new estimates
+            presetsMap[trimmedName] = {
+              ...charge,
+              name: trimmedName,
+              basisSectionIdx: undefined,
+              basisItemIdx: undefined,
+              // If it was percentage with section/item basis, fall back to project
+              basisType: charge.isPercentage
+                ? charge.basisType === 'project'
+                  ? 'project'
+                  : 'project'
+                : undefined
+            };
+          }
+        });
+      });
+      setSavedChargePresets(presetsMap);
+
+      // Hidden charge names
+      if (hiddenChargesRes?.data) {
+        const hiddenSet = new Set<string>(
+          hiddenChargesRes.data.map((hc: any) => hc.charge_name)
+        );
+        setHiddenChargeNames(hiddenSet);
+      }
       // Sélection automatique du client via l'URL
       if (targetClientId && clientsRes?.data && !editId && !pendingRaw) {
         const foundClient = clientsRes.data.find(
@@ -369,6 +439,16 @@ function NewEstimateContent() {
             }))
           }));
           setSections(loadedSections);
+
+          // Load additional charges if present
+          if (Array.isArray(est.additional_charges)) {
+            setAdditionalCharges(
+              est.additional_charges.map((c: any, idx: number) => ({
+                ...c,
+                id: c.id || `loaded_${idx}`
+              }))
+            );
+          }
         }
       } else if (prof.data && !pendingRaw) {
         setDepositEnabled(prof.data.default_deposit_enabled ?? false);
@@ -414,6 +494,196 @@ function NewEstimateContent() {
     const n = [...sections];
     (n[sIdx].items[iIdx] as any)[field] = val;
     setSections(n);
+  };
+
+  // ===== ADDITIONAL CHARGES HELPERS =====
+
+  const addCharge = () => {
+    const newCharge: AdditionalCharge = {
+      id: `charge_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      name: '',
+      isPercentage: false,
+      qty: 1,
+      unit: 'ea',
+      costPerUnitCents: 0,
+      taxRate: profile?.default_tax_rate || 0,
+      marginRate: 0
+    };
+    setAdditionalCharges((prev) => [...prev, newCharge]);
+  };
+
+  const updateCharge = (
+    idx: number,
+    field: keyof AdditionalCharge,
+    val: any
+  ) => {
+    setAdditionalCharges((prev) => {
+      const next = [...prev];
+      (next[idx] as any)[field] = val;
+      return next;
+    });
+  };
+
+  const removeCharge = (idx: number) => {
+    setAdditionalCharges((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Compute the live amount for a percentage charge so we can show a preview
+  // This mirrors the calc-lib logic but works against the live form state
+  const getChargePreviewCents = (charge: AdditionalCharge): number => {
+    if (!charge.isPercentage) {
+      const qty = charge.qty || 1;
+      const cost = charge.costPerUnitCents || 0;
+      // Margin mode rules (mirrors lib/estimateCalculations.ts):
+      //   global   → apply globalMargin
+      //   granular → apply per-charge marginRate
+      //   none/service → no margin
+      let marginMultiplier = 1;
+      if (marginMode === 'global') {
+        marginMultiplier = 1 + globalMargin / 100;
+      } else if (marginMode === 'granular') {
+        marginMultiplier = 1 + (charge.marginRate || 0) / 100;
+      }
+      return Math.round(qty * cost * marginMultiplier);
+    }
+
+    const rate = charge.percentageRate || 0;
+    if (rate <= 0) return 0;
+
+    // Build a synthetic estimate context from current form state
+    const estimateContext: EstimateFinancialContext = {
+      margin_mode_snapshot: marginMode,
+      global_margin_snapshot: globalMargin,
+      tax_rate_snapshot: null
+    };
+
+    let basisCents = 0;
+    const sectionIdx = charge.basisSectionIdx;
+    const itemIdx = charge.basisItemIdx;
+
+    if (
+      charge.basisType === 'section' &&
+      typeof sectionIdx === 'number' &&
+      sections[sectionIdx]
+    ) {
+      // Compute section total: labor + items (post-margin)
+      const sec = sections[sectionIdx];
+      let secCents = 0;
+      // Labor portion
+      const laborRaw = (sec.hourlyRate || 0) * 100 * (sec.laborHours || 0);
+      let laborMultiplier = 1;
+      if (marginMode === 'global') laborMultiplier = 1 + globalMargin / 100;
+      else if (marginMode === 'service')
+        laborMultiplier = 1 + (sec.marginRate || 0) / 100;
+      else if (marginMode === 'granular')
+        laborMultiplier = 1 + (sec.laborMarginRate || 0) / 100;
+      secCents += Math.round(laborRaw * laborMultiplier);
+      // Materials
+      sec.items.forEach((item) => {
+        const itemRaw = (item.cost_per_unit_cents || 0) * (item.qty || 0);
+        let itemMultiplier = 1;
+        if (marginMode === 'global') itemMultiplier = 1 + globalMargin / 100;
+        else if (marginMode === 'service')
+          itemMultiplier = 1 + (sec.marginRate || 0) / 100;
+        else if (marginMode === 'granular')
+          itemMultiplier = 1 + (item.marginRate || 0) / 100;
+        secCents += Math.round(itemRaw * itemMultiplier);
+      });
+      basisCents = secCents;
+    } else if (
+      charge.basisType === 'item' &&
+      typeof sectionIdx === 'number' &&
+      typeof itemIdx === 'number' &&
+      sections[sectionIdx] &&
+      sections[sectionIdx].items[itemIdx]
+    ) {
+      const sec = sections[sectionIdx];
+      const item = sec.items[itemIdx];
+      const itemRaw = (item.cost_per_unit_cents || 0) * (item.qty || 0);
+      let itemMultiplier = 1;
+      if (marginMode === 'global') itemMultiplier = 1 + globalMargin / 100;
+      else if (marginMode === 'service')
+        itemMultiplier = 1 + (sec.marginRate || 0) / 100;
+      else if (marginMode === 'granular')
+        itemMultiplier = 1 + (item.marginRate || 0) / 100;
+      basisCents = Math.round(itemRaw * itemMultiplier);
+    } else {
+      // 'project' or orphaned reference → use current sections subtotal
+      // We can leverage subtotalCents from calculateTotals for this
+      // But we need to subtract additional charges from it (since they shouldn't compound)
+      // For simplicity, we recalculate just sections subtotal here
+      sections.forEach((sec) => {
+        const laborRaw = (sec.hourlyRate || 0) * 100 * (sec.laborHours || 0);
+        let laborMultiplier = 1;
+        if (marginMode === 'global') laborMultiplier = 1 + globalMargin / 100;
+        else if (marginMode === 'service')
+          laborMultiplier = 1 + (sec.marginRate || 0) / 100;
+        else if (marginMode === 'granular')
+          laborMultiplier = 1 + (sec.laborMarginRate || 0) / 100;
+        basisCents += Math.round(laborRaw * laborMultiplier);
+        sec.items.forEach((item) => {
+          const itemRaw = (item.cost_per_unit_cents || 0) * (item.qty || 0);
+          let itemMultiplier = 1;
+          if (marginMode === 'global') itemMultiplier = 1 + globalMargin / 100;
+          else if (marginMode === 'service')
+            itemMultiplier = 1 + (sec.marginRate || 0) / 100;
+          else if (marginMode === 'granular')
+            itemMultiplier = 1 + (item.marginRate || 0) / 100;
+          basisCents += Math.round(itemRaw * itemMultiplier);
+        });
+      });
+    }
+
+    return Math.round(basisCents * (rate / 100));
+  };
+  // Apply a saved preset to a charge row (auto-fill name + config)
+  const applyChargePreset = (idx: number, preset: AdditionalCharge) => {
+    setAdditionalCharges((prev) => {
+      const next = [...prev];
+      // Preserve the local id so React keys don't change
+      next[idx] = {
+        ...preset,
+        id: next[idx].id,
+        // Always reset basis indexes — they don't transfer between estimates
+        basisSectionIdx: undefined,
+        basisItemIdx: undefined,
+        // For percentage charges, default basis to "project" since section/item refs
+        // can't carry over. For flat charges, basisType stays undefined.
+        basisType: preset.isPercentage ? 'project' : undefined,
+        // Ensure required defaults are set
+        qty: preset.qty ?? 1,
+        unit: preset.unit ?? 'ea',
+        costPerUnitCents: preset.costPerUnitCents ?? 0,
+        percentageRate: preset.percentageRate ?? 0
+      };
+      return next;
+    });
+    setActiveChargeDropdownIdx(null);
+  };
+
+  // Hide a charge name from future suggestions
+  const handleHideChargeName = async (name: string) => {
+    setHiddenChargeNames((prev) => {
+      const next = new Set(prev);
+      next.add(name);
+      return next;
+    });
+
+    if (isGuest || !profile?.id) return;
+
+    const { error } = await supabase
+      .from('hidden_charges')
+      .insert([{ user_id: profile.id, charge_name: name }]);
+
+    if (error) {
+      console.error('Failed to hide charge:', error);
+      // Rollback
+      setHiddenChargeNames((prev) => {
+        const next = new Set(prev);
+        next.delete(name);
+        return next;
+      });
+    }
   };
 
   // Hide a (title, description) pair from suggestions, with optimistic update + rollback on failure
@@ -499,8 +769,9 @@ function NewEstimateContent() {
     const { subtotalCents, totalTaxCents } = getTaxSummary(
       estimateContext,
       sections as any, // Local EstimateSection has identical shape to CalcEstimateSection
-      profileTaxRate
-      // No materialsById — items in new-estimate already have cost_per_unit_cents inline
+      profileTaxRate,
+      undefined, // No materialsById — items already have cost_per_unit_cents inline
+      additionalCharges
     );
 
     return {
@@ -508,7 +779,13 @@ function NewEstimateContent() {
       tax: totalTaxCents,
       totalCents: subtotalCents + totalTaxCents
     };
-  }, [sections, marginMode, globalMargin, profile?.default_tax_rate]);
+  }, [
+    sections,
+    marginMode,
+    globalMargin,
+    profile?.default_tax_rate,
+    additionalCharges
+  ]);
 
   const { subtotalCents, tax, totalCents } = calculateTotals;
 
@@ -612,6 +889,12 @@ function NewEstimateContent() {
       finalSections.push({ ...sec, items: finalItems });
     }
 
+    // Strip local-only `id` field from charges before saving
+    const cleanedCharges = additionalCharges.map((c) => {
+      const { id, ...rest } = c;
+      return rest;
+    });
+
     const payload = {
       user_id: user?.id,
       client_name: client.name,
@@ -625,6 +908,7 @@ function NewEstimateContent() {
       total_amount_cents: totals.totalCents,
       tax_amount_cents: totals.tax,
       sections: finalSections,
+      additional_charges: cleanedCharges,
       is_locked: false,
       business_name_snapshot: businessName || profile.business_name,
       country_snapshot: profile.country,
@@ -755,7 +1039,7 @@ function NewEstimateContent() {
   return (
     <main className="min-h-screen bg-gray-50 text-black font-sans relative flex flex-col">
       <div className="flex-1 p-6 sm:p-8 pb-32 w-full">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           {/* Header Area */}
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
@@ -1977,6 +2261,550 @@ function NewEstimateContent() {
           >
             +{lang.addService}
           </button>
+
+          {/* ===== ADDITIONAL CHARGES BLOCK ===== */}
+          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mt-8">
+            <div className="mb-4">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-1">
+                {lang.additionalCharges}
+              </p>
+              <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                {lang.additionalChargesDesc}
+              </p>
+              {(marginMode === 'global' || marginMode === 'granular') && (
+                <p className="text-[10px] text-gray-400 italic leading-relaxed mt-1.5">
+                  ⓘ {lang.additionalChargesMarginNote}
+                </p>
+              )}
+            </div>
+
+            {additionalCharges.length > 0 && (
+              <div className="flex flex-col gap-3 mb-4">
+                {additionalCharges.map((charge, cIdx) => {
+                  // Compute available preset suggestions for this row
+                  const allPresetNames = Object.keys(savedChargePresets);
+                  const visiblePresets = allPresetNames.filter(
+                    (n) => !hiddenChargeNames.has(n)
+                  );
+                  const currentName = (charge.name || '').toLowerCase().trim();
+                  const filteredPresets = currentName
+                    ? visiblePresets.filter((n) =>
+                        n.toLowerCase().includes(currentName)
+                      )
+                    : visiblePresets;
+                  const hasSuggestions = visiblePresets.length > 0;
+
+                  return (
+                    <div
+                      key={charge.id}
+                      className="flex flex-col lg:flex-row gap-3 items-stretch bg-gray-50/50 p-3 rounded-lg border border-gray-100/50"
+                    >
+                      {/* NAME with smart dropdown */}
+                      <div className="flex-1 relative min-w-[200px]">
+                        <div className="flex items-center bg-white border border-gray-200 rounded h-[34px] overflow-hidden focus-within:border-blue-500 transition-colors">
+                          <input
+                            type="text"
+                            placeholder={lang.chargeNamePlaceholder}
+                            maxLength={80}
+                            value={charge.name}
+                            onChange={(e) => {
+                              updateCharge(cIdx, 'name', e.target.value);
+                              if (hasSuggestions && e.target.value.length > 0) {
+                                setActiveChargeDropdownIdx(cIdx);
+                              } else if (e.target.value.length === 0) {
+                                setActiveChargeDropdownIdx(null);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setActiveChargeDropdownIdx(null);
+                              }
+                            }}
+                            className="flex-1 min-w-0 px-3 bg-transparent outline-none text-xs font-bold text-gray-900 placeholder:font-medium placeholder:text-gray-400"
+                          />
+                          {hasSuggestions && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActiveChargeDropdownIdx(
+                                  activeChargeDropdownIdx === cIdx ? null : cIdx
+                                )
+                              }
+                              className="shrink-0 w-8 self-stretch text-gray-400 hover:text-black hover:bg-gray-100/70 transition-all duration-200 text-[10px] cursor-pointer flex items-center justify-center"
+                              aria-label="Show preset suggestions"
+                            >
+                              ▼
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Preset dropdown panel */}
+                        {activeChargeDropdownIdx === cIdx &&
+                          filteredPresets.length > 0 && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setActiveChargeDropdownIdx(null)}
+                              />
+                              <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto p-1">
+                                {filteredPresets.map((presetName, idx) => {
+                                  const preset = savedChargePresets[presetName];
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="w-full flex items-center justify-between p-1 hover:bg-blue-50 rounded-lg group/preset transition-colors"
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          applyChargePreset(cIdx, preset)
+                                        }
+                                        className="flex-1 text-left p-2 cursor-pointer block transition-colors"
+                                      >
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-700 group-hover/preset:text-blue-900 block truncate">
+                                          {presetName}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-gray-400 block truncate normal-case tracking-normal">
+                                          {preset.isPercentage
+                                            ? `${preset.percentageRate || 0}% · ${lang.basisProject}`
+                                            : `${profile?.currency === 'EUR' ? '€' : '$'}${(
+                                                (preset.costPerUnitCents || 0) /
+                                                100
+                                              ).toFixed(
+                                                2
+                                              )} · ${preset.qty || 1} ${
+                                                lang.units?.[
+                                                  preset.unit || 'ea'
+                                                ] || preset.unit
+                                              }`}
+                                        </span>
+                                      </button>
+                                      {!isGuest && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleHideChargeName(presetName);
+                                          }}
+                                          className="shrink-0 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 text-xs font-bold cursor-pointer hover:scale-110 active:scale-95"
+                                          title={lang.removeCharge}
+                                          aria-label={lang.removeCharge}
+                                        >
+                                          ×
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                      </div>
+
+                      {/* INPUT GRID — flat or percentage mode (allow wrapping at all sizes
+                        since granular flat rows have many fields) */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* FLAT / % TOGGLE */}
+                        <div className="flex border border-gray-200 rounded h-[34px] overflow-hidden p-0.5 bg-gray-100/50 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateCharge(cIdx, 'isPercentage', false)
+                            }
+                            className={`px-2.5 rounded text-[9px] font-black uppercase tracking-widest transition-all duration-200 cursor-pointer flex items-center ${
+                              !charge.isPercentage
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                            title={lang.chargeFlat}
+                            aria-label={lang.chargeFlat}
+                          >
+                            {profile?.currency === 'EUR' ? '€' : '$'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateCharge(cIdx, 'isPercentage', true)
+                            }
+                            className={`px-2.5 rounded text-[9px] font-black uppercase tracking-widest transition-all duration-200 cursor-pointer flex items-center ${
+                              charge.isPercentage
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                            title={lang.chargePercent}
+                            aria-label={lang.chargePercent}
+                          >
+                            %
+                          </button>
+                        </div>
+
+                        {/* === FLAT MODE FIELDS === */}
+                        {!charge.isPercentage && (
+                          <>
+                            {/* QTY */}
+                            <div className="flex-1 min-w-[80px] sm:w-20 sm:flex-none relative shrink-0 group">
+                              <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
+                                {lang.qtyShort}
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="1"
+                                className="w-full py-2 pl-9 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white text-xs"
+                                value={charge.qty === 0 ? '' : charge.qty || ''}
+                                onChange={(e) =>
+                                  updateCharge(
+                                    cIdx,
+                                    'qty',
+                                    Math.max(0, parseFloat(e.target.value) || 0)
+                                  )
+                                }
+                              />
+                            </div>
+
+                            {/* UNIT */}
+                            <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
+                              <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none z-10 transition-colors group-focus-within:text-blue-500">
+                                {lang.unitShort}
+                              </span>
+                              <Listbox
+                                value={getResolvedUnitKey(charge.unit)}
+                                onChange={(val) =>
+                                  updateCharge(cIdx, 'unit', val)
+                                }
+                              >
+                                <div className="relative">
+                                  <ListboxButton className="w-full py-2 pl-11 pr-6 text-left text-xs font-bold text-gray-900 border border-gray-100 rounded outline-none focus:border-blue-500 transition-colors bg-white cursor-pointer h-[34px]">
+                                    <span className="block truncate text-right">
+                                      {lang?.units
+                                        ? lang.units[
+                                            getResolvedUnitKey(charge.unit)
+                                          ]
+                                        : 'ea'}
+                                    </span>
+                                  </ListboxButton>
+                                  <Transition
+                                    as={Fragment}
+                                    leave="transition ease-in duration-100"
+                                    leaveFrom="opacity-100"
+                                    leaveTo="opacity-0"
+                                  >
+                                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded shadow-xl max-h-60 overflow-auto focus:outline-none text-xs">
+                                      {lang?.units &&
+                                        Object.keys(lang.units).map((key) => (
+                                          <ListboxOption
+                                            key={key}
+                                            value={key}
+                                            className={({ active }) =>
+                                              `cursor-pointer select-none relative py-2 pl-3 pr-4 font-bold ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                                            }
+                                          >
+                                            {lang.units[key]}
+                                          </ListboxOption>
+                                        ))}
+                                    </ListboxOptions>
+                                  </Transition>
+                                </div>
+                              </Listbox>
+                            </div>
+
+                            {/* COST */}
+                            <div className="flex-1 min-w-[100px] sm:w-28 sm:flex-none relative shrink-0 group">
+                              <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
+                                {lang.costShort}
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                className="w-full py-2 pl-10 pr-2 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white text-xs"
+                                value={
+                                  charge.costPerUnitCents === 0
+                                    ? ''
+                                    : (charge.costPerUnitCents || 0) / 100
+                                }
+                                onChange={(e) =>
+                                  updateCharge(
+                                    cIdx,
+                                    'costPerUnitCents',
+                                    Math.max(
+                                      0,
+                                      Math.round(
+                                        (parseFloat(e.target.value) || 0) * 100
+                                      )
+                                    )
+                                  )
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {/* === PERCENTAGE MODE FIELDS === */}
+                        {charge.isPercentage && (
+                          <>
+                            {/* RATE (%) — narrower than flat fields, label is short */}
+                            <div className="w-[90px] sm:w-[90px] sm:flex-none relative shrink-0 group">
+                              <span className="absolute left-2 top-2.5 text-[9px] font-black text-blue-500 uppercase tracking-widest pointer-events-none">
+                                {lang.chargeRate}
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                placeholder="0"
+                                className="w-full py-2 pl-11 pr-5 border border-blue-200 rounded text-right font-bold outline-none focus:border-blue-500 bg-blue-50/30 text-blue-900 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                value={
+                                  charge.percentageRate === 0
+                                    ? ''
+                                    : charge.percentageRate || ''
+                                }
+                                onChange={(e) =>
+                                  updateCharge(
+                                    cIdx,
+                                    'percentageRate',
+                                    Math.max(0, parseFloat(e.target.value) || 0)
+                                  )
+                                }
+                              />
+                              <span className="absolute right-2 top-2 text-[10px] font-black text-blue-400 pointer-events-none">
+                                %
+                              </span>
+                            </div>
+
+                            {/* BASIS PICKER — fixed width, matches flat row's combined qty+unit width */}
+                            <div className="w-[180px] sm:w-[180px] sm:flex-none relative shrink-0 group">
+                              <Listbox
+                                value={(() => {
+                                  // Build a stable string key for the current basis selection
+                                  if (charge.basisType === 'item')
+                                    return `item:${charge.basisSectionIdx}:${charge.basisItemIdx}`;
+                                  if (charge.basisType === 'section')
+                                    return `section:${charge.basisSectionIdx}`;
+                                  return 'project';
+                                })()}
+                                onChange={(val) => {
+                                  // Parse the selected key and update charge fields
+                                  if (val === 'project') {
+                                    updateCharge(cIdx, 'basisType', 'project');
+                                    updateCharge(
+                                      cIdx,
+                                      'basisSectionIdx',
+                                      undefined
+                                    );
+                                    updateCharge(
+                                      cIdx,
+                                      'basisItemIdx',
+                                      undefined
+                                    );
+                                  } else if (val.startsWith('section:')) {
+                                    const idx = parseInt(val.split(':')[1], 10);
+                                    updateCharge(cIdx, 'basisType', 'section');
+                                    updateCharge(cIdx, 'basisSectionIdx', idx);
+                                    updateCharge(
+                                      cIdx,
+                                      'basisItemIdx',
+                                      undefined
+                                    );
+                                  } else if (val.startsWith('item:')) {
+                                    const [, sIdx, iIdx] = val.split(':');
+                                    updateCharge(cIdx, 'basisType', 'item');
+                                    updateCharge(
+                                      cIdx,
+                                      'basisSectionIdx',
+                                      parseInt(sIdx, 10)
+                                    );
+                                    updateCharge(
+                                      cIdx,
+                                      'basisItemIdx',
+                                      parseInt(iIdx, 10)
+                                    );
+                                  }
+                                }}
+                              >
+                                <div className="relative">
+                                  <ListboxButton className="w-full py-2 px-3 text-left text-[10px] uppercase tracking-widest font-black text-gray-700 border border-gray-100 rounded outline-none focus:border-blue-500 transition-colors bg-white cursor-pointer h-[34px] flex justify-between items-center">
+                                    <span className="block truncate">
+                                      {(() => {
+                                        if (
+                                          charge.basisType === 'item' &&
+                                          typeof charge.basisSectionIdx ===
+                                            'number' &&
+                                          typeof charge.basisItemIdx ===
+                                            'number'
+                                        ) {
+                                          const sec =
+                                            sections[charge.basisSectionIdx];
+                                          const item =
+                                            sec?.items[charge.basisItemIdx];
+                                          if (sec && item) {
+                                            return `${item.name || lang.basisItem} (${sec.title || `#${charge.basisSectionIdx + 1}`})`;
+                                          }
+                                          return lang.basisProject;
+                                        }
+                                        if (
+                                          charge.basisType === 'section' &&
+                                          typeof charge.basisSectionIdx ===
+                                            'number'
+                                        ) {
+                                          const sec =
+                                            sections[charge.basisSectionIdx];
+                                          if (sec) {
+                                            return (
+                                              sec.title ||
+                                              `${lang.basisSection} #${charge.basisSectionIdx + 1}`
+                                            );
+                                          }
+                                          return lang.basisProject;
+                                        }
+                                        return lang.basisProject;
+                                      })()}
+                                    </span>
+                                    <span className="pointer-events-none text-gray-400 ml-2 text-[10px]">
+                                      ▼
+                                    </span>
+                                  </ListboxButton>
+                                  <Transition
+                                    as={Fragment}
+                                    leave="transition ease-in duration-100"
+                                    leaveFrom="opacity-100"
+                                    leaveTo="opacity-0"
+                                  >
+                                    <ListboxOptions className="absolute z-50 right-0 w-72 max-w-[90vw] mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-72 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold p-1">
+                                      <ListboxOption
+                                        value="project"
+                                        className={({ active }) =>
+                                          `cursor-pointer select-none relative p-2.5 rounded ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                                        }
+                                      >
+                                        {lang.basisProject}
+                                      </ListboxOption>
+                                      {sections.map((sec, sIdx) => (
+                                        <Fragment key={`basis_sec_${sIdx}`}>
+                                          <ListboxOption
+                                            value={`section:${sIdx}`}
+                                            className={({ active }) =>
+                                              `cursor-pointer select-none relative p-2.5 rounded border-t border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-700'}`
+                                            }
+                                          >
+                                            {lang.basisSection}:{' '}
+                                            {sec.title || `#${sIdx + 1}`}
+                                          </ListboxOption>
+                                          {sec.items.map((item, iIdx) => (
+                                            <ListboxOption
+                                              key={`basis_item_${sIdx}_${iIdx}`}
+                                              value={`item:${sIdx}:${iIdx}`}
+                                              className={({ active }) =>
+                                                `cursor-pointer select-none relative pl-6 pr-2.5 py-2 rounded text-gray-500 normal-case tracking-normal text-[10px] ${active ? 'bg-blue-50 text-blue-900' : ''}`
+                                              }
+                                            >
+                                              ↳{' '}
+                                              {item.name ||
+                                                `${lang.basisItem} #${iIdx + 1}`}
+                                            </ListboxOption>
+                                          ))}
+                                        </Fragment>
+                                      ))}
+                                    </ListboxOptions>
+                                  </Transition>
+                                </div>
+                              </Listbox>
+                            </div>
+
+                            {/* AMOUNT PREVIEW — narrower since it's read-only display */}
+                            <div className="w-[88px] sm:w-[88px] sm:flex-none relative shrink-0 px-2 h-[34px] bg-blue-50/40 rounded border border-blue-100 flex items-center justify-end gap-1">
+                              <span className="text-[9px] font-black text-blue-400 pointer-events-none">
+                                =
+                              </span>
+                              <span className="text-xs font-mono font-bold text-blue-900 truncate">
+                                {formatMoney(
+                                  getChargePreviewCents(charge),
+                                  profile?.currency,
+                                  profile?.country
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
+
+                        {/* TAX */}
+                        <div className="flex-1 min-w-[90px] sm:w-[100px] sm:flex-none relative shrink-0 group">
+                          <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-500">
+                            {lang.taxShort}
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            className="w-full py-2 pl-10 pr-6 border border-gray-100 rounded text-right font-bold outline-none focus:border-blue-500 transition-colors bg-white text-xs"
+                            value={charge.taxRate === 0 ? '' : charge.taxRate}
+                            onChange={(e) =>
+                              updateCharge(
+                                cIdx,
+                                'taxRate',
+                                Math.max(0, parseFloat(e.target.value) || 0)
+                              )
+                            }
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] font-black text-gray-400 pointer-events-none">
+                            %
+                          </span>
+                        </div>
+
+                        {/* MARGIN (Granular only, FLAT charges only — % charges don't support margin) */}
+                        {marginMode === 'granular' && !charge.isPercentage && (
+                          <div className="flex-1 min-w-[90px] sm:w-[100px] sm:flex-none relative shrink-0 group">
+                            <span className="absolute left-2 top-2.5 text-[9px] font-black text-blue-400 uppercase tracking-widest pointer-events-none transition-colors group-focus-within:text-blue-600">
+                              Mgn
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              className="w-full py-2 pl-10 pr-6 border border-blue-100 rounded text-right font-bold outline-none focus:border-blue-500 bg-blue-50/30 text-blue-900 text-xs"
+                              value={
+                                charge.marginRate === 0
+                                  ? ''
+                                  : charge.marginRate || ''
+                              }
+                              onChange={(e) =>
+                                updateCharge(
+                                  cIdx,
+                                  'marginRate',
+                                  Math.max(0, parseFloat(e.target.value) || 0)
+                                )
+                              }
+                            />
+                            <span className="absolute right-2 top-2 text-[10px] font-black text-blue-400 pointer-events-none">
+                              %
+                            </span>
+                          </div>
+                        )}
+
+                        {/* DELETE */}
+                        <button
+                          onClick={() => removeCharge(cIdx)}
+                          className="text-gray-300 hover:text-red-500 hover:bg-red-50 w-8 h-[34px] flex items-center justify-center font-bold transition-all duration-200 shrink-0 bg-white border border-gray-100 rounded sm:border-none sm:bg-transparent cursor-pointer hover:scale-110 active:scale-95"
+                          aria-label={lang.deleteCharge}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <button
+              onClick={addCharge}
+              className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-all duration-200 cursor-pointer px-2 py-1.5 -ml-2 rounded-md"
+            >
+              + {lang.addCharge}
+            </button>
+          </div>
+
           {/* Commercial Terms Block */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 mt-8">
             {/* Payment Terms Column */}
@@ -2085,8 +2913,8 @@ function NewEstimateContent() {
       </div>
 
       {/* Sticky Footer */}
-      <div className="sticky bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] px-6 sm:px-8 py-4 z-40 transition-all print:hidden mt-auto">
-        <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+      <div className="sticky bottom-0 w-full bg-white/80 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] px-6 sm:px-8 py-4 z-40 transition-all print:hidden mt-auto">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           {/* Left Block: Pure Financial Data Displays */}
           <div className="flex items-center justify-between md:justify-start gap-6 sm:gap-10 w-full md:w-auto">
             <div>
@@ -2094,10 +2922,11 @@ function NewEstimateContent() {
                 {lang.subtotal || 'Subtotal'}
               </span>
               <span className="font-mono font-bold text-base text-gray-700">
-                {profile?.currency === 'EUR' ? '€' : '$'}
-                {(subtotalCents / 100)
-                  .toFixed(2)
-                  .replace('.', profile?.country === 'FR' ? ',' : '.')}
+                {formatMoney(
+                  subtotalCents,
+                  profile?.currency,
+                  profile?.country
+                )}
               </span>
             </div>
 
@@ -2106,10 +2935,16 @@ function NewEstimateContent() {
                 {lang.tax || 'Tax'}
               </span>
               <span className="font-mono font-bold text-base text-gray-500">
-                {profile?.currency === 'EUR' ? '€' : '$'}
-                {(tax / 100)
-                  .toFixed(2)
-                  .replace('.', profile?.country === 'FR' ? ',' : '.')}
+                {formatMoney(tax, profile?.currency, profile?.country)}
+              </span>
+            </div>
+
+            <div className="border-l border-gray-100 pl-6 sm:pl-8">
+              <span className="block text-[10px] font-black uppercase tracking-widest text-blue-600 mb-0.5">
+                {lang.grandTotal || 'Grand Total'}
+              </span>
+              <span className="font-mono font-black text-xl sm:text-2xl text-gray-950 tracking-tight">
+                {formatMoney(totalCents, profile?.currency, profile?.country)}
               </span>
             </div>
 

@@ -176,7 +176,7 @@ export const translations = {
     chargeFlat: 'Flat',
     chargePercent: 'Percentage',
     chargeBasis: 'Based on',
-    basisProject: 'Total Project',
+    basisProject: 'Total Services',
     basisSection: 'Section',
     basisItem: 'Item',
     removeCharge: 'Remove from suggestions',
@@ -184,6 +184,8 @@ export const translations = {
     chargeAmount: 'Amount',
     deleteCharge: 'Delete charge',
     additionalChargesTotal: 'Additional Charges Total',
+    additionalChargesMarginNote:
+      'Note: margins apply to flat charges only. Percentage charges are already markups based on margined amounts.',
     serviceMargin: 'Service Margin:',
     serviceDescription: 'Service Description',
     serviceDescPlaceholder:
@@ -621,7 +623,7 @@ export const translations = {
     chargeFlat: 'Forfait',
     chargePercent: 'Pourcentage',
     chargeBasis: 'Basé sur',
-    basisProject: 'Total du Projet',
+    basisProject: 'Total des Services',
     basisSection: 'Section',
     basisItem: 'Article',
     removeCharge: 'Supprimer des suggestions',
@@ -629,6 +631,8 @@ export const translations = {
     chargeAmount: 'Montant',
     deleteCharge: 'Supprimer le frais',
     additionalChargesTotal: 'Total Frais Supplémentaires',
+    additionalChargesMarginNote:
+      "Note : les marges s'appliquent uniquement aux frais forfaitaires. Les pourcentages représentent déjà des majorations sur des montants avec marges.",
     serviceMargin: 'Marge Service:',
     serviceDescription: 'Description du Service',
     serviceDescPlaceholder:
