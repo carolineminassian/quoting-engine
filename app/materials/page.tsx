@@ -190,7 +190,7 @@ export default function MaterialsPage() {
               {profile?.currency === 'EUR' ? 'Euro (€)' : 'US Dollar ($)'}
             </p>
           </div>
-          <LinkButton href="/dashboard" variant="ghost" size="sm">
+          <LinkButton href="/dashboard" variant="secondary" size="sm">
             ← {lang.dashboard}
           </LinkButton>
         </div>

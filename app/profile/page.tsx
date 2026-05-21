@@ -7,6 +7,8 @@ import { translations, t } from '@/lib/translations';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import Button from '@/components/Button';
+import LinkButton from '@/components/LinkButton';
 import {
   Listbox,
   ListboxButton,
@@ -636,12 +638,9 @@ export default function ProfilePage() {
                 : 'Platform Configurations'}
             </p> */}
           </div>
-          <Link
-            href="/dashboard"
-            className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
-          >
+          <LinkButton href="/dashboard" variant="secondary" size="sm">
             ← {lang.dashboard}
-          </Link>
+          </LinkButton>
         </div>
 
         {/* BUSINESS PROFILE SECTION */}
@@ -801,10 +800,15 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => setDepositEnabled(!depositEnabled)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${depositEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                      depositEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                    aria-label={lang.defaultDownPayment}
                   >
                     <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${depositEnabled ? 'translate-x-5' : 'translate-x-1'}`}
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        depositEnabled ? 'translate-x-5' : 'translate-x-1'
+                      }`}
                     />
                   </button>
                   <span className="text-xs font-black text-gray-700 uppercase tracking-wider select-none">
@@ -879,13 +883,16 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={savingProfile}
-              className="bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-blue-700 transition-transform active:scale-95"
+              variant="primary"
+              size="md"
+              loading={savingProfile}
+              loadingText="..."
+              className="px-8"
             >
-              {savingProfile ? '...' : lang.save}
-            </button>
+              {lang.save}
+            </Button>
           </form>
         </div>
 
@@ -925,13 +932,16 @@ export default function ProfilePage() {
               </p>
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={savingSecurity}
-              className="bg-gray-100 text-gray-700 border border-gray-200 px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-transform active:scale-95"
+              variant="secondary"
+              size="md"
+              loading={savingSecurity}
+              loadingText="..."
+              className="px-8"
             >
-              {savingSecurity ? '...' : lang.updateSecurity}
-            </button>
+              {lang.updateSecurity}
+            </Button>
           </form>
         </div>
 
@@ -1081,57 +1091,69 @@ export default function ProfilePage() {
 
             <div className="w-full sm:w-auto flex flex-col sm:items-end gap-2">
               {isFreePlan ? (
-                <Link
+                <LinkButton
                   href="/upgrade"
-                  className="w-full sm:w-auto text-center bg-blue-600 text-white px-6 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg inline-block hover:bg-blue-700 transition-transform active:scale-95"
+                  variant="primary"
+                  size="md"
+                  className="w-full sm:w-auto px-6"
                 >
                   {lang.upgradeToPro || 'Upgrade to Pro'}
-                </Link>
+                </LinkButton>
               ) : profile?.subscription_cancel_at ? (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={handleResumeSubClick}
-                  className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:text-blue-800 transition-colors cursor-pointer"
+                  className="!text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
                 >
                   {lang.resumeSubscription}
-                </button>
+                </Button>
               ) : (
                 <>
                   {/* Switch to Annual (only for monthly users without scheduled cancellation) */}
                   {profile?.subscription_interval === 'monthly' &&
                     !profile?.pending_plan_switch && (
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={handleSwitchToAnnualClick}
-                        className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:text-blue-800 transition-colors cursor-pointer"
+                        className="!text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
                       >
                         ↗ {lang.upgradeToAnnual}
-                      </button>
+                      </Button>
                     )}
 
                   {/* Cancel pending annual switch */}
                   {profile?.pending_plan_switch === 'annual' && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={handleCancelAnnualSwitchClick}
-                      className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors cursor-pointer"
+                      className="!text-gray-400 hover:!text-red-500 hover:!bg-red-50"
                     >
                       {lang.cancelAnnualSwitch}
-                    </button>
+                    </Button>
                   )}
 
                   {/* Switch to Pay-as-you-go (cancels Pro at period end + redirects to credits) */}
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={handleSwitchToPayAsYouGoClick}
-                    className="text-gray-500 text-[10px] font-black uppercase tracking-widest hover:text-blue-600 transition-colors cursor-pointer"
+                    className="!text-gray-500 hover:!text-blue-600 hover:!bg-blue-50"
                   >
                     ⇄ {lang.switchToPayAsYouGo}
-                  </button>
+                  </Button>
 
                   {/* Cancel subscription (always available) */}
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={handleCancelSubClick}
-                    className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors cursor-pointer"
+                    className="!text-gray-400 hover:!text-red-500 hover:!bg-red-50"
                   >
                     {lang.cancelSub || 'Cancel Subscription'}
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
@@ -1152,13 +1174,16 @@ export default function ProfilePage() {
                 {lang.deleteAccountDesc}
               </p>
             </div>
-            <button
+            <Button
+              variant="danger"
+              size="md"
+              loading={processingDelete}
+              loadingText="..."
               onClick={triggerDeleteAccountFlow}
-              disabled={processingDelete}
-              className="w-full sm:w-auto text-center bg-red-600 text-white px-6 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-red-700 transition-colors shrink-0 disabled:opacity-40"
+              className="w-full sm:w-auto px-6 shrink-0"
             >
-              {processingDelete ? '...' : lang.deleteAccount}
-            </button>
+              {lang.deleteAccount}
+            </Button>
           </div>
         </div>
       </div>

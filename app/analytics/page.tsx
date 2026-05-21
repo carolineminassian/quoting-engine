@@ -10,6 +10,7 @@ import {
   getRawItemCostCents
 } from '@/lib/estimateCalculations';
 import LoadingDots from '@/components/LoadingDots';
+import LinkButton from '@/components/LinkButton';
 import {
   Listbox,
   ListboxButton,
@@ -144,12 +145,14 @@ export default function AnalyticsPage() {
           <p className="text-gray-500 mb-8 max-w-md mx-auto text-xs font-bold uppercase tracking-widest">
             {lang.analyticsUpgradeAlert}
           </p>
-          <Link
+          <LinkButton
             href="/upgrade"
-            className="inline-block bg-blue-600 text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-blue-700 transition-transform active:scale-95"
+            variant="primary"
+            size="lg"
+            className="!shadow-xl !shadow-blue-600/20 hover:!shadow-blue-600/40"
           >
             {lang.upgradeToPro}
-          </Link>
+          </LinkButton>
         </div>
       </main>
     );

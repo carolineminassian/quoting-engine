@@ -2030,7 +2030,7 @@ function NewEstimateContent() {
                     className="flex-1 w-full py-3 pl-2 pr-1 bg-transparent outline-none font-mono font-bold text-right text-sm text-blue-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="w-12 text-center text-[10px] font-black text-blue-400 uppercase tracking-widest pointer-events-none shrink-0 select-none border-l border-blue-200/50 flex items-center justify-center h-full bg-blue-50/10">
-                    {profile?.country === 'FR' ? 'Jrs' : 'Days'}
+                    {lang.daysShort}
                   </span>
                 </div>
               </div>

@@ -6,6 +6,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import Button from '@/components/Button';
+import LinkButton from '@/components/LinkButton';
 import { translations, t } from '@/lib/translations';
 import {
   getEffectiveLaborRateCents,
@@ -627,12 +629,9 @@ export default function EstimateView() {
           >
             {isOwner && (
               <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center w-full sm:w-auto">
-                <Link
-                  href="/dashboard"
-                  className="text-center bg-white border border-gray-200 px-4 py-2 rounded font-bold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                >
+                <LinkButton href="/dashboard" variant="secondary" size="sm">
                   &larr; {lang.dashboard}
-                </Link>
+                </LinkButton>
 
                 {!estimate.is_locked && (
                   <div className="flex justify-between sm:justify-start items-center gap-2 bg-white px-3 py-2 rounded border border-gray-200">
@@ -641,7 +640,10 @@ export default function EstimateView() {
                     </span>
                     <button
                       onClick={() => setShowDetails(!showDetails)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                        showDetails ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                      aria-label={lang.internalDetails}
                     >
                       <span
                         className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
@@ -656,74 +658,92 @@ export default function EstimateView() {
               {estimate.is_locked ? (
                 <>
                   {isOwner && (
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="md"
                       onClick={handleCreateRevision}
-                      className="flex-1 bg-white text-gray-800 border border-gray-200 px-4 py-3 rounded font-bold text-sm hover:bg-gray-50 transition-colors"
+                      className="flex-1"
                     >
                       {lang.createRevision}
-                    </button>
+                    </Button>
                   )}
                   {isOwner && (
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="md"
                       onClick={handleNativeShare}
-                      className="flex-1 sm:hidden bg-white text-gray-800 border border-gray-200 px-4 py-3 rounded font-bold text-sm flex items-center justify-center gap-2 active:bg-gray-50 transition-colors shadow-sm"
+                      className="flex-1 sm:hidden"
+                      icon={
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="18" cy="5" r="3" />
+                          <circle cx="6" cy="12" r="3" />
+                          <circle cx="18" cy="19" r="3" />
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                        </svg>
+                      }
                     >
-                      <svg
-                        className="w-4 h-4 text-gray-500 shrink-0"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="18" cy="5" r="3" />
-                        <circle cx="6" cy="12" r="3" />
-                        <circle cx="18" cy="19" r="3" />
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                      </svg>
                       {lang.share}
-                    </button>
+                    </Button>
                   )}
                   {isOwner && estimate.client_email && (
-                    <button
-                      disabled={sending}
+                    <Button
+                      variant="dark"
+                      size="md"
+                      loading={sending}
+                      loadingText={lang.sending}
                       onClick={() => handleSend('email')}
-                      className="flex-1 bg-gray-800 text-white px-4 py-3 rounded font-bold text-sm disabled:opacity-50"
+                      className="flex-1"
                     >
-                      {sending ? lang.sending : lang.emailBtn}
-                    </button>
+                      {lang.emailBtn}
+                    </Button>
                   )}
-                  <button
-                    disabled={loading}
+                  <Button
+                    variant="primary"
+                    size="md"
+                    loading={loading}
+                    loadingText={lang.generating}
                     onClick={handleDownloadPDF}
-                    className="flex-1 sm:flex-none bg-blue-600 text-white px-6 py-3 rounded font-bold text-sm shadow-md disabled:opacity-50"
+                    className="flex-1 sm:flex-none px-6"
                   >
-                    {loading ? lang.generating : lang.downloadPdf}
-                  </button>
+                    {lang.downloadPdf}
+                  </Button>
                 </>
               ) : (
                 isOwner && (
                   <div className="flex w-full gap-2">
-                    <Link
+                    <LinkButton
                       href={`/new-estimate?edit=${id}`}
-                      className="flex-1 text-center bg-blue-50 text-blue-600 px-4 py-3 rounded font-bold text-sm"
+                      variant="soft-primary"
+                      size="md"
+                      className="flex-1"
                     >
                       {lang.edit}
-                    </Link>
-                    <button
+                    </LinkButton>
+                    <Button
+                      variant="soft-danger"
+                      size="md"
                       onClick={handleCancelDraft}
-                      className="flex-1 bg-red-50 text-red-600 font-bold text-sm px-4 py-3 rounded"
+                      className="flex-1"
                     >
                       {lang.cancel}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="success"
+                      size="md"
                       onClick={handleFinalize}
-                      className="flex-1 bg-green-600 text-white px-4 py-3 rounded font-bold text-sm shadow-md"
+                      className="flex-1"
                     >
                       {lang.finalize}
-                    </button>
+                    </Button>
                   </div>
                 )
               )}
@@ -764,18 +784,22 @@ export default function EstimateView() {
                 (estimate.client_status === 'pending' ||
                   !estimate.client_status) && (
                   <div className="flex w-full sm:w-auto gap-3">
-                    <button
+                    <Button
+                      variant="soft-danger"
+                      size="md"
                       onClick={() => handleStatusChange('rejected')}
-                      className="flex-1 sm:flex-none px-6 py-3 bg-white text-red-600 border border-red-200 hover:bg-red-50 font-bold rounded text-sm transition-colors"
+                      className="flex-1 sm:flex-none px-6"
                     >
                       {lang.reject}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="success"
+                      size="md"
                       onClick={() => handleStatusChange('approved')}
-                      className="flex-1 sm:flex-none px-6 py-3 bg-green-600 text-white hover:bg-green-700 font-bold rounded shadow-md text-sm transition-colors"
+                      className="flex-1 sm:flex-none px-6"
                     >
                       {lang.approveEstimate}
-                    </button>
+                    </Button>
                   </div>
                 )}
             </div>
@@ -1151,13 +1175,17 @@ export default function EstimateView() {
                     placeholder={lang.requestRevisions}
                     className="flex-1 p-3 border border-gray-200 rounded text-sm focus:outline-none focus:border-blue-600 resize-none text-black placeholder-gray-300 bg-white"
                   />
-                  <button
+                  <Button
                     type="submit"
-                    disabled={submittingComment || !commentInput.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-3 rounded tracking-wide transition-colors disabled:opacity-40 self-end sm:self-stretch flex items-center justify-center w-full sm:w-auto min-w-[120px]"
+                    variant="primary"
+                    size="md"
+                    loading={submittingComment}
+                    loadingText={lang.sending}
+                    disabled={!commentInput.trim()}
+                    className="self-end sm:self-stretch w-full sm:w-auto min-w-[120px] px-6"
                   >
-                    {submittingComment ? lang.sending : lang.send}
-                  </button>
+                    {lang.send}
+                  </Button>
                 </div>
               </form>
             </div>
