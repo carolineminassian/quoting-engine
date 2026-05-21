@@ -12,6 +12,8 @@ import {
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import Button from '@/components/Button';
+import LinkButton from '@/components/LinkButton';
 import MaterialCombobox from '@/components/MaterialCombobox';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import {
@@ -123,6 +125,18 @@ function NewEstimateContent() {
   const [visibleDescriptions, setVisibleDescriptions] = useState<
     Record<number, boolean>
   >({});
+  // Map of section title → unique descriptions used with it (from locked estimates)
+  const [savedDescriptions, setSavedDescriptions] = useState<
+    Record<string, string[]>
+  >({});
+  // Set of "title|description" keys that the user has hidden
+  const [hiddenDescriptions, setHiddenDescriptions] = useState<Set<string>>(
+    new Set()
+  );
+  // Tracks which section's description dropdown is currently open
+  const [activeDescDropdownIdx, setActiveDescDropdownIdx] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -178,24 +192,28 @@ function NewEstimateContent() {
         return;
       }
 
-      const [prof, mats, ests, clientsRes, hiddenRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase
-          .from('materials')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('name'),
-        supabase
-          .from('estimates')
-          .select('client_name, created_at, sections')
-          .eq('user_id', user.id),
-        supabase.from('clients').select('*').eq('user_id', user.id),
-        supabase
-          .from('hidden_categories')
-          .select('category_name')
-          .eq('user_id', user.id)
-      ]);
-
+      const [prof, mats, ests, clientsRes, hiddenRes, hiddenDescRes] =
+        await Promise.all([
+          supabase.from('profiles').select('*').eq('id', user.id).single(),
+          supabase
+            .from('materials')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('name'),
+          supabase
+            .from('estimates')
+            .select('client_name, created_at, sections, is_locked')
+            .eq('user_id', user.id),
+          supabase.from('clients').select('*').eq('user_id', user.id),
+          supabase
+            .from('hidden_categories')
+            .select('category_name')
+            .eq('user_id', user.id),
+          supabase
+            .from('hidden_descriptions')
+            .select('section_title, description')
+            .eq('user_id', user.id)
+        ]);
       if (prof.data) {
         let resolvedCountry = prof.data.country;
 
@@ -243,18 +261,48 @@ function NewEstimateContent() {
       setMaterials(mats.data || []);
       if (clientsRes?.data) setPastClients(clientsRes.data);
 
-      // Extraction des catégories/étapes uniques enregistrées
+      // Extract unique section titles (steps) and descriptions per title.
+      // Descriptions are only collected from LOCKED estimates to keep the suggestion
+      // pool clean — drafts may have placeholder text users don't want to reuse.
       const stepSet = new Set<string>();
+      const descMap: Record<string, Set<string>> = {};
+
       ests.data?.forEach((est: any) => {
-        if (Array.isArray(est.sections)) {
-          est.sections.forEach((s: any) => {
-            if (s.title) stepSet.add(s.title);
-          });
-        }
+        if (!Array.isArray(est.sections)) return;
+        est.sections.forEach((s: any) => {
+          if (s.title) stepSet.add(s.title);
+
+          // Only collect descriptions from finalized/locked estimates
+          if (est.is_locked && s.title && s.description) {
+            const trimmedDesc = s.description.trim();
+            if (trimmedDesc) {
+              if (!descMap[s.title]) descMap[s.title] = new Set();
+              descMap[s.title].add(trimmedDesc);
+            }
+          }
+        });
       });
       setSavedSteps(Array.from(stepSet));
+
+      // Convert the Set map into a plain array map for state
+      const finalDescMap: Record<string, string[]> = {};
+      Object.entries(descMap).forEach(([title, descSet]) => {
+        finalDescMap[title] = Array.from(descSet).sort();
+      });
+      setSavedDescriptions(finalDescMap);
+
       if (hiddenRes?.data) {
         setHiddenCategories(hiddenRes.data.map((hc: any) => hc.category_name));
+      }
+
+      // Build a Set of "title|description" keys for fast lookup
+      if (hiddenDescRes?.data) {
+        const hiddenSet = new Set<string>(
+          hiddenDescRes.data.map(
+            (hd: any) => `${hd.section_title}|${hd.description}`
+          )
+        );
+        setHiddenDescriptions(hiddenSet);
       }
       // Sélection automatique du client via l'URL
       if (targetClientId && clientsRes?.data && !editId && !pendingRaw) {
@@ -366,6 +414,41 @@ function NewEstimateContent() {
     const n = [...sections];
     (n[sIdx].items[iIdx] as any)[field] = val;
     setSections(n);
+  };
+
+  // Hide a (title, description) pair from suggestions, with optimistic update + rollback on failure
+  const handleHideDescription = async (
+    sectionTitle: string,
+    description: string
+  ) => {
+    const key = `${sectionTitle}|${description}`;
+
+    // Optimistically add to hidden set
+    setHiddenDescriptions((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+
+    if (isGuest || !profile?.id) return;
+
+    const { error } = await supabase.from('hidden_descriptions').insert([
+      {
+        user_id: profile.id,
+        section_title: sectionTitle,
+        description: description
+      }
+    ]);
+
+    if (error) {
+      console.error('Failed to hide description:', error);
+      // Roll back local state on failure
+      setHiddenDescriptions((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   };
 
   const handleCreateMaterialOnTheFly = (
@@ -652,18 +735,17 @@ function NewEstimateContent() {
             {lang.limitMessage}
           </p>
           <div className="flex flex-col gap-3">
-            <Link
-              href="/upgrade"
-              className="w-full inline-block bg-blue-600 text-white px-6 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-blue-700 transition-colors"
-            >
+            <LinkButton href="/upgrade" variant="primary" size="lg" fullWidth>
               {lang.upgradeToPro}
-            </Link>
-            <Link
+            </LinkButton>
+            <LinkButton
               href="/dashboard"
-              className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black mt-4 transition-colors"
+              variant="ghost"
+              size="sm"
+              className="mt-4"
             >
               {lang.cancel}
-            </Link>
+            </LinkButton>
           </div>
         </div>
       </div>
@@ -683,12 +765,14 @@ function NewEstimateContent() {
                     ? lang.editProjectTitle
                     : lang.newEstimate?.replace('+', '') || 'New Estimate'}
                 </h1>
-                <Link
+                <LinkButton
                   href="/dashboard"
-                  className="sm:hidden text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors shrink-0 text-right ml-4"
+                  variant="ghost"
+                  size="sm"
+                  className="sm:hidden shrink-0 ml-4"
                 >
                   {lang.cancel}
-                </Link>
+                </LinkButton>
               </div>
 
               <div className="flex gap-3 items-center">
@@ -702,12 +786,14 @@ function NewEstimateContent() {
                 />
               </div>
             </div>
-            <Link
+            <LinkButton
               href={isGuest ? '/' : '/dashboard'}
-              className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
+              variant="ghost"
+              size="sm"
+              className="hidden sm:flex"
             >
               {lang.cancelExit}
-            </Link>
+            </LinkButton>
           </div>
           {/* Guest Lock Context Overlay */}
           {isGuest && (
@@ -1025,7 +1111,8 @@ function NewEstimateContent() {
                     onClick={() =>
                       setSections(sections.filter((_, i) => i !== sIdx))
                     }
-                    className="absolute right-4 top-4 w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors font-black opacity-100 sm:opacity-0 sm:group-hover/section:opacity-100"
+                    className="absolute right-4 top-4 w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all duration-200 font-black opacity-100 sm:opacity-0 sm:group-hover/section:opacity-100 cursor-pointer hover:scale-110 active:scale-95"
+                    aria-label="Delete section"
                   >
                     ×
                   </button>
@@ -1066,7 +1153,8 @@ function NewEstimateContent() {
                             activeDropdownIdx === sIdx ? null : sIdx
                           )
                         }
-                        className="absolute right-1 bottom-3 text-gray-400 hover:text-black transition-colors text-[10px] p-1 cursor-pointer"
+                        className="absolute right-1 bottom-3 text-gray-400 hover:text-black hover:bg-gray-50 transition-all duration-200 text-[10px] p-1.5 rounded cursor-pointer"
+                        aria-label="Toggle category list"
                       >
                         ▼
                       </button>
@@ -1076,12 +1164,11 @@ function NewEstimateContent() {
                       <button
                         type="button"
                         onClick={() => toggleDescription(sIdx)}
-                        className="text-[10px] font-bold uppercase tracking-wider text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1.5 cursor-pointer"
+                        className="text-[10px] font-bold uppercase tracking-wider text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1.5 cursor-pointer hover:bg-blue-50/50 px-2 py-1 -ml-2 rounded-md"
                       >
                         <span className="text-xs font-mono leading-none">
                           {isDescVisible(sec, sIdx) ? '−' : '＋'}
                         </span>
-
                         <span>
                           {isDescVisible(sec, sIdx)
                             ? lang.hideDescription
@@ -1123,7 +1210,7 @@ function NewEstimateContent() {
                                       updateSection(sIdx, 'title', step);
                                       setActiveDropdownIdx(null);
                                     }}
-                                    className="flex-1 text-left p-2 text-[10px] font-black uppercase tracking-widest text-gray-700 group-hover/item:text-blue-900 cursor-pointer block truncate"
+                                    className="flex-1 text-left p-2 text-[10px] font-black uppercase tracking-widest text-gray-700 group-hover/item:text-blue-900 cursor-pointer block truncate transition-colors"
                                   >
                                     {step}
                                   </button>
@@ -1149,14 +1236,14 @@ function NewEstimateContent() {
                                             'Failed to hide category:',
                                             error
                                           );
-                                          // Roll back local state if DB write failed
                                           setHiddenCategories((prev) =>
                                             prev.filter((c) => c !== step)
                                           );
                                         }
                                       }}
-                                      className="p-2 text-gray-300 hover:text-red-500 rounded text-xs font-bold transition-colors cursor-pointer"
+                                      className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 text-xs font-bold cursor-pointer hover:scale-110 active:scale-95"
                                       title={lang.removeFromList}
+                                      aria-label={lang.removeFromList}
                                     >
                                       ×
                                     </button>
@@ -1171,7 +1258,7 @@ function NewEstimateContent() {
                                 <button
                                   type="button"
                                   onClick={() => setActiveDropdownIdx(null)}
-                                  className="w-full text-left p-3 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg uppercase tracking-wider italic cursor-pointer block"
+                                  className="w-full text-left p-3 text-[10px] font-bold text-blue-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg uppercase tracking-wider italic cursor-pointer block transition-colors duration-200"
                                 >
                                   {lang.enterToSaveCategory}
                                 </button>
@@ -1190,7 +1277,7 @@ function NewEstimateContent() {
                                     updateSection(sIdx, 'title', step);
                                     setActiveDropdownIdx(null);
                                   }}
-                                  className="flex-1 text-left p-2 text-[10px] font-black uppercase tracking-widest text-gray-700 group-hover/item:text-blue-900 cursor-pointer block truncate"
+                                  className="flex-1 text-left p-2 text-[10px] font-black uppercase tracking-widest text-gray-700 group-hover/item:text-blue-900 cursor-pointer block truncate transition-colors"
                                 >
                                   {step}
                                 </button>
@@ -1216,14 +1303,14 @@ function NewEstimateContent() {
                                           'Failed to hide category:',
                                           error
                                         );
-                                        // Roll back local state if DB write failed
                                         setHiddenCategories((prev) =>
                                           prev.filter((c) => c !== step)
                                         );
                                       }
                                     }}
-                                    className="p-2 text-gray-300 hover:text-red-500 rounded text-xs font-bold transition-colors cursor-pointer"
+                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 text-xs font-bold cursor-pointer hover:scale-110 active:scale-95"
                                     title={lang.removeFromList}
+                                    aria-label={lang.removeFromList}
                                   >
                                     ×
                                   </button>
@@ -1271,16 +1358,135 @@ function NewEstimateContent() {
                       {lang.serviceDescription}
                     </label>
 
-                    <input
-                      type="text"
-                      maxLength={500}
-                      placeholder={lang.serviceDescPlaceholder}
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-gray-50/20 text-gray-700 shadow-sm transition-colors"
-                      value={sec.description || ''}
-                      onChange={(e) =>
-                        updateSection(sIdx, 'description', e.target.value)
-                      }
-                    />
+                    {/* Smart description input — shows ▼ when past descriptions exist for the current section title */}
+                    {(() => {
+                      // Compute available description suggestions for the CURRENT section title
+                      const titleKey = (sec.title || '').trim();
+                      const allDescsForTitle =
+                        savedDescriptions[titleKey] || [];
+
+                      // Step 1: filter out user-hidden descriptions
+                      const visibleDescs = allDescsForTitle.filter(
+                        (desc) => !hiddenDescriptions.has(`${titleKey}|${desc}`)
+                      );
+
+                      // Step 2: filter by current textarea content (case-insensitive substring match)
+                      const currentText = (sec.description || '')
+                        .toLowerCase()
+                        .trim();
+                      const availableDescs = currentText
+                        ? visibleDescs.filter((desc) =>
+                            desc.toLowerCase().includes(currentText)
+                          )
+                        : visibleDescs;
+
+                      // hasSuggestions checks the unfiltered visible list — controls whether ▼ button shows.
+                      // We want the ▼ button visible even when current typing has zero matches,
+                      // so the user can still clear and explore other suggestions.
+                      const hasSuggestions = visibleDescs.length > 0;
+
+                      return (
+                        <div className="relative">
+                          <div className="flex items-stretch border border-gray-200 rounded-xl bg-gray-50/20 shadow-sm focus-within:border-blue-500 transition-colors overflow-hidden">
+                            <textarea
+                              maxLength={500}
+                              rows={2}
+                              placeholder={lang.serviceDescPlaceholder}
+                              className="flex-1 min-w-0 px-3 py-2.5 text-xs bg-transparent outline-none font-bold text-gray-700 resize-none placeholder:font-medium placeholder:text-gray-400"
+                              value={sec.description || ''}
+                              onChange={(e) => {
+                                updateSection(
+                                  sIdx,
+                                  'description',
+                                  e.target.value
+                                );
+                                // Open the dropdown when user starts typing (only if suggestions exist)
+                                if (
+                                  hasSuggestions &&
+                                  e.target.value.length > 0
+                                ) {
+                                  setActiveDescDropdownIdx(sIdx);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                  setActiveDescDropdownIdx(null);
+                                }
+                              }}
+                            />
+
+                            {/* Dropdown toggle button — only shown if there are suggestions */}
+                            {hasSuggestions && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActiveDescDropdownIdx(
+                                    activeDescDropdownIdx === sIdx ? null : sIdx
+                                  )
+                                }
+                                className="shrink-0 w-9 text-gray-400 hover:text-black hover:bg-gray-100/70 transition-all duration-200 text-[10px] cursor-pointer flex items-center justify-center"
+                                aria-label="Show description suggestions"
+                              >
+                                ▼
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Description dropdown panel — only shown if there are matches */}
+                          {activeDescDropdownIdx === sIdx &&
+                            availableDescs.length > 0 && (
+                              <>
+                                {/* Click-outside overlay */}
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => setActiveDescDropdownIdx(null)}
+                                />
+
+                                <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto p-1">
+                                  {availableDescs.map((desc, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="w-full flex items-start justify-between gap-1 p-1 hover:bg-blue-50 rounded-lg group/desc transition-colors"
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          updateSection(
+                                            sIdx,
+                                            'description',
+                                            desc
+                                          );
+                                          setActiveDescDropdownIdx(null);
+                                        }}
+                                        className="flex-1 text-left p-2 text-xs font-bold text-gray-700 group-hover/desc:text-blue-900 cursor-pointer block transition-colors leading-relaxed"
+                                      >
+                                        {desc}
+                                      </button>
+                                      {!isGuest && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleHideDescription(
+                                              titleKey,
+                                              desc
+                                            );
+                                          }}
+                                          className="shrink-0 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-all duration-200 text-xs font-bold cursor-pointer hover:scale-110 active:scale-95 self-start mt-0.5"
+                                          title={lang.removeDescription}
+                                          aria-label={lang.removeDescription}
+                                        >
+                                          ×
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                        </div>
+                      );
+                    })()}
 
                     {marginMode === 'service' && (
                       <div className="flex items-center gap-2 mt-4 animate-fade-in">
@@ -1497,7 +1703,7 @@ function NewEstimateContent() {
                                 onClick={() =>
                                   updateItem(sIdx, iIdx, 'materialId', '')
                                 }
-                                className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 bg-blue-50/50 px-2 py-1 rounded shrink-0 transition-colors"
+                                className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-100/70 px-2 py-1 rounded shrink-0 transition-all duration-200 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
                               >
                                 {lang.edit}
                               </button>
@@ -1719,7 +1925,8 @@ function NewEstimateContent() {
                               );
                               setSections(n);
                             }}
-                            className="text-gray-300 hover:text-red-500 w-8 h-[34px] flex items-center justify-center font-bold transition-colors shrink-0 bg-white border border-gray-100 rounded sm:border-none sm:bg-transparent"
+                            className="text-gray-300 hover:text-red-500 hover:bg-red-50 w-8 h-[34px] flex items-center justify-center font-bold transition-all duration-200 shrink-0 bg-white border border-gray-100 rounded sm:border-none sm:bg-transparent cursor-pointer hover:scale-110 active:scale-95"
+                            aria-label="Delete item"
                           >
                             ×
                           </button>
@@ -1741,7 +1948,7 @@ function NewEstimateContent() {
                       });
                       setSections(n);
                     }}
-                    className="mt-4 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 transition-colors"
+                    className="mt-4 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-all duration-200 cursor-pointer px-2 py-1.5 -ml-2 rounded-md"
                   >
                     + {lang.addItem || 'Add Item'}
                   </button>
@@ -1766,7 +1973,7 @@ function NewEstimateContent() {
                 }
               ]);
             }}
-            className="w-full mt-4 p-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase tracking-widest text-[10px] hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/40 transition-all cursor-pointer"
+            className="w-full mt-4 p-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-black uppercase tracking-widest text-[10px] hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all duration-200 cursor-pointer"
           >
             +{lang.addService}
           </button>
@@ -1782,10 +1989,10 @@ function NewEstimateContent() {
                   <button
                     type="button"
                     onClick={() => setPaymentTermsType('upon_receipt')}
-                    className={`flex-1 rounded-lg font-bold text-xs tracking-wide transition-all uppercase text-center cursor-pointer ${
+                    className={`flex-1 rounded-lg font-bold text-xs tracking-wide transition-all duration-200 uppercase text-center cursor-pointer active:scale-[0.98] ${
                       paymentTermsType === 'upon_receipt'
                         ? 'bg-white shadow-sm border border-gray-100 text-blue-600 font-black'
-                        : 'text-gray-400 hover:text-gray-600'
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
                     }`}
                   >
                     {lang.uponReceipt}
@@ -1793,10 +2000,10 @@ function NewEstimateContent() {
                   <button
                     type="button"
                     onClick={() => setPaymentTermsType('net_days')}
-                    className={`flex-1 rounded-lg font-bold text-xs tracking-wide transition-all uppercase text-center cursor-pointer ${
+                    className={`flex-1 rounded-lg font-bold text-xs tracking-wide transition-all duration-200 uppercase text-center cursor-pointer active:scale-[0.98] ${
                       paymentTermsType === 'net_days'
                         ? 'bg-white shadow-sm border border-gray-100 text-blue-600 font-black'
-                        : 'text-gray-400 hover:text-gray-600'
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
                     }`}
                   >
                     {lang.netDays}
@@ -1923,12 +2130,14 @@ function NewEstimateContent() {
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto justify-end">
             {/* Main Action Button */}
             <div className="w-full sm:w-auto shrink-0">
-              <button
+              <Button
+                variant="primary"
+                size="md"
                 onClick={handleSave}
-                className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-blue-600/10 hover:bg-blue-700 hover:shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] h-[40px] flex items-center justify-center"
+                className="w-full sm:w-auto px-8 h-[40px] !shadow-xl !shadow-blue-600/10 hover:!shadow-blue-600/30"
               >
                 {editId ? lang.save : lang.generateEstimate}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

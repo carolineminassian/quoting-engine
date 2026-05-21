@@ -18,6 +18,8 @@ import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ProLockModal from '@/components/ProLockModal';
+import Button from '@/components/Button';
+import LinkButton from '@/components/LinkButton';
 import {
   Listbox,
   ListboxButton,
@@ -557,12 +559,14 @@ export default function DashboardPage() {
           </div>
 
           {/* PRIMARY CALL TO ACTION */}
-          <Link
+          <LinkButton
             href="/new-estimate"
-            className="w-full sm:w-auto flex items-center justify-center text-center px-5 py-2 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md hover:bg-blue-700 transition-colors h-[38px]"
+            variant="primary"
+            size="md"
+            className="w-full sm:w-auto"
           >
             {lang.newEstimate}
-          </Link>
+          </LinkButton>
         </div>
 
         {/* UNIFIED ACTION & CONTROL PANEL */}
@@ -665,14 +669,17 @@ export default function DashboardPage() {
                     setProLockModal('csv');
                   }
                 }}
-                className="flex-1 sm:flex-none flex items-center justify-center text-center px-5 border border-green-200 bg-green-50/60 text-green-700 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-green-100/70 transition-colors cursor-pointer"
-                style={{ height: '31px' }}
+                className="inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 cursor-pointer select-none whitespace-nowrap px-3 py-2 text-[9px] rounded-lg gap-1.5 bg-green-50/60 text-green-700 border border-green-200 hover:bg-green-100/70 hover:text-green-800 hover:border-green-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] flex-1 sm:flex-none"
               >
                 Excel (CSV)
               </button>
 
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 disabled={isZipping || processedEstimates.length === 0}
+                loading={isZipping}
+                loadingText={lang.archiving}
                 onClick={() => {
                   if (profile.subscription_tier !== 'pro') {
                     setProLockModal('zip');
@@ -680,28 +687,27 @@ export default function DashboardPage() {
                   }
                   handleExportZip();
                 }}
-                className="flex-1 sm:flex-none bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-40 font-black uppercase tracking-widest text-[10px] px-5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                style={{ height: '31px' }}
+                className="flex-1 sm:flex-none"
+                icon={
+                  <svg
+                    className="w-3.5 h-3.5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                    />
+                  </svg>
+                }
               >
-                <svg
-                  className="w-3.5 h-3.5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                </svg>
-                {isZipping
-                  ? lang.archiving
-                  : t(lang.downloadPdfsZip, {
-                      count: processedEstimates.length
-                    })}
-              </button>
+                {t(lang.downloadPdfsZip, {
+                  count: processedEstimates.length
+                })}
+              </Button>
             </div>
           </div>
         )}
@@ -863,7 +869,7 @@ export default function DashboardPage() {
                       : `/new-estimate?edit=${est.id}`
                   )
                 }
-                className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 cursor-pointer transition-all group"
+                className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 hover:-translate-y-0.5 cursor-pointer transition-all duration-200 group"
               >
                 <div className="flex-1 w-full">
                   <div className="flex justify-between items-start mb-1 sm:mb-0">
@@ -961,8 +967,9 @@ export default function DashboardPage() {
                           e.stopPropagation();
                           handleDelete(est.id);
                         }}
-                        className="text-gray-300 hover:text-red-500 hover:bg-red-50 rounded p-2 transition-all"
+                        className="text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg p-2 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
                         title="Delete Draft"
+                        aria-label="Delete Draft"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -1000,7 +1007,7 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-3 mb-6">
               <button
                 onClick={() => handleExportCSV('summary')}
-                className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors shadow-sm"
+                className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] cursor-pointer"
               >
                 <p className="font-black text-sm text-gray-900 uppercase tracking-widest">
                   {lang.summarizedView}
@@ -1011,7 +1018,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => handleExportCSV('detailed')}
-                className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors shadow-sm"
+                className="text-left p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] cursor-pointer"
               >
                 <p className="font-black text-sm text-gray-900 uppercase tracking-widest">
                   {lang.detailedView}
@@ -1023,12 +1030,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="ghost"
+                size="md"
                 onClick={() => setExportModal(false)}
-                className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-xl transition-colors border border-gray-100"
               >
                 {lang.cancel}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

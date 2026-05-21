@@ -162,6 +162,8 @@ export const translations = {
     addDescription: 'Add Description',
     removeFromList: 'Remove from list',
     enterToSaveCategory: '✨ Shortcut: Press Enter to save new category',
+    noDescriptionSuggestions: 'No saved descriptions for this category yet.',
+    removeDescription: 'Remove from suggestions',
     serviceMargin: 'Service Margin:',
     serviceDescription: 'Service Description',
     serviceDescPlaceholder:
@@ -578,6 +580,9 @@ export const translations = {
     removeFromList: 'Supprimer de la liste',
     enterToSaveCategory:
       '✨ Raccourci : Entrée pour valider la nouvelle catégorie',
+    noDescriptionSuggestions:
+      'Aucune description enregistrée pour cette catégorie.',
+    removeDescription: 'Supprimer des suggestions',
     serviceMargin: 'Marge Service:',
     serviceDescription: 'Description du Service',
     serviceDescPlaceholder:

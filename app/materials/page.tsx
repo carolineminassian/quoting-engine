@@ -209,7 +209,7 @@ export default function MaterialsPage() {
                 required
                 title={lang.itemNameTooltip}
                 placeholder={lang.exampleItem}
-                className="w-full p-3.5 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50 shadow-inner"
+                className="w-full h-[52px] px-4 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50 shadow-inner text-sm placeholder:font-medium placeholder:text-gray-400"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
@@ -221,7 +221,10 @@ export default function MaterialsPage() {
               </label>
               <Listbox value={newUnit} onChange={setNewUnit}>
                 <div className="relative">
-                  <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                  <ListboxButton
+                    style={{ height: '52px' }}
+                    className="w-full px-4 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer"
+                  >
                     <span className="block truncate">
                       {newUnit ? lang.units[newUnit] : lang.unitPlaceholder}
                     </span>
@@ -266,12 +269,12 @@ export default function MaterialsPage() {
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="0.00"
-                  className="w-full p-3.5 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold pr-8 transition-colors bg-gray-50 shadow-inner"
+                  placeholder="0"
+                  className="w-full h-[52px] pl-4 pr-9 border border-gray-200 rounded-lg outline-none focus:border-blue-500 font-mono font-bold transition-colors bg-gray-50 shadow-inner text-sm placeholder:font-medium placeholder:text-gray-400"
                   value={newName === '' && newPrice === '0' ? '' : newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
                 />
-                <span className="absolute right-4 top-4 text-gray-400 font-bold text-xs font-mono">
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs font-mono pointer-events-none">
                   {currencySymbol}
                 </span>
               </div>
@@ -279,7 +282,13 @@ export default function MaterialsPage() {
 
             <div className="col-span-12 sm:col-span-2">
               <div className="col-span-12 sm:col-span-2">
-                <Button type="submit" variant="dark" size="md" fullWidth>
+                <Button
+                  type="submit"
+                  variant="dark"
+                  size="md"
+                  fullWidth
+                  className="h-[52px]"
+                >
                   {lang.addItem}
                 </Button>
               </div>
