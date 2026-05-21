@@ -30,7 +30,6 @@ export async function POST(request: Request) {
       .single();
 
     if (updateError) throw updateError;
-
     // 2. Fetch Owner's profile and auth email (including notification preferences)
     const { data: profile } = await supabaseAdmin
       .from('profiles')
@@ -39,6 +38,18 @@ export async function POST(request: Request) {
       )
       .eq('id', estimate.user_id)
       .single();
+
+    // Always create an in-app notification badge (regardless of email setting)
+    const { error: notifError } = await supabaseAdmin
+      .from('estimate_notifications')
+      .insert({
+        user_id: estimate.user_id,
+        estimate_id: estimateId,
+        event_type: status // 'approved' or 'rejected'
+      });
+    if (notifError) {
+      console.error('[notification] Failed to create badge:', notifError);
+    }
 
     const {
       data: { user }

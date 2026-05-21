@@ -38,8 +38,14 @@ export default function DashboardPage() {
 
   // Filter & Sort State
   const [filterStatus, setFilterStatus] = useState<
-    'all' | 'draft' | 'pending' | 'approved' | 'rejected'
+    'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'unread'
   >('all');
+
+  // Set of estimate IDs that have at least one unread notification.
+  // Used to show the red dot per row + filter "unread" view.
+  const [estimatesWithNotifications, setEstimatesWithNotifications] = useState<
+    Set<string>
+  >(new Set());
   const [sortBy, setSortBy] = useState<
     'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
   >('date_desc');
@@ -90,6 +96,18 @@ export default function DashboardPage() {
 
       setEstimates(estsRes.data || []);
       setMaterials(matsRes.data || []);
+
+      // Fetch unread notifications for this user
+      const { data: notifData } = await supabase
+        .from('estimate_notifications')
+        .select('estimate_id')
+        .eq('user_id', user.id);
+
+      if (notifData) {
+        const ids = new Set<string>(notifData.map((n: any) => n.estimate_id));
+        setEstimatesWithNotifications(ids);
+      }
+
       setLoading(false);
 
       // Check URL parameters to automatically set the dashboard view context
@@ -97,7 +115,7 @@ export default function DashboardPage() {
       const statusParam = params.get('status');
       if (
         statusParam &&
-        ['all', 'draft', 'pending', 'approved', 'rejected'].includes(
+        ['all', 'draft', 'pending', 'approved', 'rejected', 'unread'].includes(
           statusParam
         )
       ) {
@@ -107,6 +125,61 @@ export default function DashboardPage() {
     fetchData();
   }, [router]);
 
+  // Real-time subscription: keep the badges in sync if a new notification
+  // arrives or one is cleared while the user is on the dashboard
+  useEffect(() => {
+    let channel: any = null;
+    let cancelled = false;
+
+    (async () => {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      // Build the channel + register the listener + subscribe in one synchronous block.
+      // This avoids React Strict Mode race conditions where the effect runs twice
+      // and tries to attach a listener after subscribe() has already been called.
+      const newChannel = supabase
+        .channel(`dashboard-notifications-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'estimate_notifications',
+            filter: `user_id=eq.${user.id}`
+          },
+          async () => {
+            const { data: notifData } = await supabase
+              .from('estimate_notifications')
+              .select('estimate_id')
+              .eq('user_id', user.id);
+            const ids = new Set<string>(
+              (notifData || []).map((n: any) => n.estimate_id)
+            );
+            setEstimatesWithNotifications(ids);
+          }
+        )
+        .subscribe();
+
+      // If the cleanup ran while we were awaiting getUser, immediately tear down
+      if (cancelled) {
+        supabase.removeChannel(newChannel);
+        return;
+      }
+
+      channel = newChannel;
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
+  }, []);
   const handleExportZip = async () => {
     if (processedEstimates.length === 0) return;
     setIsZipping(true);
@@ -222,6 +295,37 @@ export default function DashboardPage() {
     }
   };
 
+  // Clear ALL notifications for this user (only used when filter is 'unread')
+  const handleClearAllNotifications = async () => {
+    setDialog({
+      type: 'confirm',
+      message: lang.clearAllConfirm,
+      onConfirm: async () => {
+        setDialog(null);
+        const {
+          data: { user }
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { error } = await supabase
+          .from('estimate_notifications')
+          .delete()
+          .eq('user_id', user.id);
+
+        if (error) {
+          setDialog({ type: 'alert', message: error.message });
+          return;
+        }
+
+        // Optimistically clear local state
+        setEstimatesWithNotifications(new Set());
+
+        // Notify navbar to refresh count
+        window.dispatchEvent(new CustomEvent('notificationsCleared'));
+      }
+    });
+  };
+
   const handleDelete = (id: string) => {
     setDialog({
       type: 'confirm',
@@ -272,12 +376,6 @@ export default function DashboardPage() {
   );
   const processedEstimates = [...estimates]
     .filter((est) => {
-      // Combined status + search filter in single pass
-      const matchesSearch = (est.client_name || '')
-        .toLowerCase()
-        .includes(query);
-      if (!matchesSearch) return false;
-
       if (filterStatus === 'draft') return !est.is_locked;
       if (filterStatus === 'pending')
         return (
@@ -288,6 +386,8 @@ export default function DashboardPage() {
         return est.is_locked && est.client_status === 'approved';
       if (filterStatus === 'rejected')
         return est.is_locked && est.client_status === 'rejected';
+      if (filterStatus === 'unread')
+        return estimatesWithNotifications.has(est.id);
       return true;
     })
     .sort((a, b) => {
@@ -569,6 +669,20 @@ export default function DashboardPage() {
           </LinkButton>
         </div>
 
+        {/* CLEAR ALL NOTIFICATIONS — only visible when viewing unread */}
+        {filterStatus === 'unread' && estimatesWithNotifications.size > 0 && (
+          <div className="mb-4 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearAllNotifications}
+              className="!text-gray-500 hover:!text-blue-600 hover:!bg-blue-50"
+            >
+              ✓ {lang.clearAllNotifications}
+            </Button>
+          </div>
+        )}
+
         {/* UNIFIED ACTION & CONTROL PANEL */}
         {estimates.length > 0 && (
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center mb-4">
@@ -662,6 +776,7 @@ export default function DashboardPage() {
             {/* Utility operational downloads row */}
             <div className="flex items-center gap-2">
               <button
+                disabled={processedEstimates.length === 0}
                 onClick={() => {
                   if (profile.subscription_tier === 'pro') {
                     setExportModal(true);
@@ -669,7 +784,7 @@ export default function DashboardPage() {
                     setProLockModal('csv');
                   }
                 }}
-                className="inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 cursor-pointer select-none whitespace-nowrap px-3 py-2 text-[9px] rounded-lg gap-1.5 bg-green-50/60 text-green-700 border border-green-200 hover:bg-green-100/70 hover:text-green-800 hover:border-green-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] flex-1 sm:flex-none"
+                className="inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 cursor-pointer select-none whitespace-nowrap px-3 py-2 text-[9px] rounded-lg gap-1.5 bg-green-50/60 text-green-700 border border-green-200 hover:bg-green-100/70 hover:text-green-800 hover:border-green-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] flex-1 sm:flex-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:bg-green-50/60 disabled:hover:text-green-700 disabled:hover:border-green-200"
               >
                 Excel (CSV)
               </button>
@@ -687,7 +802,7 @@ export default function DashboardPage() {
                   }
                   handleExportZip();
                 }}
-                className="flex-1 sm:flex-none"
+                className="flex-1 sm:flex-none disabled:cursor-not-allowed"
                 icon={
                   <svg
                     className="w-3.5 h-3.5 text-gray-400"
@@ -728,6 +843,7 @@ export default function DashboardPage() {
                       {filterStatus === 'pending' && lang.pendingOnly}
                       {filterStatus === 'approved' && lang.approvedOnly}
                       {filterStatus === 'rejected' && lang.rejectedOnly}
+                      {filterStatus === 'unread' && lang.unreadOnly}
                     </span>
                     <span className="pointer-events-none text-gray-400 text-[8px]">
                       ▼
@@ -775,10 +891,18 @@ export default function DashboardPage() {
                       <ListboxOption
                         value="rejected"
                         className={({ active }) =>
-                          `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                         }
                       >
                         {lang.rejectedOnly}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="unread"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {lang.unreadOnly}
                       </ListboxOption>
                     </ListboxOptions>
                   </Transition>
@@ -877,6 +1001,14 @@ export default function DashboardPage() {
                       <h3 className="font-black text-lg text-gray-900 group-hover:text-blue-600 transition-colors">
                         {est.client_name || lang.untitledProject}
                       </h3>
+                      {/* Notification dot — shown if this estimate has unread events */}
+                      {estimatesWithNotifications.has(est.id) && (
+                        <span
+                          className="inline-block w-2.5 h-2.5 bg-red-500 rounded-full shadow-sm shadow-red-500/40 animate-pulse"
+                          title="New activity"
+                          aria-label="New activity"
+                        />
+                      )}
                       <span
                         className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${
                           !est.is_locked

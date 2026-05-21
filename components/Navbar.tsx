@@ -6,14 +6,27 @@ import { useRouter, usePathname } from 'next/navigation';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 
+interface NotificationBadgeProps {
+  count: number;
+}
+
+const NotificationBadge = ({ count }: NotificationBadgeProps) => {
+  if (count <= 0) return null;
+  return (
+    <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] px-1 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md shadow-red-500/30 ring-2 ring-white">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+};
+
 interface BrandLogoProps {
   country: 'US' | 'FR';
 }
 
 const BrandLogo = ({ country }: BrandLogoProps) => (
-  <div className="flex items-center gap-2.5 select-none group">
+  <div className="flex items-center gap-3 select-none group">
     <svg
-      className="w-7 h-7 transition-transform duration-300 group-hover:scale-105"
+      className="w-9 h-9 transition-transform duration-300 group-hover:scale-105"
       viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -35,7 +48,7 @@ const BrandLogo = ({ country }: BrandLogoProps) => (
         className={country === 'FR' ? 'text-gray-900' : 'text-blue-600'}
       />
     </svg>
-    <span className="text-lg tracking-tighter font-sans antialiased">
+    <span className="text-2xl tracking-tighter font-sans antialiased">
       <span className="font-black text-gray-900">Pact</span>
       <span className="font-light text-blue-600">Estim</span>
     </span>
@@ -50,6 +63,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [hasBusinessProfile, setHasBusinessProfile] = useState<boolean>(false);
+  const [notificationCount, setNotificationCount] = useState<number>(0);
 
   // 1. Fetch Session & Profile Data (re-runs on path change OR custom 'profileUpdated' event)
   useEffect(() => {
@@ -61,6 +75,7 @@ export default function Navbar() {
 
       if (!currentSession?.user) {
         setHasBusinessProfile(false);
+        setNotificationCount(0);
         return;
       }
 
@@ -76,18 +91,66 @@ export default function Navbar() {
         setLang(primaryCountry === 'FR' ? translations.FR : translations.US);
         setHasBusinessProfile(!!prof.business_name);
       }
+
+      // Fetch unread notification count for the current user
+      const { count } = await supabase
+        .from('estimate_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', currentSession.user.id);
+
+      setNotificationCount(count || 0);
     }
     fetchAuthAndLang();
 
     // Listen for profile updates from anywhere in the app (e.g. profile page save)
     const handleProfileUpdate = () => fetchAuthAndLang();
     window.addEventListener('profileUpdated', handleProfileUpdate);
+
+    // Listen for custom event when notifications are cleared elsewhere in the app
+    const handleNotificationsCleared = () => fetchAuthAndLang();
+    window.addEventListener('notificationsCleared', handleNotificationsCleared);
+
     return () => {
       window.removeEventListener('profileUpdated', handleProfileUpdate);
+      window.removeEventListener(
+        'notificationsCleared',
+        handleNotificationsCleared
+      );
     };
   }, [pathname]);
 
-  // 2. Sync Tab Title and Favicon Using Translation File Schema
+  // 2. Real-time notification subscription — updates badge count when new notifications arrive
+  // or are cleared elsewhere in the app
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const channel = supabase
+      .channel(`navbar-notifications-${session.user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'estimate_notifications',
+          filter: `user_id=eq.${session.user.id}`
+        },
+        async () => {
+          // Refetch the count whenever any notification row changes
+          const { count } = await supabase
+            .from('estimate_notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', session.user.id);
+          setNotificationCount(count || 0);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
+
+  // 3. Sync Tab Title and Favicon Using Translation File Schema
   useEffect(() => {
     if (!lang || !lang.tabTitle || !lang.faviconUrl) return;
 
@@ -121,8 +184,21 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/dashboard" className="flex items-center outline-none">
+            <Link
+              href={
+                notificationCount > 0
+                  ? '/dashboard?status=unread'
+                  : '/dashboard'
+              }
+              className="flex items-center outline-none relative"
+              aria-label={
+                notificationCount > 0
+                  ? `${notificationCount} ${lang.unreadFilterLabel}`
+                  : 'Dashboard'
+              }
+            >
               <BrandLogo country={country} />
+              <NotificationBadge count={notificationCount} />
             </Link>
 
             <div className="hidden sm:ml-10 sm:flex sm:space-x-8">

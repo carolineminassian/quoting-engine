@@ -123,6 +123,7 @@ export const translations = {
     pendingOnly: 'Pending Only',
     approvedOnly: 'Approved Only',
     rejectedOnly: 'Rejected Only',
+    unreadOnly: 'Unread Activity',
     newestFirst: 'Newest First',
     oldestFirst: 'Oldest First',
     highestAmount: 'Highest Amount',
@@ -405,6 +406,12 @@ export const translations = {
     notifyOnRejected: 'When a client rejects an estimate',
     notificationUpdateError:
       'Failed to update notification preference. Please try again.',
+
+    // In-app notification badges
+    unreadFilterLabel: 'Unread Activity',
+    clearAllNotifications: 'Clear all',
+    clearAllConfirm: 'Mark all as read?',
+    notificationsCleared: 'All notifications cleared.',
     paymentCanceled: 'Payment canceled.',
     creditsLabel: 'Credits',
     errorOccurred: 'An error occurred.',
@@ -539,6 +546,7 @@ export const translations = {
     pendingOnly: 'En Attente',
     approvedOnly: 'Approuvés',
     rejectedOnly: 'Refusés',
+    unreadOnly: 'Activité non lue',
     newestFirst: 'Plus Récents',
     oldestFirst: 'Plus Anciens',
     highestAmount: 'Montant Supérieur',
@@ -823,6 +831,12 @@ export const translations = {
     notifyOnApproved: 'Quand un client approuve un devis',
     notifyOnRejected: 'Quand un client refuse un devis',
     notificationUpdateError: 'Échec de la mise à jour. Veuillez réessayer.',
+
+    // In-app notification badges
+    unreadFilterLabel: 'Activité non lue',
+    clearAllNotifications: 'Tout marquer comme lu',
+    clearAllConfirm: 'Tout marquer comme lu ?',
+    notificationsCleared: 'Toutes les notifications ont été effacées.',
     paymentCanceled: 'Paiement annulé.',
     creditsLabel: 'Crédits',
     errorOccurred: 'Une erreur est survenue.',

@@ -46,9 +46,26 @@ export async function POST(request: Request) {
       .eq('id', ownerId)
       .single();
 
+    // Resolve the estimate ID from the body (we'll need it for notification creation)
+    const estimateId = body.estimateId;
+
+    // Always create an in-app notification badge (regardless of email setting)
+    if (estimateId) {
+      const { error: notifError } = await supabaseAdmin
+        .from('estimate_notifications')
+        .insert({
+          user_id: ownerId,
+          estimate_id: estimateId,
+          event_type: 'comment'
+        });
+      if (notifError) {
+        console.error('[notification] Failed to create badge:', notifError);
+      }
+    }
+
     if (ownerProfile?.notify_on_comment === false) {
       return NextResponse.json(
-        { skipped: 'owner opted out of comment notifications' },
+        { skipped: 'owner opted out of comment emails (badge created)' },
         { status: 200 }
       );
     }
