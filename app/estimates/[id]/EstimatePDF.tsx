@@ -1,120 +1,290 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Image
+} from '@react-pdf/renderer';
 
-StyleSheet.create({});
+// ============================================================
+// TYPES
+// ============================================================
+
+interface PreparedItem {
+  name: string;
+  qty: number;
+  unit: string;
+  cost: number; // in major units (dollars/euros)
+  taxRate: number;
+}
+
+interface PreparedSection {
+  title: string;
+  description: string;
+  total: number; // in major units
+  hasDetails: boolean;
+  laborHours: number;
+  laborType?: 'hourly' | 'daily';
+  laborRate: number; // in major units
+  laborTaxRate: number;
+  items: PreparedItem[];
+}
+
+interface PreparedCharge {
+  name: string;
+  isPercentage: boolean;
+  percentageRate: number;
+  qty: number;
+  unit: string;
+  costPerUnitCents: number;
+  taxRate: number;
+  amountCents: number;
+  basisLabel: string;
+}
+
+interface EstimatePDFProps {
+  estimate: any;
+  profile: any;
+  lang: any;
+  subtotal: number; // major units
+  taxGroups: [string, number][]; // tax amounts in cents
+  grandTotal: number; // major units
+  sections: PreparedSection[];
+  additionalCharges?: PreparedCharge[];
+}
+
+// ============================================================
+// STYLES
+// ============================================================
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    paddingTop: 40,
+    paddingBottom: 90,
+    paddingHorizontal: 45,
     fontSize: 10,
     fontFamily: 'Helvetica',
     color: '#111827',
     backgroundColor: '#ffffff'
   },
-  headerContainer: {
+
+  // === LETTERHEAD ===
+  letterhead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 40,
-    alignItems: 'flex-start'
+    alignItems: 'flex-start',
+    paddingBottom: 14,
+    marginBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb'
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: -1,
-    color: '#111827',
-    marginBottom: 15
+  letterheadLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 16
+  },
+  logo: {
+    height: 40,
+    width: 'auto',
+    objectFit: 'contain',
+    marginRight: 12
   },
   businessName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2563eb',
-    textTransform: 'uppercase',
-    textAlign: 'right',
-    marginBottom: 5
-  },
-  metaText: {
-    fontSize: 9,
-    color: '#6b7280',
-    textAlign: 'right',
-    marginBottom: 2
-  },
-  label: {
-    fontSize: 8,
-    textTransform: 'uppercase',
-    color: '#9ca3af',
-    fontWeight: 'bold',
-    marginBottom: 3
-  },
-  clientName: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#1f2937'
+    color: '#111827',
+    letterSpacing: -0.3
   },
-  clientAddress: {
-    fontSize: 10,
-    color: '#4b5563',
-    marginTop: 2,
-    maxWidth: 220,
-    lineHeight: 1.4
+  letterheadRight: {
+    alignItems: 'flex-end'
   },
-  tableHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 3,
-    borderBottomColor: '#111827',
-    paddingBottom: 6,
-    textTransform: 'uppercase',
+  documentTypeLabel: {
     fontSize: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
     fontWeight: 'bold',
     color: '#9ca3af',
-    letterSpacing: 1
-  },
-  row: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-    paddingVertical: 14,
-    alignItems: 'flex-start'
-  },
-  colDescription: {
-    width: '75%',
-    paddingRight: 15
-  },
-  colAmount: {
-    width: '24%',
-    textAlign: 'right',
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#374151'
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 4
-  },
-  sectionText: {
-    fontSize: 9,
-    color: '#6b7280',
-    lineHeight: 1.4,
     marginBottom: 6
   },
-  breakdownBox: {
-    backgroundColor: '#f9fafb',
-    padding: 6,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: '#f3f4f6'
+  documentRef: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#111827'
   },
-  breakdownLine: {
-    fontSize: 8,
-    color: '#4b5563',
+  documentDate: {
+    fontSize: 9,
+    color: '#6b7280',
+    marginTop: 3
+  },
+
+  // === BILL TO ===
+  billToSection: {
+    marginBottom: 22
+  },
+  sectionLabel: {
+    fontSize: 7.5,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    fontWeight: 'bold',
+    color: '#9ca3af',
+    marginBottom: 5
+  },
+  clientName: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#111827',
     marginBottom: 2
   },
+  clientLine: {
+    fontSize: 9,
+    color: '#4b5563',
+    lineHeight: 1.4,
+    marginBottom: 1
+  },
+
+  // === SECTION HEADERS (Services + Additional Charges tables) ===
+  servicesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    marginBottom: 4,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#374151'
+  },
+  chargesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    marginBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb'
+  },
+  tableHeaderText: {
+    fontSize: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    fontWeight: 'bold'
+  },
+  tableHeaderTextLeft: {
+    color: '#374151'
+  },
+  tableHeaderTextRight: {
+    color: '#9ca3af'
+  },
+
+  // === SERVICE ROWS ===
+  serviceRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6'
+  },
+  serviceRowLast: {
+    paddingVertical: 10,
+    borderBottomWidth: 0
+  },
+  serviceTopLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6
+  },
+  serviceTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#111827',
+    flex: 1,
+    paddingRight: 12
+  },
+  serviceAmount: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#111827'
+  },
+  serviceDescription: {
+    fontSize: 9.5,
+    color: '#4b5563',
+    lineHeight: 1.5,
+    marginBottom: 4
+  },
+
+  // Public materials list (when details OFF)
+  itemsList: {
+    marginTop: 4
+  },
+  itemBullet: {
+    fontSize: 9,
+    color: '#6b7280',
+    marginBottom: 2,
+    paddingLeft: 4
+  },
+
+  // Internal details breakdown (when details ON)
+  detailsBlock: {
+    marginTop: 6,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: '#e5e7eb'
+  },
+  detailLine: {
+    fontSize: 8.5,
+    color: '#6b7280',
+    marginBottom: 2,
+    lineHeight: 1.4
+  },
+
+  // === ADDITIONAL CHARGES ROWS ===
+  chargeRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6'
+  },
+  chargeRowLast: {
+    paddingVertical: 10,
+    borderBottomWidth: 0
+  },
+  chargeTopLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start'
+  },
+  chargeInfoBlock: {
+    flex: 1,
+    paddingRight: 12,
+    flexDirection: 'column'
+  },
+  chargeName: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 2
+  },
+  chargeAmount: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#111827'
+  },
+  chargeSubtitle: {
+    fontSize: 8.5,
+    color: '#6b7280',
+    marginTop: 2
+  },
+
+  // === SECTION SPACING ===
+  sectionSpacer: {
+    marginBottom: 24
+  },
+
+  // === TOTALS ===
   totalsContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 40
+    paddingTop: 12,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb'
   },
   totalsBox: {
     width: 240
@@ -122,109 +292,123 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6
+    alignItems: 'baseline',
+    marginBottom: 8
   },
   totalLabel: {
-    fontSize: 8,
-    textTransform: 'uppercase',
-    color: '#9ca3af',
-    fontWeight: 'bold'
+    fontSize: 10,
+    color: '#6b7280'
   },
   totalValue: {
     fontSize: 10,
-    color: '#4b5563'
+    color: '#111827',
+    fontWeight: 'bold'
   },
   grandTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderTopWidth: 3,
-    borderTopColor: '#111827',
-    paddingTop: 8,
+    alignItems: 'baseline',
+    paddingTop: 12,
     marginTop: 6,
-    alignItems: 'baseline'
+    borderTopWidth: 1.5,
+    borderTopColor: '#374151'
   },
   grandTotalLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
+    color: '#111827',
+    letterSpacing: 0.5
   },
   grandTotalValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2563eb'
   },
-  footer: {
-    position: 'absolute',
-    bottom: 40,
-    left: 40,
-    right: 40,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    paddingTop: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between'
-  },
-  footerBlock: {
-    width: '45%'
-  },
-  footerTitle: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    color: '#9ca3af',
-    marginBottom: 4
-  },
-  footerText: {
-    fontSize: 8,
-    color: '#9ca3af',
-    lineHeight: 1.4,
-    fontStyle: 'italic'
-  },
+
+  // === DEPOSIT BREAKDOWN ===
   depositDivider: {
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    borderTopStyle: 'dashed',
-    marginTop: 8,
-    paddingTop: 8
+    paddingTop: 10,
+    marginTop: 12,
+    borderTopWidth: 0.5,
+    borderTopColor: '#d1d5db',
+    borderTopStyle: 'dashed'
   },
-  depositRowBg: {
+  depositRowPill: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'baseline',
     backgroundColor: '#eff6ff',
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderRadius: 2,
-    marginBottom: 4
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginBottom: 4,
+    borderRadius: 3
   },
-  depositLabelBlue: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    color: '#2563eb'
+  depositLabel: {
+    fontSize: 9.5,
+    color: '#2563eb',
+    fontWeight: 'bold'
   },
-  depositValueBlue: {
+  depositValue: {
     fontSize: 10,
-    fontWeight: 'bold',
-    color: '#1e3a8a'
+    color: '#2563eb',
+    fontWeight: 'bold'
   },
   balanceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 6,
+    alignItems: 'baseline',
+    paddingHorizontal: 8,
     marginTop: 2
+  },
+  balanceLabel: {
+    fontSize: 9.5,
+    color: '#6b7280'
+  },
+  balanceValue: {
+    fontSize: 10,
+    color: '#374151',
+    fontWeight: 'bold'
+  },
+
+  // === FOOTER ===
+  footer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 50,
+    right: 50,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  footerBlock: {
+    width: '47%'
+  },
+  footerTitle: {
+    fontSize: 7.5,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    color: '#9ca3af',
+    marginBottom: 5
+  },
+  footerText: {
+    fontSize: 8,
+    color: '#9ca3af',
+    lineHeight: 1.5,
+    fontStyle: 'italic'
+  },
+  footerTextRight: {
+    fontStyle: 'normal',
+    fontWeight: 'bold'
   }
 });
 
-interface EstimatePDFProps {
-  estimate: any;
-  profile: any;
-  lang: any;
-  subtotal: number;
-  taxGroups: [string, number][];
-  grandTotal: number;
-  sections: any[];
-  // materials: any[];
-}
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export default function EstimatePDF({
   estimate,
@@ -233,126 +417,223 @@ export default function EstimatePDF({
   subtotal,
   taxGroups,
   grandTotal,
-  sections
+  sections,
+  additionalCharges = []
 }: EstimatePDFProps) {
   const isFr = profile.country === 'FR';
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
-  console.log('Sections reçues dans le PDF :', sections);
-  const formatPrice = (value: number) => {
-    const formatted = value.toFixed(2);
-    return profile.currency === 'EUR'
-      ? `${formatted.replace('.', ',')}${currencySymbol}`
-      : `${currencySymbol}${formatted}`;
+  const locale = isFr ? 'fr-FR' : 'en-US';
+
+  // Format a number (in major units like dollars/euros) with proper thousands separators.
+  // US: $1,234.56 · FR: €1 234,56 (non-breaking space + comma decimal)
+  const formatPrice = (value: number): string => {
+    const formatted = value.toLocaleString(locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    return `${currencySymbol}${formatted}`;
   };
+
+  // Same as formatPrice but accepts cents directly
+  const formatCents = (cents: number): string => formatPrice(cents / 100);
+
+  // Show logo only for Pro users with a logo URL
+  const showLogo =
+    profile.subscription_tier === 'pro' &&
+    typeof profile.logo_url === 'string' &&
+    profile.logo_url.length > 0;
+
+  // Format date with full month name (matches on-screen design)
+  const formattedDate = new Date(estimate.created_at).toLocaleDateString(
+    locale,
+    { year: 'numeric', month: 'long', day: 'numeric' }
+  );
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* En-tête */}
-        <View style={styles.headerContainer}>
-          <View>
-            <Text style={styles.title}>{isFr ? 'Devis' : 'Estimate'}</Text>
-            <Text style={styles.label}>{isFr ? 'Client' : 'Client'}</Text>
-            <Text style={styles.clientName}>{estimate.client_name}</Text>
-            {estimate.client_address && (
-              <Text style={styles.clientAddress}>
-                {estimate.client_address}
-              </Text>
+        {/* ═══════════════════════════════════════════════
+          LETTERHEAD: business identity ←→ document metadata
+          ═══════════════════════════════════════════════ */}
+        <View style={styles.letterhead}>
+          <View style={styles.letterheadLeft}>
+            {showLogo && (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={profile.logo_url} style={styles.logo} />
             )}
-            {estimate.client_phone && (
-              <Text style={styles.metaText}>{estimate.client_phone}</Text>
-            )}
-            {estimate.client_email && (
-              <Text style={styles.metaText}>{estimate.client_email}</Text>
-            )}
+            <Text style={styles.businessName}>{profile.business_name}</Text>
           </View>
 
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.businessName}>{profile.business_name}</Text>
-            <Text style={styles.metaText}>
-              {isFr ? 'Date :' : 'Date:'}{' '}
-              {new Date(estimate.created_at).toLocaleDateString(
-                isFr ? 'fr-FR' : 'en-US'
-              )}
+          <View style={styles.letterheadRight}>
+            <Text style={styles.documentTypeLabel}>
+              {isFr ? 'Devis' : 'Estimate'}
             </Text>
-            <Text style={styles.metaText}>
-              {isFr ? 'Réf :' : 'Ref:'}{' '}
-              {estimate.custom_id || estimate.id.slice(0, 8)}
+            <Text style={styles.documentRef}>
+              #{estimate.custom_id || estimate.id.slice(0, 8)}
             </Text>
+            <Text style={styles.documentDate}>{formattedDate}</Text>
           </View>
         </View>
 
-        {/* Tableau des prestations */}
-        <View style={styles.tableHeader}>
-          <Text style={{ width: '75%' }}>
+        {/* ═══════════════════════════════════════════════
+          BILL TO
+          ═══════════════════════════════════════════════ */}
+        <View style={styles.billToSection}>
+          <Text style={styles.sectionLabel}>{isFr ? 'Client' : 'Client'}</Text>
+          <Text style={styles.clientName}>{estimate.client_name}</Text>
+          {estimate.client_address && (
+            <Text style={styles.clientLine}>{estimate.client_address}</Text>
+          )}
+          {estimate.client_phone && (
+            <Text style={styles.clientLine}>{estimate.client_phone}</Text>
+          )}
+          {estimate.client_email && (
+            <Text style={styles.clientLine}>{estimate.client_email}</Text>
+          )}
+        </View>
+
+        {/* ═══════════════════════════════════════════════
+          SERVICES (heavy 3px black anchor)
+          ═══════════════════════════════════════════════ */}
+        <View style={styles.servicesHeader}>
+          <Text style={[styles.tableHeaderText, styles.tableHeaderTextLeft]}>
             {isFr ? 'Etape du Service / Catégorie' : 'Service Category / Step'}
           </Text>
-          <Text style={{ width: '25%', textAlign: 'right' }}>
+          <Text style={[styles.tableHeaderText, styles.tableHeaderTextRight]}>
             {isFr ? 'Montant' : 'Amount'}
           </Text>
         </View>
 
-        {/* Lignes du devis */}
-        {sections.map((sec, idx) => (
-          <View key={idx} style={styles.row} wrap={false}>
-            <View style={styles.colDescription}>
-              <Text style={styles.sectionTitle}>
-                {sec.title || (isFr ? 'Prestation' : 'Service')}
-              </Text>
+        {sections.map((sec, idx) => {
+          const isLast = idx === sections.length - 1;
+          return (
+            <View
+              key={idx}
+              style={isLast ? styles.serviceRowLast : styles.serviceRow}
+              wrap={false}
+            >
+              <View style={styles.serviceTopLine}>
+                <Text style={styles.serviceTitle}>
+                  {sec.title || (isFr ? 'Prestation' : 'Service')}
+                </Text>
+                <Text style={styles.serviceAmount}>
+                  {formatPrice(sec.total || 0)}
+                </Text>
+              </View>
 
-              {/* 1. Custom Description (Always visible) */}
+              {/* Description */}
               {sec.description && (
-                <Text style={styles.sectionText}>{sec.description}</Text>
+                <Text style={styles.serviceDescription}>{sec.description}</Text>
               )}
 
-              {/* 2. Public Materials List (Only visible if Internal Details are OFF) */}
+              {/* Public items list (when internal details OFF) */}
               {!sec.hasDetails && (sec.items || []).length > 0 && (
-                <View style={{ marginBottom: 6, marginTop: 2 }}>
-                  {sec.items.map((item: any, i: number) => (
-                    <Text
-                      key={`auto-${i}`}
-                      style={{ fontSize: 9, color: '#6b7280', marginBottom: 2 }}
-                    >
-                      • {item.name || (isFr ? 'Article' : 'Item')}{' '}
-                      {item.qty > 0 ? `(${item.qty} ${item.unit || ''})` : ''}
+                <View style={styles.itemsList}>
+                  {sec.items.map((item, i) => (
+                    <Text key={`item-${i}`} style={styles.itemBullet}>
+                      · {item.name || (isFr ? 'Article' : 'Item')}
+                      {item.qty > 0
+                        ? ` (${item.qty}${item.unit ? ` ${item.unit}` : ''})`
+                        : ''}
                     </Text>
                   ))}
                 </View>
               )}
 
-              {/* 3. Detailed Internal Breakdown Box (Only visible if Internal Details are ON) */}
+              {/* Internal details breakdown (when ON) — subtle inline list */}
               {sec.hasDetails && (
-                <View style={styles.breakdownBox}>
+                <View style={styles.detailsBlock}>
                   {sec.laborHours > 0 && (
-                    <Text style={styles.breakdownLine}>
-                      • {isFr ? "Main-d'œuvre" : 'Labor'}: {sec.laborHours}
+                    <Text style={styles.detailLine}>
+                      {isFr ? "Main-d'œuvre" : 'Labor'}: {sec.laborHours}
                       {sec.laborType === 'daily'
                         ? isFr
                           ? 'j'
                           : 'd'
-                        : 'h'} @ {formatPrice(sec.laborRate)}
+                        : 'h'} × {formatPrice(sec.laborRate)}
                       {sec.laborType === 'daily'
                         ? isFr
                           ? '/j'
                           : '/d'
                         : '/h'}{' '}
-                      (Tax: {sec.laborTaxRate}%)
+                      ({isFr ? 'TVA' : 'Tax'} {sec.laborTaxRate}%)
                     </Text>
                   )}
-                  {(sec.items || []).map((item: any, i: number) => (
-                    <Text key={`detail-${i}`} style={styles.breakdownLine}>
-                      • {item.name} : {item.qty} {item.unit || ''} @{' '}
-                      {formatPrice(item.cost || 0)} (Tax: {item.taxRate}%)
+                  {(sec.items || []).map((item, i) => (
+                    <Text key={`detail-${i}`} style={styles.detailLine}>
+                      {item.name}: {item.qty}
+                      {item.unit ? ` ${item.unit}` : ''} ×{' '}
+                      {formatPrice(item.cost || 0)} ({isFr ? 'TVA' : 'Tax'}{' '}
+                      {item.taxRate}%)
                     </Text>
                   ))}
                 </View>
               )}
             </View>
-            <Text style={styles.colAmount}>{formatPrice(sec.total || 0)}</Text>
-          </View>
-        ))}
+          );
+        })}
 
-        {/* Calculs des totaux financiers */}
+        {/* ═══════════════════════════════════════════════
+          ADDITIONAL CHARGES (only if any) — light gray header
+          ═══════════════════════════════════════════════ */}
+        {additionalCharges.length > 0 && (
+          <View style={styles.sectionSpacer} wrap={false}>
+            <View style={[styles.chargesHeader, { marginTop: 24 }]}>
+              <Text
+                style={[styles.tableHeaderText, styles.tableHeaderTextLeft]}
+              >
+                {lang?.additionalCharges ||
+                  (isFr ? 'Frais Supplémentaires' : 'Additional Charges')}
+              </Text>
+              <Text
+                style={[styles.tableHeaderText, styles.tableHeaderTextRight]}
+              >
+                {isFr ? 'Montant' : 'Amount'}
+              </Text>
+            </View>
+
+            {additionalCharges.map((charge, idx) => {
+              const isLast = idx === additionalCharges.length - 1;
+
+              // Subtitle: same logic as on-screen design
+              let subtitle = '';
+              if (charge.isPercentage) {
+                subtitle = `${charge.percentageRate || 0}% · ${charge.basisLabel}`;
+              } else {
+                const qty = charge.qty || 1;
+                // Compute effective per-unit cost (post-margin) by dividing back
+                const effectivePerUnitCents =
+                  qty > 0 ? charge.amountCents / qty : 0;
+                subtitle = `${qty} ${charge.unit} × ${formatCents(effectivePerUnitCents)}`;
+              }
+
+              return (
+                <View
+                  key={idx}
+                  style={isLast ? styles.chargeRowLast : styles.chargeRow}
+                  wrap={false}
+                >
+                  <View style={styles.chargeTopLine}>
+                    <View style={styles.chargeInfoBlock}>
+                      <Text style={styles.chargeName}>
+                        {charge.name ||
+                          (isFr ? 'Frais Supplémentaire' : 'Additional Charge')}
+                      </Text>
+                      <Text style={styles.chargeSubtitle}>{subtitle}</Text>
+                    </View>
+                    <Text style={styles.chargeAmount}>
+                      {formatCents(charge.amountCents)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ═══════════════════════════════════════════════
+          TOTALS — light hairline above, heavy black above grand total
+          ═══════════════════════════════════════════════ */}
         <View style={styles.totalsContainer} wrap={false}>
           <View style={styles.totalsBox}>
             <View style={styles.totalRow}>
@@ -367,7 +648,7 @@ export default function EstimatePDF({
                 <Text style={styles.totalLabel}>
                   {isFr ? 'TVA' : 'Tax'} ({rate}%)
                 </Text>
-                <Text style={styles.totalValue}>{formatPrice(amt / 100)}</Text>
+                <Text style={styles.totalValue}>{formatCents(amt)}</Text>
               </View>
             ))}
 
@@ -380,16 +661,16 @@ export default function EstimatePDF({
               </Text>
             </View>
 
-            {/* Section Acompte & Solde */}
+            {/* Deposit breakdown — blue pill + balance row */}
             {estimate.deposit_enabled && (
               <View style={styles.depositDivider}>
-                <View style={styles.depositRowBg}>
-                  <Text style={styles.depositLabelBlue}>
+                <View style={styles.depositRowPill}>
+                  <Text style={styles.depositLabel}>
                     {isFr
                       ? `Acompte (${estimate.deposit_percentage || 20}%)`
                       : `Deposit (${estimate.deposit_percentage || 20}%)`}
                   </Text>
-                  <Text style={styles.depositValueBlue}>
+                  <Text style={styles.depositValue}>
                     {formatPrice(
                       (grandTotal * (estimate.deposit_percentage || 20)) / 100
                     )}
@@ -397,10 +678,10 @@ export default function EstimatePDF({
                 </View>
 
                 <View style={styles.balanceRow}>
-                  <Text style={styles.totalLabel}>
+                  <Text style={styles.balanceLabel}>
                     {isFr ? 'Solde Restant' : 'Balance Due'}
                   </Text>
-                  <Text style={styles.totalValue}>
+                  <Text style={styles.balanceValue}>
                     {formatPrice(
                       (grandTotal *
                         (100 - (estimate.deposit_percentage || 20))) /
@@ -413,8 +694,10 @@ export default function EstimatePDF({
           </View>
         </View>
 
-        {/* Mentions légales bas de page */}
-        <View style={styles.footer} wrap={false}>
+        {/* ═══════════════════════════════════════════════
+          FOOTER (compliance + payment terms — preserved as-is)
+          ═══════════════════════════════════════════════ */}
+        <View style={styles.footer} fixed>
           <View style={styles.footerBlock}>
             <Text style={styles.footerTitle}>
               {isFr ? 'Conformité & Mentions Légales' : 'Compliance & Legal'}
@@ -440,7 +723,11 @@ export default function EstimatePDF({
               {isFr ? 'Conditions de Paiement' : 'Terms'}
             </Text>
             <Text
-              style={[styles.footerText, { fontWeight: 'bold', width: '100%' }]}
+              style={[
+                styles.footerText,
+                styles.footerTextRight,
+                { width: '100%' }
+              ]}
             >
               {(() => {
                 const rawTerms = estimate.payment_terms_snapshot || '30_days';
