@@ -28,7 +28,6 @@ export interface EstimateItem {
   name?: string;
   cost_per_unit_cents?: number;
 }
-
 export interface EstimateSection {
   title: string;
   description?: string;
@@ -41,6 +40,41 @@ export interface EstimateSection {
   items: EstimateItem[];
 }
 
+/**
+ * An additional charge applied at the project level — outside of services/materials.
+ * Used for insurance, permits, equipment rentals, overhead allocation, etc.
+ *
+ * Two modes:
+ * - Flat: a fixed cost (qty × costPerUnitCents), like a regular item
+ * - Percentage: a % of project / section / item — calculated dynamically
+ *
+ * Percentage charges are applied AFTER margins on their basis amount.
+ */
+export interface AdditionalCharge {
+  /** Local-only ID for React keys; not stored in DB */
+  id?: string;
+  name: string;
+  taxRate: number;
+  /** Whether this is a flat or percentage charge */
+  isPercentage: boolean;
+
+  // === Flat charge fields (used when isPercentage = false) ===
+  qty?: number;
+  unit?: string;
+  costPerUnitCents?: number;
+  /** Optional margin (only applies to flat charges; percentage charges already mark up) */
+  marginRate?: number;
+
+  // === Percentage charge fields (used when isPercentage = true) ===
+  /** Rate as a number (e.g., 5 means 5%) */
+  percentageRate?: number;
+  /** What this charge is calculated against */
+  basisType?: 'project' | 'section' | 'item';
+  /** Section index when basisType = 'section' or 'item' */
+  basisSectionIdx?: number;
+  /** Item index within section when basisType = 'item' */
+  basisItemIdx?: number;
+}
 /**
  * The minimal set of estimate fields needed for calculations.
  * Use this for finalized estimates (locked) — the *_snapshot fields take priority.
@@ -206,6 +240,96 @@ export function getSectionTotal(
 }
 
 // ============================================================
+// ADDITIONAL CHARGES
+// ============================================================
+
+/**
+ * Compute the cents amount of a single additional charge, applying its tax/margin rules.
+ *
+ * For FLAT charges:
+ *   amount = qty * costPerUnitCents * (1 + marginRate/100)
+ *
+ * For PERCENTAGE charges:
+ *   amount = basis * (percentageRate/100)
+ *
+ *   Where basis is post-margin amount of the referenced project/section/item.
+ *   If the referenced section/item is missing (deleted), falls back to project total.
+ *
+ * Note: percentage charges intentionally don't apply margin on top — they're already markups.
+ */
+export function getAdditionalChargeAmountCents(
+  estimate: EstimateFinancialContext,
+  charge: AdditionalCharge,
+  sections: EstimateSection[],
+  materialsById?: Map<string, Material>
+): number {
+  if (charge.isPercentage) {
+    const rate = charge.percentageRate || 0;
+    if (rate <= 0) return 0;
+
+    let basisCents = 0;
+    const sectionIdx = charge.basisSectionIdx;
+    const itemIdx = charge.basisItemIdx;
+
+    // Compute basis amount based on the reference type
+    if (
+      charge.basisType === 'section' &&
+      typeof sectionIdx === 'number' &&
+      sections[sectionIdx]
+    ) {
+      basisCents = getSectionTotalCents(
+        estimate,
+        sections[sectionIdx],
+        materialsById
+      );
+    } else if (
+      charge.basisType === 'item' &&
+      typeof sectionIdx === 'number' &&
+      typeof itemIdx === 'number' &&
+      sections[sectionIdx] &&
+      sections[sectionIdx].items[itemIdx]
+    ) {
+      const sec = sections[sectionIdx];
+      const item = sec.items[itemIdx];
+      basisCents =
+        getEffectiveItemCostCents(estimate, sec, item, materialsById) *
+        (item.qty || 0);
+    } else {
+      // Fallback: 'project' or orphaned reference → use total project
+      basisCents = sections.reduce(
+        (acc, sec) => acc + getSectionTotalCents(estimate, sec, materialsById),
+        0
+      );
+    }
+
+    return Math.round(basisCents * (rate / 100));
+  }
+
+  // Flat charge: qty × cost × (1 + margin/100)
+  const qty = charge.qty || 1;
+  const cost = charge.costPerUnitCents || 0;
+  const marginMultiplier = 1 + (charge.marginRate || 0) / 100;
+  return Math.round(qty * cost * marginMultiplier);
+}
+
+/**
+ * Sum all additional charges in cents. Used for display totals.
+ */
+export function getAdditionalChargesTotalCents(
+  estimate: EstimateFinancialContext,
+  charges: AdditionalCharge[],
+  sections: EstimateSection[],
+  materialsById?: Map<string, Material>
+): number {
+  return (charges || []).reduce(
+    (acc, charge) =>
+      acc +
+      getAdditionalChargeAmountCents(estimate, charge, sections, materialsById),
+    0
+  );
+}
+
+// ============================================================
 // TAX SUMMARY
 // ============================================================
 
@@ -225,12 +349,14 @@ export interface TaxSummary {
  * @param sections - the line items
  * @param profileTaxRate - default tax rate from the profile (used as fallback when item has no taxRate)
  * @param materialsById - optional Map for O(1) material lookups
+ * @param additionalCharges - optional additional charges array (insurance, permits, etc.)
  */
 export function getTaxSummary(
   estimate: EstimateFinancialContext,
   sections: EstimateSection[],
   profileTaxRate: number = 0,
-  materialsById?: Map<string, Material>
+  materialsById?: Map<string, Material>,
+  additionalCharges?: AdditionalCharge[]
 ): TaxSummary {
   const baseTaxRate =
     estimate.tax_rate_snapshot !== null &&
@@ -262,6 +388,23 @@ export function getTaxSummary(
         taxGroups[r] = (taxGroups[r] || 0) + Math.round(matCents * (r / 100));
       }
     });
+  });
+
+  // Additional charges — applied AFTER all sections, on top of subtotal
+  // Note: percentage charges use the sections subtotal as their basis, so they're
+  // computed after sections have been summed up.
+  (additionalCharges || []).forEach((charge) => {
+    const amountCents = getAdditionalChargeAmountCents(
+      estimate,
+      charge,
+      sections,
+      materialsById
+    );
+    if (amountCents > 0) {
+      subtotalCents += amountCents;
+      const r = charge.taxRate !== undefined ? charge.taxRate : baseTaxRate;
+      taxGroups[r] = (taxGroups[r] || 0) + Math.round(amountCents * (r / 100));
+    }
   });
 
   const totalTaxCents = Object.values(taxGroups).reduce((acc, v) => acc + v, 0);

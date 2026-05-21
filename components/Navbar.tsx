@@ -14,7 +14,7 @@ const NotificationBadge = ({ count }: NotificationBadgeProps) => {
   if (count <= 0) return null;
   return (
     <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] px-1 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-md shadow-red-500/30 ring-2 ring-white">
-      {count > 99 ? '99+' : count}
+      {count > 15 ? '15+' : count}
     </span>
   );
 };

@@ -165,6 +165,25 @@ export const translations = {
     enterToSaveCategory: '✨ Shortcut: Press Enter to save new category',
     noDescriptionSuggestions: 'No saved descriptions for this category yet.',
     removeDescription: 'Remove from suggestions',
+
+    // Additional Charges
+    additionalCharges: 'Additional Charges',
+    additionalChargesDesc:
+      'Optional fees or overhead charges (insurance, permits, equipment rental, etc.)',
+    addCharge: 'Add Charge',
+    chargeName: 'Charge Name',
+    chargeNamePlaceholder: 'e.g. Liability Insurance, Permit Fee',
+    chargeFlat: 'Flat',
+    chargePercent: 'Percentage',
+    chargeBasis: 'Based on',
+    basisProject: 'Total Project',
+    basisSection: 'Section',
+    basisItem: 'Item',
+    removeCharge: 'Remove from suggestions',
+    chargeRate: 'Rate',
+    chargeAmount: 'Amount',
+    deleteCharge: 'Delete charge',
+    additionalChargesTotal: 'Additional Charges Total',
     serviceMargin: 'Service Margin:',
     serviceDescription: 'Service Description',
     serviceDescPlaceholder:
@@ -591,6 +610,25 @@ export const translations = {
     noDescriptionSuggestions:
       'Aucune description enregistrée pour cette catégorie.',
     removeDescription: 'Supprimer des suggestions',
+
+    // Additional Charges
+    additionalCharges: 'Frais Supplémentaires',
+    additionalChargesDesc:
+      'Frais ou charges optionnels (assurance, permis, location de matériel, etc.)',
+    addCharge: 'Ajouter un Frais',
+    chargeName: 'Nom du Frais',
+    chargeNamePlaceholder: 'Ex : Assurance, Frais de Permis',
+    chargeFlat: 'Forfait',
+    chargePercent: 'Pourcentage',
+    chargeBasis: 'Basé sur',
+    basisProject: 'Total du Projet',
+    basisSection: 'Section',
+    basisItem: 'Article',
+    removeCharge: 'Supprimer des suggestions',
+    chargeRate: 'Taux',
+    chargeAmount: 'Montant',
+    deleteCharge: 'Supprimer le frais',
+    additionalChargesTotal: 'Total Frais Supplémentaires',
     serviceMargin: 'Marge Service:',
     serviceDescription: 'Description du Service',
     serviceDescPlaceholder:
