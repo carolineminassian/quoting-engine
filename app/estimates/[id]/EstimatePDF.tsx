@@ -69,7 +69,6 @@ const styles = StyleSheet.create({
     color: '#111827',
     backgroundColor: '#ffffff'
   },
-
   // === LETTERHEAD ===
   letterhead: {
     flexDirection: 'row',
@@ -281,8 +280,8 @@ const styles = StyleSheet.create({
   totalsContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingTop: 12,
-    marginTop: 12,
+    paddingTop: 10,
+    marginTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb'
   },
@@ -293,7 +292,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 8
+    marginBottom: 6
   },
   totalLabel: {
     fontSize: 10,
@@ -308,8 +307,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    paddingTop: 12,
-    marginTop: 6,
+    paddingTop: 9,
+    marginTop: 4,
     borderTopWidth: 1.5,
     borderTopColor: '#374151'
   },
@@ -328,8 +327,8 @@ const styles = StyleSheet.create({
 
   // === DEPOSIT BREAKDOWN ===
   depositDivider: {
-    paddingTop: 10,
-    marginTop: 12,
+    paddingTop: 8,
+    marginTop: 8,
     borderTopWidth: 0.5,
     borderTopColor: '#d1d5db',
     borderTopStyle: 'dashed'
@@ -374,10 +373,10 @@ const styles = StyleSheet.create({
   // === FOOTER ===
   footer: {
     position: 'absolute',
-    bottom: 40,
-    left: 50,
-    right: 50,
-    paddingTop: 14,
+    bottom: 14,
+    left: 45,
+    right: 45,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
     flexDirection: 'row',
@@ -431,7 +430,11 @@ export default function EstimatePDF({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    return `${currencySymbol}${formatted}`;
+    // Helvetica in react-pdf doesn't render U+202F (narrow no-break space) or
+    // U+00A0 (regular no-break space) — they show as a fallback glyph (often "/").
+    // Replace with a regular space so French thousands separators render correctly.
+    const safe = formatted.replace(/[\u202F\u00A0]/g, ' ');
+    return `${currencySymbol}${safe}`;
   };
 
   // Same as formatPrice but accepts cents directly
