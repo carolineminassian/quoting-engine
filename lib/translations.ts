@@ -277,6 +277,38 @@ export const translations = {
     smsSentSuccess: 'SMS sent successfully to {target}',
     sendError: 'Error: {msg}',
     failedToSend: 'Failed to send',
+
+    // Cancellations
+    cancelEstimate: 'Cancel Estimate',
+    cancelEstimateBtn: 'Cancel Estimate',
+    cancelEstimateConfirm:
+      'Cancel this estimate? It will no longer be active and cannot be used. This action is permanent.',
+    cancelEstimateReasonLabel: 'Reason (optional)',
+    cancelEstimateReasonPlaceholder:
+      'e.g. Client unresponsive, scope changed, scheduling conflict...',
+    cancelEstimateConfirmBtn: 'Confirm Cancellation',
+    cancelEstimateError: 'Failed to cancel the estimate. Please try again.',
+    estimateCancelled: 'Estimate Cancelled',
+    cancelledFilter: 'Cancelled',
+    cancelledOnly: 'Cancelled Only',
+    cancelledLabel: 'cancelled',
+    cancelledOn: 'Cancelled on {date}',
+    supersededBadge: 'Superseded',
+    supersededLabel: 'This estimate has been replaced by a revised version.',
+
+    // Follow-up emails
+    followUpBtn: 'Follow Up',
+    followUpSending: 'Sending...',
+    followUpSentSuccess: 'Follow-up sent successfully to {target}',
+    followUpCooldown: 'Available again on {date}',
+    followUpAllBtn: 'Follow Up All Pending',
+    followUpAllConfirm:
+      'Send a follow-up email to all {count} pending estimates with a client email? Estimates contacted within the last 7 days will be skipped.',
+    followUpAllResult:
+      'Follow-up complete: {sent} sent, {skipped} skipped (cooldown or no email), {failed} failed.',
+    followUpAllNothingToSend:
+      'No pending estimates currently eligible for follow-up.',
+    followUpEmailSubject: 'Following up on Estimate #{customId}',
     paymentSuccessful: 'Payment successful! Welcome to Pro.',
     selectUnitError: 'Please select a unit.',
     deleteItemConfirm: 'Delete this item?',
@@ -725,6 +757,38 @@ export const translations = {
     smsSentSuccess: 'SMS envoyé avec succès à {target}',
     sendError: 'Erreur : {msg}',
     failedToSend: "L'envoi a échoué",
+
+    // Cancellations
+    cancelEstimate: 'Annuler le Devis',
+    cancelEstimateBtn: 'Annuler le Devis',
+    cancelEstimateConfirm:
+      'Annuler ce devis ? Il ne sera plus actif et ne pourra plus être utilisé. Cette action est définitive.',
+    cancelEstimateReasonLabel: 'Raison (facultatif)',
+    cancelEstimateReasonPlaceholder:
+      'Ex : Client injoignable, changement de périmètre, conflit de planning...',
+    cancelEstimateConfirmBtn: "Confirmer l'Annulation",
+    cancelEstimateError: "Échec de l'annulation du devis. Veuillez réessayer.",
+    estimateCancelled: 'Devis Annulé',
+    cancelledFilter: 'Annulés',
+    cancelledOnly: 'Annulés Uniquement',
+    cancelledLabel: 'annulé',
+    cancelledOn: 'Annulé le {date}',
+    supersededBadge: 'Remplacé',
+    supersededLabel: 'Ce devis a été remplacé par une version révisée.',
+
+    // Follow-up emails
+    followUpBtn: 'Relancer',
+    followUpSending: 'Envoi...',
+    followUpSentSuccess: 'Relance envoyée avec succès à {target}',
+    followUpCooldown: 'Disponible à nouveau le {date}',
+    followUpAllBtn: 'Relancer Tous',
+    followUpAllConfirm:
+      'Envoyer une relance à tous les {count} devis en attente ayant un email client ? Les devis contactés dans les 7 derniers jours seront ignorés.',
+    followUpAllResult:
+      'Relance terminée : {sent} envoyées, {skipped} ignorées (délai ou pas d’email), {failed} échouées.',
+    followUpAllNothingToSend:
+      'Aucun devis en attente actuellement éligible pour une relance.',
+    followUpEmailSubject: 'Suivi de votre devis #{customId}',
     paymentSuccessful: 'Paiement réussi ! Bienvenue dans Pro.',
     selectUnitError: 'Veuillez choisir une unité.',
     deleteItemConfirm: 'Supprimer cet article ?',

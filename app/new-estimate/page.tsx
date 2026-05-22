@@ -2947,18 +2947,6 @@ function NewEstimateContent() {
                 {formatMoney(totalCents, profile?.currency, profile?.country)}
               </span>
             </div>
-
-            <div className="border-l border-gray-100 pl-6 sm:pl-8">
-              <span className="block text-[10px] font-black uppercase tracking-widest text-blue-600 mb-0.5">
-                {lang.grandTotal || 'Grand Total'}
-              </span>
-              <span className="font-mono font-black text-xl sm:text-2xl text-gray-950 tracking-tight">
-                {profile?.currency === 'EUR' ? '€' : '$'}
-                {(totalCents / 100)
-                  .toFixed(2)
-                  .replace('.', profile?.country === 'FR' ? ',' : '.')}
-              </span>
-            </div>
           </div>
 
           {/* Right Block: Modifiers & Primary Actions */}

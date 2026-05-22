@@ -9,7 +9,6 @@ import {
   getRawLaborRateCents,
   getRawItemCostCents
 } from '@/lib/estimateCalculations';
-import { formatMoney } from '@/lib/formatMoney';
 import LoadingDots from '@/components/LoadingDots';
 import LinkButton from '@/components/LinkButton';
 import {
@@ -88,10 +87,11 @@ export default function AnalyticsPage() {
         }
       }
 
+      // Pull cancelled_at + cancelled_reason so we can categorize cancelled estimates
       const { data: ests } = await supabase
         .from('estimates')
         .select(
-          'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot, client_status'
+          'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot, client_status, cancelled_at, cancelled_reason'
         )
         .eq('user_id', user.id)
         .eq('is_locked', true)
@@ -117,7 +117,7 @@ export default function AnalyticsPage() {
   };
 
   // Analytics shows whole-dollar amounts (no cents) for cleaner big numbers.
-  // We use the shared helper but with custom rounding here.
+  // We use Intl directly with no fraction digits.
   const formatMoney = (cents: number) => {
     const symbol = targetCurrency === 'EUR' ? '€' : '$';
     const formattedValue = Math.round(cents / 100).toLocaleString(
@@ -174,20 +174,30 @@ export default function AnalyticsPage() {
     return true;
   });
 
+  // Cancelled estimates are tracked separately, regardless of their previous status.
+  // An estimate is "cancelled" if cancelled_at is set — we don't care what the
+  // client_status was beforehand (could be approved, rejected, or pending).
+  const cancelledEstimates = filteredEstimates.filter((e) => e.cancelled_at);
+
+  // For all other categories, exclude cancelled estimates so each estimate is
+  // counted in exactly one bucket
   const approvedEstimates = filteredEstimates.filter(
-    (e) => e.client_status === 'approved'
+    (e) => !e.cancelled_at && e.client_status === 'approved'
   );
   const pendingEstimates = filteredEstimates.filter(
-    (e) => !e.client_status || e.client_status === 'pending'
+    (e) =>
+      !e.cancelled_at && (!e.client_status || e.client_status === 'pending')
   );
   const rejectedEstimates = filteredEstimates.filter(
-    (e) => e.client_status === 'rejected'
+    (e) => !e.cancelled_at && e.client_status === 'rejected'
   );
 
   const countApproved = approvedEstimates.length;
   const countPending = pendingEstimates.length;
   const countRejected = rejectedEstimates.length;
-  const totalDecided = countApproved + countRejected;
+  const countCancelled = cancelledEstimates.length;
+  // Win rate: approved / (approved + rejected + cancelled). Cancelled = lost opportunity.
+  const totalDecided = countApproved + countRejected + countCancelled;
   const conversionRate =
     totalDecided > 0 ? Math.round((countApproved / totalDecided) * 100) : 0;
 
@@ -293,6 +303,7 @@ export default function AnalyticsPage() {
       ? Math.round((repeatClientsCount / totalUniqueClients) * 100)
       : 0;
 
+  // Revenue trend chart — only approved + non-cancelled estimates contribute
   const chartData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - (5 - i));
@@ -308,7 +319,8 @@ export default function AnalyticsPage() {
         return (
           ed.getMonth() === m &&
           ed.getFullYear() === y &&
-          e.client_status === 'approved'
+          e.client_status === 'approved' &&
+          !e.cancelled_at
         );
       })
       .reduce(
@@ -450,7 +462,7 @@ export default function AnalyticsPage() {
 
         {/* KPIs Cards Block */}
         <div className="flex flex-col gap-4 sm:gap-6 mb-8">
-          {/* Row 1: Consolidated Status Counts */}
+          {/* Row 1: Status Counts — now 4 columns including Cancelled */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between overflow-hidden">
             <div className="flex-1 p-5 flex justify-between items-center w-full">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
@@ -495,6 +507,23 @@ export default function AnalyticsPage() {
                 className="text-3xl font-black font-mono text-red-500 bg-red-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
               >
                 {countRejected}
+              </Link>
+            </div>
+
+            <div
+              className="hidden sm:block bg-gray-200 shrink-0"
+              style={{ width: '3px', height: '36px' }}
+            />
+
+            <div className="flex-1 p-5 flex justify-between items-center w-full">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                {lang.cancelledOnly}
+              </span>
+              <Link
+                href="/dashboard?status=cancelled"
+                className="text-3xl font-black font-mono text-gray-500 bg-gray-100 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+              >
+                {countCancelled}
               </Link>
             </div>
           </div>

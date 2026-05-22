@@ -39,7 +39,13 @@ export default function DashboardPage() {
 
   // Filter & Sort State
   const [filterStatus, setFilterStatus] = useState<
-    'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'unread'
+    | 'all'
+    | 'draft'
+    | 'pending'
+    | 'approved'
+    | 'rejected'
+    | 'cancelled'
+    | 'unread'
   >('all');
 
   // Set of estimate IDs that have at least one unread notification.
@@ -63,6 +69,7 @@ export default function DashboardPage() {
   } | null>(null);
   const [exportModal, setExportModal] = useState(false);
   const [proLockModal, setProLockModal] = useState<null | 'csv' | 'zip'>(null);
+  const [bulkFollowupSending, setBulkFollowupSending] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -116,9 +123,15 @@ export default function DashboardPage() {
       const statusParam = params.get('status');
       if (
         statusParam &&
-        ['all', 'draft', 'pending', 'approved', 'rejected', 'unread'].includes(
-          statusParam
-        )
+        [
+          'all',
+          'draft',
+          'pending',
+          'approved',
+          'rejected',
+          'cancelled',
+          'unread'
+        ].includes(statusParam)
       ) {
         setFilterStatus(statusParam as any);
       }
@@ -181,6 +194,84 @@ export default function DashboardPage() {
       }
     };
   }, []);
+  // Send a follow-up email to all CURRENTLY VISIBLE pending estimates that have
+  // a client email and aren't in cooldown. Server validates eligibility.
+  const handleBulkFollowUp = async () => {
+    // Collect IDs of all visible pending estimates with a client email.
+    // The server will further filter for cooldown / status edge cases.
+    const candidateIds = processedEstimates
+      .filter((est) => est.client_email)
+      .map((est) => est.id);
+
+    if (candidateIds.length === 0) {
+      setDialog({
+        type: 'alert',
+        message: lang.followUpAllNothingToSend
+      });
+      return;
+    }
+
+    setDialog({
+      type: 'confirm',
+      message: t(lang.followUpAllConfirm, { count: candidateIds.length }),
+      onConfirm: async () => {
+        setDialog(null);
+        setBulkFollowupSending(true);
+
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+          if (!session) {
+            setDialog({
+              type: 'alert',
+              message:
+                profile?.country === 'FR'
+                  ? 'Session expirée. Veuillez vous reconnecter.'
+                  : 'Session expired. Please log in again.'
+            });
+            return;
+          }
+
+          const res = await fetch('/api/send-bulk-followup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              estimateIds: candidateIds,
+              baseUrl: window.location.origin
+            })
+          });
+
+          const result = await res.json();
+
+          if (!res.ok) {
+            setDialog({
+              type: 'alert',
+              message: result.error || lang.failedToSend
+            });
+            return;
+          }
+
+          setDialog({
+            type: 'alert',
+            message: t(lang.followUpAllResult, {
+              sent: result.sent ?? 0,
+              skipped: result.skipped ?? 0,
+              failed: result.failed ?? 0
+            })
+          });
+        } catch (err) {
+          setDialog({ type: 'alert', message: lang.connectionError });
+        } finally {
+          setBulkFollowupSending(false);
+        }
+      }
+    });
+  };
+
   const handleExportZip = async () => {
     if (processedEstimates.length === 0) return;
     setIsZipping(true);
@@ -377,16 +468,27 @@ export default function DashboardPage() {
   );
   const processedEstimates = [...estimates]
     .filter((est) => {
+      // Apply text search filter first — matches against client name
+      if (query && !(est.client_name || '').toLowerCase().includes(query)) {
+        return false;
+      }
+
       if (filterStatus === 'draft') return !est.is_locked;
       if (filterStatus === 'pending')
         return (
           est.is_locked &&
+          !est.cancelled_at &&
           (!est.client_status || est.client_status === 'pending')
         );
       if (filterStatus === 'approved')
-        return est.is_locked && est.client_status === 'approved';
+        return (
+          est.is_locked && !est.cancelled_at && est.client_status === 'approved'
+        );
       if (filterStatus === 'rejected')
-        return est.is_locked && est.client_status === 'rejected';
+        return (
+          est.is_locked && !est.cancelled_at && est.client_status === 'rejected'
+        );
+      if (filterStatus === 'cancelled') return !!est.cancelled_at;
       if (filterStatus === 'unread')
         return estimatesWithNotifications.has(est.id);
       return true;
@@ -776,6 +878,35 @@ export default function DashboardPage() {
             </div>
             {/* Utility operational downloads row */}
             <div className="flex items-center gap-2">
+              {/* Bulk Follow Up — only when viewing pending estimates */}
+              {filterStatus === 'pending' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={bulkFollowupSending}
+                  loadingText={lang.followUpSending}
+                  disabled={
+                    bulkFollowupSending || processedEstimates.length === 0
+                  }
+                  onClick={handleBulkFollowUp}
+                  className="flex-1 sm:flex-none"
+                  icon={
+                    <svg
+                      className="w-3.5 h-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 12c0 4.97-4.03 9-9 9-1.32 0-2.58-.28-3.7-.79l-4.3 1.29 1.29-4.3A8.96 8.96 0 013 12c0-4.97 4.03-9 9-9s9 4.03 9 9z" />
+                    </svg>
+                  }
+                >
+                  {lang.followUpAllBtn}
+                </Button>
+              )}
               <button
                 disabled={processedEstimates.length === 0}
                 onClick={() => {
@@ -844,6 +975,7 @@ export default function DashboardPage() {
                       {filterStatus === 'pending' && lang.pendingOnly}
                       {filterStatus === 'approved' && lang.approvedOnly}
                       {filterStatus === 'rejected' && lang.rejectedOnly}
+                      {filterStatus === 'cancelled' && lang.cancelledOnly}
                       {filterStatus === 'unread' && lang.unreadOnly}
                     </span>
                     <span className="pointer-events-none text-gray-400 text-[8px]">
@@ -896,6 +1028,14 @@ export default function DashboardPage() {
                         }
                       >
                         {lang.rejectedOnly}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="cancelled"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {lang.cancelledOnly}
                       </ListboxOption>
                       <ListboxOption
                         value="unread"
@@ -1012,22 +1152,26 @@ export default function DashboardPage() {
                       )}
                       <span
                         className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${
-                          !est.is_locked
-                            ? 'bg-yellow-50 text-yellow-600'
-                            : est.client_status === 'approved'
-                              ? 'bg-green-50 text-green-600'
-                              : est.client_status === 'rejected'
-                                ? 'bg-red-50 text-red-600'
-                                : 'bg-blue-50 text-blue-600'
+                          est.cancelled_at
+                            ? 'bg-gray-100 text-gray-500'
+                            : !est.is_locked
+                              ? 'bg-yellow-50 text-yellow-600'
+                              : est.client_status === 'approved'
+                                ? 'bg-green-50 text-green-600'
+                                : est.client_status === 'rejected'
+                                  ? 'bg-red-50 text-red-600'
+                                  : 'bg-blue-50 text-blue-600'
                         }`}
                       >
-                        {!est.is_locked
-                          ? lang.draft
-                          : est.client_status === 'approved'
-                            ? lang.statusApproved
-                            : est.client_status === 'rejected'
-                              ? lang.statusRejected
-                              : lang.statusPending}
+                        {est.cancelled_at
+                          ? lang.cancelledLabel
+                          : !est.is_locked
+                            ? lang.draft
+                            : est.client_status === 'approved'
+                              ? lang.statusApproved
+                              : est.client_status === 'rejected'
+                                ? lang.statusRejected
+                                : lang.statusPending}
                       </span>
                     </div>
                     {/* Mobile Price */}
@@ -1057,22 +1201,26 @@ export default function DashboardPage() {
                   {/* Mobile Status Badge */}
                   <span
                     className={`sm:hidden text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${
-                      !est.is_locked
-                        ? 'bg-yellow-50 text-yellow-600'
-                        : est.client_status === 'approved'
-                          ? 'bg-green-50 text-green-600'
-                          : est.client_status === 'rejected'
-                            ? 'bg-red-50 text-red-600'
-                            : 'bg-blue-50 text-blue-600'
+                      est.cancelled_at
+                        ? 'bg-gray-100 text-gray-500'
+                        : !est.is_locked
+                          ? 'bg-yellow-50 text-yellow-600'
+                          : est.client_status === 'approved'
+                            ? 'bg-green-50 text-green-600'
+                            : est.client_status === 'rejected'
+                              ? 'bg-red-50 text-red-600'
+                              : 'bg-blue-50 text-blue-600'
                     }`}
                   >
-                    {!est.is_locked
-                      ? lang.draft
-                      : est.client_status === 'approved'
-                        ? lang.statusApproved
-                        : est.client_status === 'rejected'
-                          ? lang.statusRejected
-                          : lang.statusPending}
+                    {est.cancelled_at
+                      ? lang.cancelledLabel
+                      : !est.is_locked
+                        ? lang.draft
+                        : est.client_status === 'approved'
+                          ? lang.statusApproved
+                          : est.client_status === 'rejected'
+                            ? lang.statusRejected
+                            : lang.statusPending}
                   </span>
 
                   {/* Desktop Price */}

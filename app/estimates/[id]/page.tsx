@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { Fragment, useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,6 +9,13 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import Button from '@/components/Button';
 import LinkButton from '@/components/LinkButton';
 import { translations, t } from '@/lib/translations';
+import {
+  Menu,
+  MenuButton,
+  MenuItems,
+  MenuItem,
+  Transition
+} from '@headlessui/react';
 import {
   getEffectiveLaborRateCents,
   getEffectiveItemCostCents,
@@ -80,6 +87,11 @@ export default function EstimateView() {
     message: string;
     onConfirm?: () => void;
   } | null>(null);
+
+  // Cancellation flow — separate state because we need a reason textarea
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -202,6 +214,98 @@ export default function EstimateView() {
   const fmt = (cents: number) =>
     formatMoney(cents, profile?.currency, profile?.country);
 
+  // Determines whether the estimate is eligible for a follow-up email.
+  // Returns: { mode: 'send' | 'cooldown' | 'hidden', cooldownUntil?: Date }
+  const getFollowUpState = () => {
+    // Hidden: estimate not finalized, or already decided/cancelled/superseded
+    if (
+      !estimate?.is_locked ||
+      estimate?.cancelled_at ||
+      estimate?.superseded_at ||
+      (estimate?.client_status && estimate.client_status !== 'pending')
+    ) {
+      return { mode: 'hidden' as const };
+    }
+
+    // No prior email — show plain "Email" button (handled separately)
+    if (!estimate?.last_email_sent_at) {
+      return { mode: 'hidden' as const };
+    }
+
+    // Cooldown check (7 days since last follow-up)
+    if (estimate?.last_followup_sent_at) {
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      const lastSent = new Date(estimate.last_followup_sent_at).getTime();
+      const cooldownEnds = new Date(lastSent + sevenDaysMs);
+      if (cooldownEnds.getTime() > Date.now()) {
+        return { mode: 'cooldown' as const, cooldownUntil: cooldownEnds };
+      }
+    }
+
+    return { mode: 'send' as const };
+  };
+
+  // Send a follow-up email for the current estimate
+  const handleSendFollowUp = async () => {
+    if (!estimate?.client_email) return;
+    setSending(true);
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    const ownerEmail = user?.email;
+
+    if (!ownerEmail) {
+      setDialog({ type: 'alert', message: lang.senderEmailError });
+      setSending(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/send-followup-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estimateId: estimate.id,
+          customId: estimate.custom_id || estimate.id.slice(0, 8),
+          clientName: estimate.client_name,
+          clientEmail: estimate.client_email,
+          estimateUrl: window.location.href,
+          businessName: profile.business_name,
+          ownerEmail,
+          logoUrl: profile.logo_url,
+          country: profile.country
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const nowIso = new Date().toISOString();
+        setEstimate((prev: any) =>
+          prev ? { ...prev, last_followup_sent_at: nowIso } : prev
+        );
+        setDialog({
+          type: 'alert',
+          message: t(lang.followUpSentSuccess, {
+            target: estimate.client_email
+          })
+        });
+      } else {
+        setDialog({
+          type: 'alert',
+          message: t(lang.sendError, {
+            msg: data.error?.message || data.error || lang.failedToSend
+          })
+        });
+      }
+    } catch (err) {
+      setDialog({ type: 'alert', message: lang.connectionError });
+    } finally {
+      setSending(false);
+    }
+  };
+
   // Resolve a percentage charge's basis into human-readable text.
   // Falls back to "project" if a referenced section/item no longer exists.
   const getChargeBasisLabel = (charge: AdditionalCharge): string => {
@@ -314,6 +418,23 @@ export default function EstimateView() {
       });
       setLoading(false);
     } else if (data) {
+      // Mark the ORIGINAL estimate as superseded by this new revision
+      const { error: supersededError } = await supabase
+        .from('estimates')
+        .update({
+          superseded_at: new Date().toISOString(),
+          superseded_by_estimate_id: data.id
+        })
+        .eq('id', estimate.id);
+
+      if (supersededError) {
+        console.error(
+          'Failed to mark original as superseded:',
+          supersededError
+        );
+        // Non-blocking — the revision was created, the supersession is just a state flag
+      }
+
       router.push(`/new-estimate?edit=${data.id}`);
     }
   };
@@ -439,7 +560,9 @@ export default function EstimateView() {
             clientName: estimate.client_name,
             estimateUrl,
             businessName: profile.business_name,
-            userEmail: currentUserEmail
+            userEmail: currentUserEmail,
+            logoUrl: profile.logo_url,
+            country: profile.country
           }
         : {
             phone: estimate.client_phone,
@@ -458,6 +581,19 @@ export default function EstimateView() {
       if (res.ok) {
         const target =
           method === 'email' ? estimate.client_email : estimate.client_phone;
+
+        // Track that this estimate has been emailed so the button transforms to "Follow Up"
+        if (method === 'email') {
+          const nowIso = new Date().toISOString();
+          await supabase
+            .from('estimates')
+            .update({ last_email_sent_at: nowIso })
+            .eq('id', id);
+          setEstimate((prev: any) =>
+            prev ? { ...prev, last_email_sent_at: nowIso } : prev
+          );
+        }
+
         setDialog({
           type: 'alert',
           message: t(
@@ -643,6 +779,37 @@ export default function EstimateView() {
     });
   };
 
+  // Cancel a finalized estimate (pending OR approved) — sets cancelled_at + cancelled_reason
+  const handleCancelLockedEstimate = async () => {
+    setCancelling(true);
+    const { error } = await supabase
+      .from('estimates')
+      .update({
+        cancelled_at: new Date().toISOString(),
+        cancelled_reason: cancelReason.trim() || null
+      })
+      .eq('id', id);
+
+    setCancelling(false);
+
+    if (error) {
+      setDialog({ type: 'alert', message: lang.cancelEstimateError });
+      return;
+    }
+
+    setEstimate((prev: any) =>
+      prev
+        ? {
+            ...prev,
+            cancelled_at: new Date().toISOString(),
+            cancelled_reason: cancelReason.trim() || null
+          }
+        : prev
+    );
+    setCancelModalOpen(false);
+    setCancelReason('');
+  };
+
   const handleCancelDraft = () => {
     setDialog({
       type: 'confirm',
@@ -738,55 +905,81 @@ export default function EstimateView() {
             <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
               {estimate.is_locked ? (
                 <>
-                  {isOwner && (
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={handleCreateRevision}
-                      className="flex-1"
-                    >
-                      {lang.createRevision}
-                    </Button>
-                  )}
-                  {isOwner && (
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={handleNativeShare}
-                      className="flex-1 sm:hidden"
-                      icon={
-                        <svg
-                          className="w-4 h-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <circle cx="18" cy="5" r="3" />
-                          <circle cx="6" cy="12" r="3" />
-                          <circle cx="18" cy="19" r="3" />
-                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                        </svg>
-                      }
-                    >
-                      {lang.share}
-                    </Button>
-                  )}
-                  {isOwner && estimate.client_email && (
-                    <Button
-                      variant="dark"
-                      size="md"
-                      loading={sending}
-                      loadingText={lang.sending}
-                      onClick={() => handleSend('email')}
-                      className="flex-1"
-                    >
-                      {lang.emailBtn}
-                    </Button>
-                  )}
+                  {/* PRIMARY ACTIONS (always visible) */}
+
+                  {/* Email / Follow-Up — primary communication action.
+                    The button transforms based on follow-up state:
+                    - No prior email → "Email" button calls handleSend
+                    - Already emailed, cooldown ok → "Follow Up" button calls handleSendFollowUp
+                    - Already emailed, in cooldown → "Follow Up" disabled with date in title */}
+                  {isOwner &&
+                    estimate.client_email &&
+                    !estimate.cancelled_at &&
+                    !estimate.superseded_at && (
+                      <>
+                        {(() => {
+                          const followUpState = getFollowUpState();
+
+                          // No prior email → standard Email button
+                          if (followUpState.mode === 'hidden') {
+                            return (
+                              <Button
+                                variant="dark"
+                                size="md"
+                                loading={sending}
+                                loadingText={lang.sending}
+                                onClick={() => handleSend('email')}
+                                className="flex-1"
+                              >
+                                {lang.emailBtn}
+                              </Button>
+                            );
+                          }
+
+                          // Cooldown active → disabled button with tooltip
+                          if (followUpState.mode === 'cooldown') {
+                            const dateStr =
+                              followUpState.cooldownUntil!.toLocaleDateString(
+                                profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                                {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                }
+                              );
+                            return (
+                              <Button
+                                variant="dark"
+                                size="md"
+                                disabled
+                                title={t(lang.followUpCooldown, {
+                                  date: dateStr
+                                })}
+                                className="flex-1"
+                              >
+                                {lang.followUpBtn}
+                              </Button>
+                            );
+                          }
+
+                          // Cooldown clear → active Follow Up button
+                          return (
+                            <Button
+                              variant="dark"
+                              size="md"
+                              loading={sending}
+                              loadingText={lang.followUpSending}
+                              onClick={handleSendFollowUp}
+                              className="flex-1"
+                            >
+                              {lang.followUpBtn}
+                            </Button>
+                          );
+                        })()}
+                      </>
+                    )}
+
+                  {/* Download PDF — always available (even for cancelled — record keeping) */}
                   <Button
                     variant="primary"
                     size="md"
@@ -797,6 +990,145 @@ export default function EstimateView() {
                   >
                     {lang.downloadPdf}
                   </Button>
+
+                  {/* SECONDARY ACTIONS MENU — kebab dropdown for owner-only actions
+                    Hidden when the estimate is cancelled (no actions remain).
+                    Contains: Create Revision · Share · Cancel Estimate */}
+                  {isOwner && !estimate.cancelled_at && (
+                    <Menu as="div" className="relative shrink-0">
+                      <MenuButton
+                        className="inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 cursor-pointer select-none whitespace-nowrap text-[10px] rounded-xl bg-white text-gray-700 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:shadow hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] data-[open]:bg-gray-50 data-[open]:border-gray-300 px-3.5 h-[38px]"
+                        aria-label="More actions"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <circle cx="12" cy="5" r="2" />
+                          <circle cx="12" cy="12" r="2" />
+                          <circle cx="12" cy="19" r="2" />
+                        </svg>
+                      </MenuButton>
+                      <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="opacity-0 scale-95"
+                        enterTo="opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="opacity-100 scale-100"
+                        leaveTo="opacity-0 scale-95"
+                      >
+                        <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none">
+                          {/* Create Revision — hidden if estimate already superseded */}
+                          {!estimate.superseded_at && (
+                            <MenuItem>
+                              {({ active }) => (
+                                <button
+                                  onClick={handleCreateRevision}
+                                  className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-2.5 ${
+                                    active
+                                      ? 'bg-gray-50 text-gray-900'
+                                      : 'text-gray-700'
+                                  }`}
+                                >
+                                  <svg
+                                    className="w-3.5 h-3.5 shrink-0"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <polyline points="1 20 1 14 7 14" />
+                                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                                  </svg>
+                                  {lang.createRevision}
+                                </button>
+                              )}
+                            </MenuItem>
+                          )}
+
+                          {/* Native share — keep available; mobile uses native sheet,
+                            desktop falls back to a friendly dialog if unsupported */}
+                          <MenuItem>
+                            {({ active }) => (
+                              <button
+                                onClick={handleNativeShare}
+                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-2.5 ${
+                                  active
+                                    ? 'bg-gray-50 text-gray-900'
+                                    : 'text-gray-700'
+                                }`}
+                              >
+                                <svg
+                                  className="w-3.5 h-3.5 shrink-0"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <circle cx="18" cy="5" r="3" />
+                                  <circle cx="6" cy="12" r="3" />
+                                  <circle cx="18" cy="19" r="3" />
+                                  <line
+                                    x1="8.59"
+                                    y1="13.51"
+                                    x2="15.42"
+                                    y2="17.49"
+                                  />
+                                  <line
+                                    x1="15.41"
+                                    y1="6.51"
+                                    x2="8.59"
+                                    y2="10.49"
+                                  />
+                                </svg>
+                                {lang.share}
+                              </button>
+                            )}
+                          </MenuItem>
+
+                          {/* Cancel Estimate — destructive, separated by a divider */}
+                          <MenuItem>
+                            {({ active }) => (
+                              <button
+                                onClick={() => setCancelModalOpen(true)}
+                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-2.5 border-t border-gray-100 ${
+                                  active
+                                    ? 'bg-red-50 text-red-700'
+                                    : 'text-red-600'
+                                }`}
+                              >
+                                <svg
+                                  className="w-3.5 h-3.5 shrink-0"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <circle cx="12" cy="12" r="10" />
+                                  <line
+                                    x1="4.93"
+                                    y1="4.93"
+                                    x2="19.07"
+                                    y2="19.07"
+                                  />
+                                </svg>
+                                {lang.cancelEstimateBtn}
+                              </button>
+                            )}
+                          </MenuItem>
+                        </MenuItems>
+                      </Transition>
+                    </Menu>
+                  )}
                 </>
               ) : (
                 isOwner && (
@@ -831,19 +1163,64 @@ export default function EstimateView() {
             </div>
           </div>
 
-          {/* === STATUS BANNER (refined, lighter feel) === */}
+          {/* === STATUS BANNER (refined, with cancelled + superseded states) === */}
           {estimate.is_locked && (
             <div
               className={`mb-6 px-5 py-3.5 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden ${
-                estimate.client_status === 'approved'
-                  ? 'bg-green-50/60 border-green-200'
-                  : estimate.client_status === 'rejected'
-                    ? 'bg-red-50/60 border-red-200'
-                    : 'bg-blue-50/60 border-blue-200'
+                estimate.cancelled_at
+                  ? 'bg-gray-100 border-gray-300'
+                  : estimate.superseded_at
+                    ? 'bg-amber-50/60 border-amber-200'
+                    : estimate.client_status === 'approved'
+                      ? 'bg-green-50/60 border-green-200'
+                      : estimate.client_status === 'rejected'
+                        ? 'bg-red-50/60 border-red-200'
+                        : 'bg-blue-50/60 border-blue-200'
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                {estimate.client_status === 'approved' && (
+              <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                {/* CANCELLED takes precedence over all other statuses */}
+                {estimate.cancelled_at ? (
+                  <>
+                    <span className="text-gray-500 text-base leading-none mt-0.5">
+                      ⊘
+                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-gray-700 font-bold text-sm">
+                        {lang.estimateCancelled}
+                      </span>
+                      {estimate.cancelled_reason && (
+                        <span className="text-gray-500 text-xs italic mt-0.5 break-words">
+                          “{estimate.cancelled_reason}”
+                        </span>
+                      )}
+                      <span className="text-gray-400 text-[10px] uppercase tracking-widest font-bold mt-1">
+                        {t(lang.cancelledOn, {
+                          date: new Date(
+                            estimate.cancelled_at
+                          ).toLocaleDateString(
+                            profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                            { year: 'numeric', month: 'short', day: 'numeric' }
+                          )
+                        })}
+                      </span>
+                    </div>
+                  </>
+                ) : estimate.superseded_at ? (
+                  <>
+                    <span className="text-amber-600 text-base leading-none mt-0.5">
+                      ↻
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-amber-700 font-bold text-sm">
+                        {lang.supersededBadge}
+                      </span>
+                      <span className="text-amber-600 text-xs mt-0.5">
+                        {lang.supersededLabel}
+                      </span>
+                    </div>
+                  </>
+                ) : estimate.client_status === 'approved' ? (
                   <>
                     <span className="text-green-600 text-base leading-none">
                       ✓
@@ -852,8 +1229,7 @@ export default function EstimateView() {
                       {lang.estimateApproved}
                     </span>
                   </>
-                )}
-                {estimate.client_status === 'rejected' && (
+                ) : estimate.client_status === 'rejected' ? (
                   <>
                     <span className="text-red-600 text-base leading-none">
                       ✕
@@ -862,9 +1238,7 @@ export default function EstimateView() {
                       {lang.estimateRejected}
                     </span>
                   </>
-                )}
-                {(estimate.client_status === 'pending' ||
-                  !estimate.client_status) && (
+                ) : (
                   <>
                     <span className="text-blue-600 text-base leading-none">
                       ⏳
@@ -876,7 +1250,10 @@ export default function EstimateView() {
                 )}
               </div>
 
+              {/* Approve/Reject buttons — only for non-cancelled, non-superseded, pending estimates by clients */}
               {!isOwner &&
+                !estimate.cancelled_at &&
+                !estimate.superseded_at &&
                 (estimate.client_status === 'pending' ||
                   !estimate.client_status) && (
                   <div className="flex w-full sm:w-auto gap-2.5">
@@ -1364,6 +1741,55 @@ export default function EstimateView() {
             confirmOk: lang.confirmOk
           }}
         />
+
+        {/* --- CANCEL ESTIMATE MODAL (with optional reason input) --- */}
+        {cancelModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-gray-100 animate-scale-up">
+              <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
+                {lang.cancelEstimate}
+              </h3>
+              <p className="text-xs text-gray-500 font-bold mb-5 leading-relaxed">
+                {lang.cancelEstimateConfirm}
+              </p>
+
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                {lang.cancelEstimateReasonLabel}
+              </label>
+              <textarea
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder={lang.cancelEstimateReasonPlaceholder}
+                maxLength={300}
+                className="w-full p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-600 resize-none text-gray-900 placeholder-gray-400 bg-white transition-colors mb-5"
+              />
+
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="md"
+                  onClick={() => {
+                    setCancelModalOpen(false);
+                    setCancelReason('');
+                  }}
+                  disabled={cancelling}
+                >
+                  {lang.cancel}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="md"
+                  loading={cancelling}
+                  loadingText={lang.cancel}
+                  onClick={handleCancelLockedEstimate}
+                >
+                  {lang.cancelEstimateConfirmBtn}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
