@@ -1,4 +1,5 @@
 import React from 'react';
+import Button from '@/components/Button';
 
 export type DialogType = 'alert' | 'confirm' | 'danger';
 
@@ -44,7 +45,7 @@ export default function ConfirmDialog({
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
       <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-sm w-full border border-gray-100 animate-scale-up">
         <h3
-          className={`text-sm font-black uppercase tracking-widest mb-3 ${
+          className={`text-sm font-black uppercase tracking-widests mb-3 ${
             isDanger ? 'text-red-600' : 'text-gray-900'
           }`}
         >
@@ -55,25 +56,19 @@ export default function ConfirmDialog({
         </p>
         <div className="flex gap-2 justify-end">
           {isConfirmable && (
-            <button
-              onClick={onClose}
-              className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"
-            >
+            <Button variant="ghost" size="sm" onClick={onClose}>
               {labels.cancel}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant={isDanger ? 'danger' : 'primary'}
+            size="sm"
             onClick={handleConfirm}
-            className={`px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-white rounded-lg shadow-sm transition-colors ${
-              isDanger
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
           >
             {isDanger
               ? labels.deletePermanently || labels.confirmOk
               : labels.confirmOk}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
