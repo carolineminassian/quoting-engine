@@ -213,11 +213,18 @@ const styles = StyleSheet.create({
   itemsList: {
     marginTop: 4
   },
-  itemBullet: {
+  itemLine: {
     fontSize: 9,
-    color: '#6b7280',
-    marginBottom: 2,
-    paddingLeft: 4
+    marginBottom: 2
+  },
+  itemLineName: {
+    fontSize: 9,
+    color: '#4b5563',
+    fontWeight: 'bold'
+  },
+  itemLineMeta: {
+    fontSize: 9,
+    color: '#9ca3af'
   },
 
   // Internal details breakdown (when details ON)
@@ -532,14 +539,23 @@ export default function EstimatePDF({
               {/* Public items list (when internal details OFF) */}
               {!sec.hasDetails && (sec.items || []).length > 0 && (
                 <View style={styles.itemsList}>
-                  {sec.items.map((item, i) => (
-                    <Text key={`item-${i}`} style={styles.itemBullet}>
-                      · {item.name || (isFr ? 'Article' : 'Item')}
-                      {item.qty > 0
-                        ? ` (${item.qty}${item.unit ? ` ${item.unit}` : ''})`
-                        : ''}
-                    </Text>
-                  ))}
+                  {sec.items.map((item, i) => {
+                    const hasQtyInfo = item.qty > 0 || item.unit;
+                    return (
+                      <Text key={`item-${i}`} style={styles.itemLine}>
+                        <Text style={styles.itemLineName}>
+                          {item.name || (isFr ? 'Article' : 'Item')}
+                        </Text>
+                        {hasQtyInfo && (
+                          <Text style={styles.itemLineMeta}>
+                            {' · '}
+                            {item.qty}
+                            {item.unit ? ` ${item.unit}` : ''}
+                          </Text>
+                        )}
+                      </Text>
+                    );
+                  })}
                 </View>
               )}
 

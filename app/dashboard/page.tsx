@@ -346,6 +346,72 @@ export default function DashboardPage() {
           };
         });
 
+        // Pre-compute additional charges with resolved amounts + basis labels
+        // Same pattern as estimates/[id]/page.tsx handleDownloadPDF
+        const preparedCharges = ((est.additional_charges || []) as any[]).map(
+          (charge: any) => {
+            const qty = charge.qty || 1;
+
+            // For percentage charges, compute amount against hydratedSections
+            let amountCents = 0;
+            if (charge.isPercentage) {
+              const rate = charge.percentageRate || 0;
+              if (rate > 0) {
+                // Basis: project subtotal (sections only, not including other charges)
+                const basisCents = hydratedSections.reduce(
+                  (acc: number, sec: any) =>
+                    acc + getSectionTotalCents(est, sec, materialsById),
+                  0
+                );
+                amountCents = Math.round(basisCents * (rate / 100));
+              }
+            } else {
+              // Flat charge: qty × cost × margin
+              const cost = charge.costPerUnitCents || 0;
+              const mode = est.margin_mode_snapshot || 'none';
+              let marginMultiplier = 1;
+              if (mode === 'global') {
+                marginMultiplier = 1 + (est.global_margin_snapshot || 0) / 100;
+              } else if (mode === 'granular') {
+                marginMultiplier = 1 + (charge.marginRate || 0) / 100;
+              }
+              amountCents = Math.round(qty * cost * marginMultiplier);
+            }
+
+            // Basis label for percentage charges
+            let basisLabel = currentLang.basisProject || 'Total Services';
+            if (charge.isPercentage && charge.basisType === 'section') {
+              const sec = (est.sections || [])[charge.basisSectionIdx];
+              if (sec?.title) basisLabel = sec.title;
+            } else if (charge.isPercentage && charge.basisType === 'item') {
+              const sec = (est.sections || [])[charge.basisSectionIdx];
+              const item = sec?.items?.[charge.basisItemIdx];
+              if (item?.name) basisLabel = item.name;
+            }
+
+            return {
+              name: charge.name || '',
+              isPercentage: !!charge.isPercentage,
+              percentageRate: charge.percentageRate || 0,
+              qty,
+              unit:
+                (charge.unit &&
+                  currentLang?.units?.[
+                    charge.unit as keyof typeof currentLang.units
+                  ]) ||
+                charge.unit ||
+                'ea',
+              costPerUnitCents: charge.costPerUnitCents || 0,
+              taxRate:
+                charge.taxRate !== undefined
+                  ? charge.taxRate
+                  : profile?.default_tax_rate || 0,
+              amountCents,
+              basisLabel
+            };
+          }
+        );
+
         const docBlob = await pdf(
           <EstimatePDF
             estimate={{
@@ -364,6 +430,7 @@ export default function DashboardPage() {
             taxGroups={Object.entries(taxGroups) as any}
             grandTotal={est.total_amount_cents / 100}
             sections={preparedSections}
+            additionalCharges={preparedCharges}
           />
         ).toBlob();
 
@@ -772,20 +839,7 @@ export default function DashboardPage() {
           </LinkButton>
         </div>
 
-        {/* CLEAR ALL NOTIFICATIONS — only visible when viewing unread */}
-        {filterStatus === 'unread' && estimatesWithNotifications.size > 0 && (
-          <div className="mb-4 flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearAllNotifications}
-              className="!text-gray-500 hover:!text-blue-600 hover:!bg-blue-50"
-            >
-              ✓ {lang.clearAllNotifications}
-            </Button>
-          </div>
-        )}
-
+        {/* Removed from here — moved inline next to the bell button */}
         {/* UNIFIED ACTION & CONTROL PANEL */}
         {estimates.length > 0 && (
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center mb-4">
@@ -963,14 +1017,14 @@ export default function DashboardPage() {
         {estimates.length > 0 && (
           <div className="bg-white p-3 sm:px-4 sm:py-2.5 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="flex items-center gap-2 w-full sm:w-auto">
-  <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
-    {lang.filterLabel}
-  </span>
-  <Listbox
-    value={filterStatus === 'unread' ? 'all' : filterStatus}
-    onChange={setFilterStatus}
-  >
-    <div className="relative w-full sm:w-40">
+              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
+                {lang.filterLabel}
+              </span>
+              <Listbox
+                value={filterStatus === 'unread' ? 'all' : filterStatus}
+                onChange={setFilterStatus}
+              >
+                <div className="relative w-full sm:w-40">
                   <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
                     <span className="block truncate">
                       {filterStatus === 'all' && lang.allProjects}
@@ -1032,58 +1086,80 @@ export default function DashboardPage() {
                       >
                         {lang.rejectedOnly}
                       </ListboxOption>
-                               <ListboxOption
-            value="cancelled"
-            className={({ active }) =>
-              `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
-            }
-          >
-            {lang.cancelledOnly}
-          </ListboxOption>
+                      <ListboxOption
+                        value="cancelled"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative py-2 px-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {lang.cancelledOnly}
+                      </ListboxOption>
                     </ListboxOptions>
                   </Transition>
-                 </div>
-  </Listbox>
+                </div>
+              </Listbox>
 
-  {/* Bell icon button — toggles unread activity filter */}
-  <button
-    type="button"
-    onClick={() =>
-      setFilterStatus((prev) =>
-        prev === 'unread' ? 'all' : 'unread'
-      )
-    }
-    className={`relative shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border transition-all duration-200 cursor-pointer ${
-      filterStatus === 'unread'
-        ? 'bg-blue-50 border-blue-300 text-blue-600'
-        : 'bg-white border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-    }`}
-    title={lang.unreadOnly}
-    aria-label={lang.unreadOnly}
-  >
-    <svg
-      className="w-3.5 h-3.5"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-    {/* Badge showing unread count */}
-    {estimatesWithNotifications.size > 0 && (
-      <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] px-0.5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center leading-none">
-        {estimatesWithNotifications.size > 9
-          ? '9+'
-          : estimatesWithNotifications.size}
-      </span>
-    )}
-  </button>
-</div>
-
+              {/* Bell icon button — toggles unread activity filter */}
+              <button
+                type="button"
+                onClick={() =>
+                  setFilterStatus((prev) =>
+                    prev === 'unread' ? 'all' : 'unread'
+                  )
+                }
+                className={`relative shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border transition-all duration-200 cursor-pointer ${
+                  filterStatus === 'unread'
+                    ? 'bg-blue-50 border-blue-300 text-blue-600'
+                    : 'bg-white border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+                title={lang.unreadOnly}
+                aria-label={lang.unreadOnly}
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {estimatesWithNotifications.size > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] px-0.5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center leading-none">
+                    {estimatesWithNotifications.size > 9
+                      ? '9+'
+                      : estimatesWithNotifications.size}
+                  </span>
+                )}
+              </button>
+              {/* Clear all — only visible when unread filter is active, sits right next to the bell */}
+              {filterStatus === 'unread' &&
+                estimatesWithNotifications.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllNotifications}
+                    className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-200 cursor-pointer border border-gray-200 hover:border-gray-300"
+                    title={lang.clearAllNotifications}
+                  >
+                    <svg
+                      className="w-3 h-3 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <line x1="2" y1="2" x2="22" y2="22" />
+                    </svg>
+                    {lang.clearAllNotifications}
+                  </button>
+                )}
+            </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">

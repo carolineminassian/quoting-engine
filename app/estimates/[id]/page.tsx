@@ -1349,7 +1349,7 @@ export default function EstimateView() {
                   <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-700">
                     {lang.serviceCategoryHeader}
                   </p>
-                  <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-400">
+                  <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-700">
                     {lang.amountHeader}
                   </p>
                 </div>
@@ -1361,7 +1361,7 @@ export default function EstimateView() {
                       className="py-6 border-b border-gray-100 last:border-b-0"
                     >
                       <div className="flex justify-between items-baseline gap-4 mb-2">
-                        <h3 className="text-lg font-bold text-gray-900 break-words">
+                        <h3 className="text-[16px] font-bold text-gray-900 break-words">
                           {sec.title || lang.professionalServices}
                         </h3>
                         <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0">
@@ -1371,7 +1371,7 @@ export default function EstimateView() {
                         </span>
                       </div>
 
-                      <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words max-w-3xl">
+                      <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words max-w-3xl">
                         {generateDescription(
                           estimate,
                           sec,
@@ -1442,7 +1442,7 @@ export default function EstimateView() {
                         </div>
                       ) : (
                         sec.items.length > 0 && (
-                          <ul className="mt-3 space-y-1 max-w-3xl">
+                          <div className="mt-3 space-y-1 max-w-3xl">
                             {sec.items.map((item: any, i: number) => {
                               const m = materialsById.get(item.materialId);
                               const displayName =
@@ -1450,29 +1450,25 @@ export default function EstimateView() {
                               const rawUnit = item.unit || m?.unit || '';
                               const displayUnit =
                                 lang?.units?.[rawUnit] || rawUnit;
+                              const hasQtyInfo = item.qty > 0 || displayUnit;
 
                               return (
-                                <li
+                                <p
                                   key={i}
-                                  className="text-xs text-gray-500 flex items-baseline gap-2 break-words"
+                                  className="text-xs text-gray-600 break-words"
                                 >
-                                  <span className="text-gray-300 shrink-0">
-                                    ·
-                                  </span>
-                                  <span>
-                                    {displayName}
-                                    {item.qty || displayUnit ? (
-                                      <span className="text-gray-400">
-                                        {' '}
-                                        ({item.qty}
-                                        {displayUnit ? ` ${displayUnit}` : ''})
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                </li>
+                                  <span>{displayName}</span>
+                                  {hasQtyInfo && (
+                                    <span className="text-gray-400">
+                                      {' '}
+                                      · {item.qty}
+                                      {displayUnit ? ` ${displayUnit}` : ''}
+                                    </span>
+                                  )}
+                                </p>
                               );
                             })}
-                          </ul>
+                          </div>
                         )
                       )}
                     </div>
@@ -1485,7 +1481,7 @@ export default function EstimateView() {
                 estimate.additional_charges.length > 0 && (
                   <section className="mb-10">
                     <div className="flex items-baseline justify-between pb-3 mb-2 border-b-2 border-gray-300">
-                      <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-700">
+                      <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-400">
                         {lang.additionalCharges}
                       </p>
                       <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-400">
@@ -1526,7 +1522,7 @@ export default function EstimateView() {
                             >
                               <div className="flex justify-between items-baseline gap-4">
                                 <div className="min-w-0">
-                                  <h4 className="text-base font-bold text-gray-900 break-words">
+                                  <h4 className="text-[14px] font-bold text-gray-900 break-words">
                                     {charge.name || lang.additionalCharges}
                                   </h4>
                                   <p className="text-xs text-gray-500 mt-0.5">
