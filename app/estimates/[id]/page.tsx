@@ -1356,22 +1356,24 @@ export default function EstimateView() {
 
                 <div>
                   {estimate.sections.map((sec: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="py-6 border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="flex justify-between items-baseline gap-4 mb-2">
-                        <h3 className="text-[16px] font-bold text-gray-900 break-words">
-                          {sec.title || lang.professionalServices}
-                        </h3>
-                        <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0">
-                          {fmt(
-                            getSectionTotal(estimate, sec, materialsById) * 100
-                          )}
-                        </span>
-                      </div>
+                   <div
+                    key={idx}
+                    className="py-6 border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="flex justify-between items-baseline gap-4 mb-2">
+                      <h3 className="text-[16px] font-bold text-gray-900 break-words flex-1 min-w-0">
+                        {sec.title || lang.professionalServices}
+                      </h3>
+                      <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0">
+                        {fmt(
+                          getSectionTotal(estimate, sec, materialsById) * 100
+                        )}
+                      </span>
+                    </div>
 
-                      <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words max-w-3xl">
+                    {/* Description constrained to left column only — never bleeds under the amount */}
+                    <div className="pr-24 sm:pr-32">
+                      <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
                         {generateDescription(
                           estimate,
                           sec,
@@ -1379,7 +1381,7 @@ export default function EstimateView() {
                           materialsById
                         )}
                       </p>
-
+                    </div>
                       {/* Items — subtle inline list, or detailed breakdown when toggled */}
                       {isShowingDetails ? (
                         <div className="mt-4 pl-4 border-l-2 border-gray-100 space-y-1.5 max-w-3xl">
