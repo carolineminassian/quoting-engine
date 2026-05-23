@@ -14,7 +14,7 @@ const roboto = Roboto({
   display: 'swap'
 });
 
-async function detectFrench(): Promise {
+async function detectFrench(): Promise<boolean> {
   try {
     const headersList = await headers();
     const acceptLanguage = headersList.get('accept-language') || '';
@@ -30,7 +30,7 @@ async function detectFrench(): Promise {
   }
 }
 
-export async function generateMetadata(): Promise {
+export async function generateMetadata(): Promise<Metadata> {
   const isFr = await detectFrench();
 
   return {
