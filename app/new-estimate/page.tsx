@@ -181,6 +181,15 @@ function NewEstimateContent() {
             cachedBusinessName = pending.businessName;
             setBusinessName(pending.businessName);
           }
+          if (pending.additionalCharges) {
+            // Re-attach local IDs so React keys work correctly
+            setAdditionalCharges(
+              pending.additionalCharges.map((c: any, idx: number) => ({
+                ...c,
+                id: c.id || `restored_${idx}`
+              }))
+            );
+          }
         } catch (e) {
           console.error('Failed to parse pending estimate');
         }
@@ -828,7 +837,8 @@ function NewEstimateContent() {
         depositEnabled,
         depositPercentage,
         paymentTermsType,
-        paymentDays
+        paymentDays,
+        additionalCharges
       };
       localStorage.setItem(
         'pactestim_pending_estimate',

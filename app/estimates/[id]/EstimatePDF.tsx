@@ -144,7 +144,8 @@ const styles = StyleSheet.create({
     marginBottom: 1
   },
 
-  // === SECTION HEADERS (Services + Additional Charges tables) ===
+  // === SECTION HEADERS ===
+  // Services: bold gray-700 label, heavy 1.5pt border (mirrors border-b-4 border-black on web)
   servicesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -153,35 +154,41 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1.5,
     borderBottomColor: '#374151'
   },
+  // Charges: lighter gray-400 label, 1pt gray-300 border (mirrors border-b-2 border-gray-300)
   chargesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingBottom: 6,
     marginBottom: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb'
+    borderBottomColor: '#d1d5db'
   },
-  tableHeaderText: {
-    fontSize: 8,
+  // Services header text: text-[11px] font-bold text-gray-700
+  tableHeaderTextServices: {
+    fontSize: 9,
     textTransform: 'uppercase',
     letterSpacing: 1.5,
-    fontWeight: 'bold'
-  },
-  tableHeaderTextLeft: {
+    fontWeight: 'bold',
     color: '#374151'
   },
-  tableHeaderTextRight: {
+  // Charges header text: text-[11px] font-bold text-gray-400
+  tableHeaderTextCharges: {
+    fontSize: 9,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    fontWeight: 'bold',
     color: '#9ca3af'
   },
 
   // === SERVICE ROWS ===
+  // py-6 on web → paddingVertical 14 in PDF
   serviceRow: {
-    paddingVertical: 10,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6'
   },
   serviceRowLast: {
-    paddingVertical: 10,
+    paddingVertical: 14,
     borderBottomWidth: 0
   },
   serviceTopLine: {
@@ -190,26 +197,30 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 6
   },
+  // text-[16px] font-bold text-gray-900 → fontSize: 13
   serviceTitle: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#111827',
     flex: 1,
     paddingRight: 12
   },
+  // text-lg font-bold font-mono text-gray-900 → fontSize: 13
   serviceAmount: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#111827'
   },
+  // text-[13px] text-gray-600 leading-relaxed → fontSize: 10.5
   serviceDescription: {
-    fontSize: 9.5,
+    fontSize: 10.5,
     color: '#4b5563',
     lineHeight: 1.5,
     marginBottom: 4
   },
 
-  // Public materials list (when details OFF)
+  // === PUBLIC MATERIALS LIST (non-detailed view) ===
+  // "Name · qty unit" inline — text-xs text-gray-600
   itemsList: {
     marginTop: 4
   },
@@ -217,23 +228,27 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginBottom: 2
   },
+  // span className="font-medium" + text-gray-600
   itemLineName: {
     fontSize: 9,
     color: '#4b5563',
     fontWeight: 'bold'
   },
+  // · qty unit — text-gray-400
   itemLineMeta: {
     fontSize: 9,
     color: '#9ca3af'
   },
 
-  // Internal details breakdown (when details ON)
+  // === INTERNAL DETAILS (detailed view) ===
+  // mt-4 pl-4 border-l-2 border-gray-100
   detailsBlock: {
     marginTop: 6,
     paddingLeft: 8,
     borderLeftWidth: 2,
     borderLeftColor: '#e5e7eb'
   },
+  // text-xs text-gray-500
   detailLine: {
     fontSize: 8.5,
     color: '#6b7280',
@@ -242,6 +257,7 @@ const styles = StyleSheet.create({
   },
 
   // === ADDITIONAL CHARGES ROWS ===
+  // py-4 on web → paddingVertical 10 in PDF
   chargeRow: {
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -261,17 +277,20 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     flexDirection: 'column'
   },
+  // text-[14px] font-bold text-gray-900 → fontSize: 11.5
   chargeName: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 2
   },
+  // text-base font-bold font-mono text-gray-900 → fontSize: 11.5
   chargeAmount: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: 'bold',
     color: '#111827'
   },
+  // text-xs text-gray-500 → fontSize: 8.5
   chargeSubtitle: {
     fontSize: 8.5,
     color: '#6b7280',
@@ -506,10 +525,10 @@ export default function EstimatePDF({
           SERVICES (heavy 3px black anchor)
           ═══════════════════════════════════════════════ */}
         <View style={styles.servicesHeader}>
-          <Text style={[styles.tableHeaderText, styles.tableHeaderTextLeft]}>
+          <Text style={styles.tableHeaderTextServices}>
             {isFr ? 'Etape du Service / Catégorie' : 'Service Category / Step'}
           </Text>
-          <Text style={[styles.tableHeaderText, styles.tableHeaderTextRight]}>
+          <Text style={styles.tableHeaderTextServices}>
             {isFr ? 'Montant' : 'Amount'}
           </Text>
         </View>
@@ -598,15 +617,11 @@ export default function EstimatePDF({
         {additionalCharges.length > 0 && (
           <View style={styles.sectionSpacer} wrap={false}>
             <View style={[styles.chargesHeader, { marginTop: 24 }]}>
-              <Text
-                style={[styles.tableHeaderText, styles.tableHeaderTextLeft]}
-              >
+              <Text style={styles.tableHeaderTextCharges}>
                 {lang?.additionalCharges ||
                   (isFr ? 'Frais Supplémentaires' : 'Additional Charges')}
               </Text>
-              <Text
-                style={[styles.tableHeaderText, styles.tableHeaderTextRight]}
-              >
+              <Text style={styles.tableHeaderTextCharges}>
                 {isFr ? 'Montant' : 'Amount'}
               </Text>
             </View>
