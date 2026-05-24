@@ -211,6 +211,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#111827'
   },
+  // Wrapper that constrains description + items to left column only.
+  // paddingRight reserves space for the amount column (~80pt wide)
+  // so text never bleeds under the price on the right.
+  serviceContentBlock: {
+    paddingRight: 80
+  },
   // text-[13px] text-gray-600 leading-relaxed → fontSize: 10.5
   serviceDescription: {
     fontSize: 10.5,
@@ -550,63 +556,69 @@ export default function EstimatePDF({
                 </Text>
               </View>
 
-              {/* Description */}
-              {sec.description && (
-                <Text style={styles.serviceDescription}>{sec.description}</Text>
-              )}
+              {/* Description + items — wrapped in serviceContentBlock to prevent
+                text bleeding under the amount column on the right */}
+              <View style={styles.serviceContentBlock}>
+                {/* Description */}
+                {sec.description && (
+                  <Text style={styles.serviceDescription}>
+                    {sec.description}
+                  </Text>
+                )}
 
-              {/* Public items list (when internal details OFF) */}
-              {!sec.hasDetails && (sec.items || []).length > 0 && (
-                <View style={styles.itemsList}>
-                  {sec.items.map((item, i) => {
-                    const hasQtyInfo = item.qty > 0 || item.unit;
-                    return (
-                      <Text key={`item-${i}`} style={styles.itemLine}>
-                        <Text style={styles.itemLineName}>
-                          {item.name || (isFr ? 'Article' : 'Item')}
-                        </Text>
-                        {hasQtyInfo && (
-                          <Text style={styles.itemLineMeta}>
-                            {' · '}
-                            {item.qty}
-                            {item.unit ? ` ${item.unit}` : ''}
+                {/* Public items list (when internal details OFF) */}
+                {!sec.hasDetails && (sec.items || []).length > 0 && (
+                  <View style={styles.itemsList}>
+                    {sec.items.map((item, i) => {
+                      const hasQtyInfo = item.qty > 0 || item.unit;
+                      return (
+                        <Text key={`item-${i}`} style={styles.itemLine}>
+                          <Text style={styles.itemLineName}>
+                            {item.name || (isFr ? 'Article' : 'Item')}
                           </Text>
-                        )}
-                      </Text>
-                    );
-                  })}
-                </View>
-              )}
+                          {hasQtyInfo && (
+                            <Text style={styles.itemLineMeta}>
+                              {' · '}
+                              {item.qty}
+                              {item.unit ? ` ${item.unit}` : ''}
+                            </Text>
+                          )}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                )}
 
-              {/* Internal details breakdown (when ON) — subtle inline list */}
-              {sec.hasDetails && (
-                <View style={styles.detailsBlock}>
-                  {sec.laborHours > 0 && (
-                    <Text style={styles.detailLine}>
-                      {isFr ? "Main-d'œuvre" : 'Labor'}: {sec.laborHours}
-                      {sec.laborType === 'daily'
-                        ? isFr
-                          ? 'j'
-                          : 'd'
-                        : 'h'} × {formatPrice(sec.laborRate)}
-                      {sec.laborType === 'daily'
-                        ? isFr
-                          ? '/j'
-                          : '/d'
-                        : '/h'}{' '}
-                      ({isFr ? 'TVA' : 'Tax'} {sec.laborTaxRate}%)
-                    </Text>
-                  )}
-                  {(sec.items || []).map((item, i) => (
-                    <Text key={`detail-${i}`} style={styles.detailLine}>
-                      {item.name}: {item.qty}
-                      {item.unit ? ` ${item.unit}` : ''} ×{' '}
-                      {formatPrice(item.cost || 0)} ({isFr ? 'TVA' : 'Tax'}{' '}
-                      {item.taxRate}%)
-                    </Text>
-                  ))}
-                </View>
-              )}
+                {/* Internal details breakdown (when ON) — subtle inline list */}
+                {sec.hasDetails && (
+                  <View style={styles.detailsBlock}>
+                    {sec.laborHours > 0 && (
+                      <Text style={styles.detailLine}>
+                        {isFr ? "Main-d'œuvre" : 'Labor'}: {sec.laborHours}
+                        {sec.laborType === 'daily'
+                          ? isFr
+                            ? 'j'
+                            : 'd'
+                          : 'h'} × {formatPrice(sec.laborRate)}
+                        {sec.laborType === 'daily'
+                          ? isFr
+                            ? '/j'
+                            : '/d'
+                          : '/h'}{' '}
+                        ({isFr ? 'TVA' : 'Tax'} {sec.laborTaxRate}%)
+                      </Text>
+                    )}
+                    {(sec.items || []).map((item, i) => (
+                      <Text key={`detail-${i}`} style={styles.detailLine}>
+                        {item.name}: {item.qty}
+                        {item.unit ? ` ${item.unit}` : ''} ×{' '}
+                        {formatPrice(item.cost || 0)} ({isFr ? 'TVA' : 'Tax'}{' '}
+                        {item.taxRate}%)
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
           );
         })}
