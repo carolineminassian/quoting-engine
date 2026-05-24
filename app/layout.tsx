@@ -17,6 +17,15 @@ const roboto = Roboto({
 async function detectFrench(): Promise<boolean> {
   try {
     const headersList = await headers();
+
+    // Primary: use Vercel geo-based header set by middleware (most accurate)
+    const geoIsFr = headersList.get('x-user-is-fr');
+    if (geoIsFr !== null) {
+      return geoIsFr === 'true';
+    }
+
+    // Fallback: use Accept-Language if middleware header not available
+    // (e.g. local dev environment)
     const acceptLanguage = headersList.get('accept-language') || '';
     return (
       acceptLanguage.toLowerCase().startsWith('fr') ||
