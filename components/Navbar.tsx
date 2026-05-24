@@ -233,6 +233,16 @@ export default function Navbar() {
                 {lang.clientsNav}
               </Link>
               <Link
+                href="/invoices"
+                className={`inline-flex items-center px-1 pt-1 text-[10px] font-black uppercase tracking-widest ${
+                  pathname === '/invoices' || pathname.startsWith('/invoices/')
+                    ? 'border-b-2 border-blue-600 text-gray-900'
+                    : 'text-gray-400 hover:text-gray-900'
+                }`}
+              >
+                {lang.invoices}
+              </Link>
+              <Link
                 href="/analytics"
                 className={`inline-flex items-center px-1 pt-1 text-[10px] font-black uppercase tracking-widest ${
                   pathname === '/analytics'
@@ -319,6 +329,17 @@ export default function Navbar() {
               className={`py-4 ${pathname === '/clients' ? 'text-black' : ''}`}
             >
               {lang.clientsNav}
+            </Link>
+            <Link
+              href="/invoices"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`py-4 ${
+                pathname === '/invoices' || pathname.startsWith('/invoices/')
+                  ? 'text-black'
+                  : ''
+              }`}
+            >
+              {lang.invoices}
             </Link>
             <Link
               href="/analytics"

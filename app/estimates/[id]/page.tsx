@@ -93,6 +93,12 @@ export default function EstimateView() {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
+  // Invoice state
+  const [existingInvoiceId, setExistingInvoiceId] = useState<string | null>(
+    null
+  );
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       const {
@@ -145,6 +151,18 @@ export default function EstimateView() {
 
       setMaterials(mats.data || []);
       setComments(comms.data || []);
+
+      // Check if an invoice already exists for this estimate
+      if (user && user.id === est.user_id && est.client_status === 'approved') {
+        const { data: inv } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('estimate_id', est.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (inv) setExistingInvoiceId(inv.id);
+      }
+
       setLoading(false);
 
       // Auto-mark this estimate as "seen" by clearing any pending notifications.
@@ -779,6 +797,61 @@ export default function EstimateView() {
     });
   };
 
+  const handleCreateInvoice = async () => {
+    // Pro gate check
+    if (profile?.subscription_tier !== 'pro') {
+      setDialog({
+        type: 'alert',
+        message: lang.createInvoiceProOnly
+      });
+      return;
+    }
+
+    setCreatingInvoice(true);
+
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setDialog({ type: 'alert', message: lang.sessionExpired });
+        return;
+      }
+
+      const res = await fetch('/api/create-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ estimateId: estimate.id })
+      });
+
+      const data = await res.json();
+
+      if (res.status === 409 && data.invoiceId) {
+        // Invoice already exists — navigate to it
+        router.push(`/invoices/${data.invoiceId}`);
+        return;
+      }
+
+      if (!res.ok) {
+        setDialog({
+          type: 'alert',
+          message: data.error || lang.cancelEstimateError
+        });
+        return;
+      }
+
+      router.push(`/invoices/${data.invoice.id}`);
+    } catch (err: any) {
+      setDialog({ type: 'alert', message: lang.connectionError });
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
   // Cancel a finalized estimate (pending OR approved) — sets cancelled_at + cancelled_reason
   const handleCancelLockedEstimate = async () => {
     setCancelling(true);
@@ -990,6 +1063,62 @@ export default function EstimateView() {
                   >
                     {lang.downloadPdf}
                   </Button>
+                  {/* Create Invoice / View Invoice — only on approved non-cancelled estimates */}
+                  {isOwner &&
+                    estimate.client_status === 'approved' &&
+                    !estimate.cancelled_at &&
+                    !estimate.superseded_at &&
+                    (existingInvoiceId ? (
+                      <LinkButton
+                        href={`/invoices/${existingInvoiceId}`}
+                        variant="secondary"
+                        size="md"
+                        className="flex-1 sm:flex-none"
+                        icon={
+                          <svg
+                            className="w-3.5 h-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        }
+                      >
+                        {lang.viewInvoice}
+                      </LinkButton>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        loading={creatingInvoice}
+                        loadingText="..."
+                        onClick={handleCreateInvoice}
+                        className="flex-1 sm:flex-none"
+                        icon={
+                          <svg
+                            className="w-3.5 h-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="12" y1="18" x2="12" y2="12" />
+                            <line x1="9" y1="15" x2="15" y2="15" />
+                          </svg>
+                        }
+                      >
+                        {lang.createInvoice}
+                      </Button>
+                    ))}
 
                   {/* SECONDARY ACTIONS MENU — kebab dropdown for owner-only actions
                     Hidden when the estimate is cancelled (no actions remain).
@@ -1356,32 +1485,32 @@ export default function EstimateView() {
 
                 <div>
                   {estimate.sections.map((sec: any, idx: number) => (
-                   <div
-                    key={idx}
-                    className="py-6 border-b border-gray-100 last:border-b-0"
-                  >
-                    <div className="flex justify-between items-baseline gap-4 mb-2">
-                      <h3 className="text-[16px] font-bold text-gray-900 break-words flex-1 min-w-0">
-                        {sec.title || lang.professionalServices}
-                      </h3>
-                      <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0">
-                        {fmt(
-                          getSectionTotal(estimate, sec, materialsById) * 100
-                        )}
-                      </span>
-                    </div>
+                    <div
+                      key={idx}
+                      className="py-6 border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="flex justify-between items-baseline gap-4 mb-2">
+                        <h3 className="text-[16px] font-bold text-gray-900 break-words flex-1 min-w-0">
+                          {sec.title || lang.professionalServices}
+                        </h3>
+                        <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0">
+                          {fmt(
+                            getSectionTotal(estimate, sec, materialsById) * 100
+                          )}
+                        </span>
+                      </div>
 
-                    {/* Description constrained to left column only — never bleeds under the amount */}
-                    <div className="pr-24 sm:pr-32">
-                      <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
-                        {generateDescription(
-                          estimate,
-                          sec,
-                          descTranslations,
-                          materialsById
-                        )}
-                      </p>
-                    </div>
+                      {/* Description constrained to left column only — never bleeds under the amount */}
+                      <div className="pr-24 sm:pr-32">
+                        <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+                          {generateDescription(
+                            estimate,
+                            sec,
+                            descTranslations,
+                            materialsById
+                          )}
+                        </p>
+                      </div>
                       {/* Items — subtle inline list, or detailed breakdown when toggled */}
                       {isShowingDetails ? (
                         <div className="mt-4 pl-4 border-l-2 border-gray-100 space-y-1.5 max-w-3xl">
