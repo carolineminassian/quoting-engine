@@ -18,7 +18,7 @@ export default function InvoicesPage() {
   const [dialog, setDialog] = useState<any>(null);
 
   const [filterStatus, setFilterStatus] = useState<
-    'all' | 'paid' | 'unpaid' | 'overdue' | 'draft'
+    'all' | 'draft' | 'paid' | 'unpaid' | 'overdue' | 'credit_note'
   >('all');
 
   useEffect(() => {
