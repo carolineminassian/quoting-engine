@@ -228,58 +228,46 @@ export default function InvoicesPage() {
                   );
                 return true;
               })
-              .map((inv) => (
-                <div
-                  key={inv.id}
-                  onClick={() => router.push(`/invoices/${inv.id}`)}
-                  className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 hover:-translate-y-0.5 cursor-pointer transition-all duration-200 group"
-                >
-                  <div className="flex-1 w-full">
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-black text-lg text-gray-900 group-hover:text-blue-600 transition-colors">
-                          {inv.client_name ||
-                            (profile?.country === 'FR' ? 'Client' : 'Client')}
-                        </h3>
-                        <span
-                          className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${getStatusColor(inv)}`}
-                        >
-                          {getPaymentStatus(inv)}
-                        </span>
-                      </div>
-                      <p className="sm:hidden font-mono font-black text-lg text-blue-600">
-                        {formatMoney(
-                          inv.total_amount_cents,
-                          inv.currency_snapshot,
-                          inv.currency_snapshot === 'EUR' ? 'FR' : 'US'
-                        )}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs text-gray-400 font-medium mt-2 sm:mt-1">
-                      <span className="font-mono bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-black">
-                        {inv.invoice_number}
-                      </span>
-                      <span className="hidden sm:inline">•</span>
-                      <span className="hidden sm:inline">
-                        {new Date(inv.invoice_date).toLocaleDateString(
-                          profile?.country === 'FR' ? 'fr-FR' : 'en-US',
-                          { year: 'numeric', month: 'short', day: 'numeric' }
-                        )}
-                      </span>
-                      {inv.due_date && (
-                        <>
+              .map((item) => {
+                // --- CREDIT NOTE CARD ---
+                if (item.itemType === 'credit_note') {
+                  return (
+                    <div
+                      key={`cn-${item.id}`}
+                      onClick={() => router.push(`/credit-notes/${item.id}`)}
+                      className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-purple-200 hover:ring-1 hover:ring-purple-200 hover:-translate-y-0.5 cursor-pointer transition-all duration-200 group"
+                    >
+                      <div className="flex-1 w-full">
+                        <div className="flex justify-between items-start mb-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-black text-lg text-gray-900 group-hover:text-purple-600 transition-colors">
+                              {item.client_name ||
+                                (profile?.country === 'FR'
+                                  ? 'Client'
+                                  : 'Client')}
+                            </h3>
+                            <span className="hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm bg-purple-50 text-purple-600">
+                              {profile?.country === 'FR'
+                                ? 'Avoir'
+                                : 'Credit Note'}
+                            </span>
+                          </div>
+                          <p className="sm:hidden font-mono font-black text-lg text-purple-600">
+                            -
+                            {formatMoney(
+                              item.amount_cents,
+                              item.currency_snapshot,
+                              item.country_snapshot
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-400 font-medium mt-2 sm:mt-1">
+                          <span className="font-mono bg-purple-50 text-purple-600 px-2 py-0.5 rounded text-[10px] font-black">
+                            {item.credit_note_number}
+                          </span>
                           <span className="hidden sm:inline">•</span>
-                          <span
-                            className={`hidden sm:inline ${
-                              new Date(inv.due_date) < new Date() &&
-                              inv.payment_status === 'unpaid'
-                                ? 'text-red-500 font-bold'
-                                : ''
-                            }`}
-                          >
-                            {profile?.country === 'FR' ? 'Échéance :' : 'Due:'}{' '}
-                            {new Date(inv.due_date).toLocaleDateString(
+                          <span className="hidden sm:inline">
+                            {new Date(item.credit_note_date).toLocaleDateString(
                               profile?.country === 'FR' ? 'fr-FR' : 'en-US',
                               {
                                 year: 'numeric',
@@ -288,32 +276,120 @@ export default function InvoicesPage() {
                               }
                             )}
                           </span>
-                        </>
-                      )}
+                        </div>
+                      </div>
+                      <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-6 mt-4 pt-4 border-t border-gray-100 sm:mt-0 sm:pt-0 sm:border-0">
+                        <span className="sm:hidden text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm bg-purple-50 text-purple-600">
+                          {profile?.country === 'FR' ? 'Avoir' : 'Credit Note'}
+                        </span>
+                        <div className="hidden sm:block text-right">
+                          <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                            {profile?.country === 'FR' ? 'Montant' : 'Amount'}
+                          </p>
+                          <p className="font-mono font-black text-xl text-gray-800 group-hover:text-purple-600 transition-colors">
+                            -
+                            {formatMoney(
+                              item.amount_cents,
+                              item.currency_snapshot,
+                              item.country_snapshot
+                            )}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  );
+                }
 
-                  <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-6 mt-4 pt-4 border-t border-gray-100 sm:mt-0 sm:pt-0 sm:border-0">
-                    <span
-                      className={`sm:hidden text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${getStatusColor(inv)}`}
-                    >
-                      {getPaymentStatus(inv)}
-                    </span>
-                    <div className="hidden sm:block text-right">
-                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                        {lang.grandTotal}
-                      </p>
-                      <p className="font-mono font-black text-xl text-gray-800 group-hover:text-blue-600 transition-colors">
-                        {formatMoney(
-                          inv.total_amount_cents,
-                          inv.currency_snapshot,
-                          inv.currency_snapshot === 'EUR' ? 'FR' : 'US'
+                // --- STANDARD INVOICE CARD (Your existing code) ---
+                return (
+                  <div
+                    key={`inv-${item.id}`} // Changed to ensure unique keys when combined
+                    onClick={() => router.push(`/invoices/${item.id}`)}
+                    className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:shadow-md hover:border-blue-200 hover:ring-1 hover:ring-blue-200 hover:-translate-y-0.5 cursor-pointer transition-all duration-200 group"
+                  >
+                    <div className="flex-1 w-full">
+                      <div className="flex justify-between items-start mb-1">
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-black text-lg text-gray-900 group-hover:text-blue-600 transition-colors">
+                            {item.client_name ||
+                              (profile?.country === 'FR' ? 'Client' : 'Client')}
+                          </h3>
+                          <span
+                            className={`hidden sm:inline-block text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${getStatusColor(item)}`}
+                          >
+                            {getPaymentStatus(item)}
+                          </span>
+                        </div>
+                        <p className="sm:hidden font-mono font-black text-lg text-blue-600">
+                          {formatMoney(
+                            item.total_amount_cents,
+                            item.currency_snapshot,
+                            item.currency_snapshot === 'EUR' ? 'FR' : 'US'
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-gray-400 font-medium mt-2 sm:mt-1">
+                        <span className="font-mono bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-black">
+                          {item.invoice_number}
+                        </span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="hidden sm:inline">
+                          {new Date(item.invoice_date).toLocaleDateString(
+                            profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                            { year: 'numeric', month: 'short', day: 'numeric' }
+                          )}
+                        </span>
+                        {item.due_date && (
+                          <>
+                            <span className="hidden sm:inline">•</span>
+                            <span
+                              className={`hidden sm:inline ${
+                                new Date(item.due_date) < new Date() &&
+                                item.payment_status === 'unpaid'
+                                  ? 'text-red-500 font-bold'
+                                  : ''
+                              }`}
+                            >
+                              {profile?.country === 'FR'
+                                ? 'Échéance :'
+                                : 'Due:'}{' '}
+                              {new Date(item.due_date).toLocaleDateString(
+                                profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                                {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                }
+                              )}
+                            </span>
+                          </>
                         )}
-                      </p>
+                      </div>
+                    </div>
+
+                    <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-6 mt-4 pt-4 border-t border-gray-100 sm:mt-0 sm:pt-0 sm:border-0">
+                      <span
+                        className={`sm:hidden text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm ${getStatusColor(item)}`}
+                      >
+                        {getPaymentStatus(item)}
+                      </span>
+                      <div className="hidden sm:block text-right">
+                        <p className="text-[8px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                          {lang.grandTotal}
+                        </p>
+                        <p className="font-mono font-black text-xl text-gray-800 group-hover:text-blue-600 transition-colors">
+                          {formatMoney(
+                            item.total_amount_cents,
+                            item.currency_snapshot,
+                            item.currency_snapshot === 'EUR' ? 'FR' : 'US'
+                          )}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
           )}
         </div>
       </div>

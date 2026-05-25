@@ -36,6 +36,8 @@ export default function InvoiceView() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
+  const [creditNotes, setCreditNotes] = useState<any[]>([]);
+
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm' | 'danger';
     title?: string;
@@ -48,6 +50,11 @@ export default function InvoiceView() {
   const [markingPaid, setMarkingPaid] = useState(false);
 
   const [deletingDraft, setDeletingDraft] = useState(false);
+
+  const [editMode, setEditMode] = useState(false);
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -96,6 +103,13 @@ export default function InvoiceView() {
         tax_rate: inv.tax_rate_snapshot ?? prof.data?.default_tax_rate ?? 0
       });
       setMaterials(mats.data || []);
+
+      // Inside your fetchData function, below the profiles/materials fetch:
+      const { data: cns } = await supabase
+        .from('credit_notes')
+        .select('*')
+        .eq('invoice_id', id);
+      setCreditNotes(cns || []);
       setLoading(false);
     }
     fetchData();
@@ -507,6 +521,34 @@ export default function InvoiceView() {
     : parseInt(rawTerms.replace('_days', '')) || 30;
 
   const followUpState = getFollowUpState();
+  const handleSaveEdit = async () => {
+    setSavingEdit(true);
+    const { error } = await supabase
+      .from('invoices')
+      .update({
+        due_date: editDueDate || null,
+        notes: editNotes.trim() || null
+      })
+      .eq('id', id);
+
+    setSavingEdit(false);
+
+    if (error) {
+      setDialog({ type: 'alert', message: error.message });
+      return;
+    }
+
+    setInvoice((prev: any) =>
+      prev
+        ? {
+            ...prev,
+            due_date: editDueDate || null,
+            notes: editNotes.trim() || null
+          }
+        : prev
+    );
+    setEditMode(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-black font-sans print:bg-white flex flex-col">
@@ -876,7 +918,51 @@ export default function InvoiceView() {
                 </span>
               )}
           </div>
-
+          {/* Related Credit Notes Banner */}
+          {creditNotes.length > 0 && (
+            <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl p-4 print:hidden">
+              <p className="text-[10px] font-black uppercase tracking-widest text-purple-800 mb-3">
+                {lang.relatedCreditNotes}
+              </p>
+              <div className="flex flex-col gap-2">
+                {creditNotes.map((cn) => (
+                  <div
+                    key={cn.id}
+                    className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-purple-100 shadow-sm"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-sm font-bold text-purple-700">
+                        {cn.credit_note_number}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(cn.credit_note_date).toLocaleDateString(
+                          profile?.country === 'FR' ? 'fr-FR' : 'en-US'
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="font-mono font-black text-purple-700">
+                        -
+                        {formatMoney(
+                          cn.amount_cents,
+                          cn.currency_snapshot,
+                          cn.country_snapshot
+                        )}
+                      </span>
+                      <LinkButton
+                        href={`/credit-notes/${cn.id}`}
+                        variant="secondary"
+                        size="sm"
+                        className="!bg-purple-50 !text-purple-700 !border-purple-200 hover:!bg-purple-100"
+                      >
+                        {lang.viewCreditNote}
+                      </LinkButton>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {/* === MAIN INVOICE DOCUMENT === */}
           <article className="bg-white shadow-xl border border-gray-200 rounded-xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
             <div className="p-8 sm:p-14 print:p-12">
@@ -1229,7 +1315,62 @@ export default function InvoiceView() {
             deletePermanently: lang.cancelInvoice
           }}
         />
+        {/* Edit Draft Modal */}
+        {editMode && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-gray-100 animate-scale-up">
+              <h3 className="text-sm font-black uppercase tracking-widest mb-5 text-gray-900">
+                {lang.reviseInvoice}
+              </h3>
 
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    {lang.dueDate}
+                  </label>
+                  <input
+                    type="date"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                    className="w-full p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-600 text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    {lang.invoiceNotes}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder={lang.invoiceNotesPlaceholder}
+                    className="w-full p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-600 resize-none text-gray-900 placeholder-gray-400"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="md"
+                  onClick={() => setEditMode(false)}
+                  disabled={savingEdit}
+                >
+                  {lang.cancel}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  loading={savingEdit}
+                  loadingText="..."
+                  onClick={handleSaveEdit}
+                >
+                  {lang.save}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Mark as Paid Modal */}
         {markPaidModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">

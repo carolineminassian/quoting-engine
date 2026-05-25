@@ -334,6 +334,7 @@ export const translations = {
     creditNoteCreated: 'Credit note created successfully.',
     creditNoteError: 'Failed to create credit note.',
     relatedInvoice: 'Related Invoice',
+    relatedCreditNotes: 'Related Credit Notes',
     viewCreditNote: 'View Credit Note',
 
     // Payment instructions (shown on invoice PDF + email)
@@ -900,6 +901,7 @@ export const translations = {
     creditNoteCreated: 'Avoir créé avec succès.',
     creditNoteError: "Échec de la création de l'avoir.",
     relatedInvoice: 'Facture Associée',
+    relatedCreditNotes: 'Avoirs liés à cette facture',
     viewCreditNote: "Voir l'Avoir",
 
     // Instructions de paiement (sur le PDF et l'email)
