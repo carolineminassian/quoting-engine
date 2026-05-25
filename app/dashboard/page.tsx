@@ -48,6 +48,10 @@ export default function DashboardPage() {
     | 'unread'
   >('all');
 
+  const [filterBilling, setFilterBilling] = useState<
+    'all' | 'fully-billed' | 'partially-billed' | 'unbilled'
+  >('all');
+
   // Set of estimate IDs that have at least one unread notification.
   // Used to show the red dot per row + filter "unread" view.
   const [estimatesWithNotifications, setEstimatesWithNotifications] = useState<
@@ -93,16 +97,72 @@ export default function DashboardPage() {
         setLang(prof.country === 'FR' ? translations.FR : translations.US);
       }
 
-      const [estsRes, matsRes] = await Promise.all([
+      const [estsRes, matsRes, billingsRes] = await Promise.all([
         supabase
           .from('estimates')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false }),
-        supabase.from('materials').select('*').eq('user_id', user.id)
+        supabase.from('materials').select('*').eq('user_id', user.id),
+        supabase
+          .from('invoices')
+          .select(
+            'estimate_id, total_amount_cents, payment_status, is_cancelled, is_locked, due_date, last_email_sent_at, paid_at'
+          )
+          .eq('user_id', user.id)
+          .not('estimate_id', 'is', null)
       ]);
 
-      setEstimates(estsRes.data || []);
+      // Build billing map: estimate_id → billing summary
+      const billingMap = new Map<
+        string,
+        {
+          billedCents: number;
+          paidCents: number;
+          hasOverdue: boolean;
+          hasUnpaidSent: boolean;
+          invoiceCount: number;
+        }
+      >();
+
+      (billingsRes.data || []).forEach((inv: any) => {
+        if (!inv.estimate_id || inv.is_cancelled) return;
+        const existing = billingMap.get(inv.estimate_id) || {
+          billedCents: 0,
+          paidCents: 0,
+          hasOverdue: false,
+          hasUnpaidSent: false,
+          invoiceCount: 0
+        };
+        existing.billedCents += inv.total_amount_cents || 0;
+        if (inv.payment_status === 'paid')
+          existing.paidCents += inv.total_amount_cents || 0;
+        if (
+          inv.is_locked &&
+          inv.payment_status === 'unpaid' &&
+          inv.due_date &&
+          new Date(inv.due_date) < new Date()
+        ) {
+          existing.hasOverdue = true;
+        }
+        if (
+          inv.is_locked &&
+          inv.last_email_sent_at &&
+          inv.payment_status === 'unpaid'
+        ) {
+          existing.hasUnpaidSent = true;
+        }
+        existing.invoiceCount += 1;
+        billingMap.set(inv.estimate_id, existing);
+      });
+
+      // Attach billing data to each estimate
+      const estimatesWithBilling = (estsRes.data || []).map((est: any) => ({
+        ...est,
+        _billing: billingMap.get(est.id) || null
+      }));
+
+      setEstimates(estimatesWithBilling);
       setMaterials(matsRes.data || []);
 
       // Fetch unread notifications for this user
@@ -121,9 +181,8 @@ export default function DashboardPage() {
       // Check URL parameters to automatically set the dashboard view context
       const params = new URLSearchParams(window.location.search);
       const statusParam = params.get('status');
-      if (
-        statusParam &&
-        [
+      if (statusParam) {
+        const statusFilters = [
           'all',
           'draft',
           'pending',
@@ -131,9 +190,13 @@ export default function DashboardPage() {
           'rejected',
           'cancelled',
           'unread'
-        ].includes(statusParam)
-      ) {
-        setFilterStatus(statusParam as any);
+        ];
+        const billingFilters = ['fully-billed', 'partially-billed', 'unbilled'];
+        if (statusFilters.includes(statusParam)) {
+          setFilterStatus(statusParam as any);
+        } else if (billingFilters.includes(statusParam)) {
+          setFilterBilling(statusParam as any);
+        }
       }
     }
     fetchData();
@@ -535,11 +598,17 @@ export default function DashboardPage() {
   );
   const processedEstimates = [...estimates]
     .filter((est) => {
-      // Apply text search filter first — matches against client name
+      // Text search
       if (query && !(est.client_name || '').toLowerCase().includes(query)) {
         return false;
       }
 
+      const billing = est._billing;
+      const totalCents = est.total_amount_cents || 0;
+      const billedCents = billing?.billedCents || 0;
+
+      // Status filter
+      if (filterStatus === 'draft' && !!est.is_locked) return false;
       if (filterStatus === 'draft') return !est.is_locked;
       if (filterStatus === 'pending')
         return (
@@ -558,6 +627,31 @@ export default function DashboardPage() {
       if (filterStatus === 'cancelled') return !!est.cancelled_at;
       if (filterStatus === 'unread')
         return estimatesWithNotifications.has(est.id);
+
+      // When status = 'all', also apply billing filter if set
+      if (filterBilling !== 'all') {
+        if (filterBilling === 'fully-billed')
+          return (
+            est.client_status === 'approved' &&
+            !est.cancelled_at &&
+            billedCents >= totalCents &&
+            totalCents > 0
+          );
+        if (filterBilling === 'partially-billed')
+          return (
+            est.client_status === 'approved' &&
+            !est.cancelled_at &&
+            billedCents > 0 &&
+            billedCents < totalCents
+          );
+        if (filterBilling === 'unbilled')
+          return (
+            est.client_status === 'approved' &&
+            !est.cancelled_at &&
+            (!billing || billedCents === 0)
+          );
+      }
+
       return true;
     })
     .sort((a, b) => {
@@ -1022,7 +1116,13 @@ export default function DashboardPage() {
               </span>
               <Listbox
                 value={filterStatus === 'unread' ? 'all' : filterStatus}
-                onChange={setFilterStatus}
+                onChange={(val: any) => {
+                  setFilterStatus(val);
+                  // Reset billing filter when switching to non-approved statuses
+                  if (!['all', 'approved'].includes(val)) {
+                    setFilterBilling('all');
+                  }
+                }}
               >
                 <div className="relative w-full sm:w-40">
                   <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
@@ -1033,7 +1133,7 @@ export default function DashboardPage() {
                       {filterStatus === 'approved' && lang.approvedOnly}
                       {filterStatus === 'rejected' && lang.rejectedOnly}
                       {filterStatus === 'cancelled' && lang.cancelledOnly}
-                      {filterStatus === 'unread' && lang.unreadOnly}
+                      {filterStatus === 'unread' && lang.allProjects}
                     </span>
                     <span className="pointer-events-none text-gray-400 text-[8px]">
                       ▼
@@ -1160,6 +1260,80 @@ export default function DashboardPage() {
                   </button>
                 )}
             </div>
+
+            {/* Billing filter — only shown for Pro users since billing is Pro-only */}
+            {profile?.subscription_tier === 'pro' && (
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-[9px] font-black uppercase tracking-widests text-gray-400 shrink-0">
+                  {lang.billingProgress}:
+                </span>
+                <Listbox
+                  value={filterBilling}
+                  onChange={(val) => setFilterBilling(val as any)}
+                >
+                  <div className="relative w-full sm:w-44">
+                    <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widests text-gray-700 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {filterBilling === 'all' &&
+                          (profile?.country === 'FR'
+                            ? 'Tous les statuts'
+                            : 'All Statuses')}
+                        {filterBilling === 'fully-billed' && lang.fullyBilled}
+                        {filterBilling === 'partially-billed' &&
+                          lang.partiallyBilled}
+                        {filterBilling === 'unbilled' && lang.unbilled}
+                      </span>
+                      <span className="pointer-events-none text-gray-400 text-[8px]">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[9px] uppercase tracking-widests font-bold">
+                        <ListboxOption
+                          value="all"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {profile?.country === 'FR'
+                            ? 'Toutes les factures'
+                            : 'All Invoices'}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="fully-billed"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.fullyBilled}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="partially-billed"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.partiallyBilled}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="unbilled"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.unbilled}
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
@@ -1305,6 +1479,62 @@ export default function DashboardPage() {
                       {est.custom_id || est.id.slice(0, 8)}
                     </span>
                   </div>
+
+                  {/* Billing progress — only for approved estimates with at least one invoice */}
+                  {est.client_status === 'approved' &&
+                    !est.cancelled_at &&
+                    est._billing && (
+                      <div className="mt-2 max-w-xs">
+                        {(() => {
+                          const totalCents = est.total_amount_cents || 0;
+                          const billedCents = est._billing.billedCents || 0;
+                          const paidCents = est._billing.paidCents || 0;
+                          const billedPct =
+                            totalCents > 0
+                              ? Math.round((billedCents / totalCents) * 100)
+                              : 0;
+                          const isFullyPaid =
+                            paidCents >= totalCents && totalCents > 0;
+                          const hasOverdue = est._billing.hasOverdue;
+
+                          return (
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                      isFullyPaid
+                                        ? 'bg-green-500'
+                                        : hasOverdue
+                                          ? 'bg-red-400'
+                                          : 'bg-blue-500'
+                                    }`}
+                                    style={{
+                                      width: `${Math.min(billedPct, 100)}%`
+                                    }}
+                                  />
+                                </div>
+                                <span
+                                  className={`text-[9px] font-black uppercase tracking-widest shrink-0 ${
+                                    isFullyPaid
+                                      ? 'text-green-600'
+                                      : hasOverdue
+                                        ? 'text-red-500'
+                                        : 'text-gray-400'
+                                  }`}
+                                >
+                                  {isFullyPaid
+                                    ? lang.invoicePaid
+                                    : hasOverdue
+                                      ? lang.invoiceOverdue
+                                      : t(lang.billedPct, { pct: billedPct })}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                 </div>
 
                 <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-6 mt-4 pt-4 border-t border-gray-100 sm:mt-0 sm:pt-0 sm:border-0">

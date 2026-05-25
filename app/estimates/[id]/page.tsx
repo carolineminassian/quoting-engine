@@ -93,12 +93,13 @@ export default function EstimateView() {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
-  // Invoice state
-  const [existingInvoiceId, setExistingInvoiceId] = useState<string | null>(
+  // Invoice / billing state
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [billingOpen, setBillingOpen] = useState(false);
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(
     null
   );
-  const [creatingInvoice, setCreatingInvoice] = useState(false);
-
   useEffect(() => {
     async function fetchData() {
       const {
@@ -152,18 +153,27 @@ export default function EstimateView() {
       setMaterials(mats.data || []);
       setComments(comms.data || []);
 
-      // Check if an invoice already exists for this estimate
+      // Fetch all invoices for this estimate
       if (user && user.id === est.user_id && est.client_status === 'approved') {
-        const { data: inv } = await supabase
+        const { data: invs } = await supabase
           .from('invoices')
-          .select('id')
+          .select(
+            'id, invoice_number, invoice_type, invoice_description, total_amount_cents, payment_status, is_locked, is_cancelled, paid_at, currency_snapshot, country_snapshot'
+          )
           .eq('estimate_id', est.id)
           .eq('user_id', user.id)
-          .maybeSingle();
-        if (inv) setExistingInvoiceId(inv.id);
+          .order('created_at', { ascending: true });
+        if (invs) setInvoices(invs);
       }
 
       setLoading(false);
+
+      // Tab opening is handled by the invoices.length effect below
+      // (handles both fresh load and client-side navigation cases)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('tab') === 'billing') {
+        setBillingOpen(true);
+      }
 
       // Auto-mark this estimate as "seen" by clearing any pending notifications.
       // Only the OWNER's notifications get cleared — guests don't have any.
@@ -217,6 +227,40 @@ export default function EstimateView() {
     () => buildMaterialsMap(materials),
     [materials]
   );
+
+  // When invoices are first loaded (after creation redirect), auto-open + scroll
+  // Uses invoices.length as trigger so it fires when data arrives after navigation
+  useEffect(() => {
+    if (invoices.length === 0) return;
+
+    // Check both window.location AND the current URL reactively
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab !== 'billing') return;
+
+    setBillingOpen(true);
+
+    // Aggressive retry loop — keeps trying until the element is in the DOM
+    let attempts = 0;
+    const maxAttempts = 20;
+    const interval = setInterval(() => {
+      attempts++;
+      const el = document.getElementById('billing-hub');
+      if (el) {
+        clearInterval(interval);
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Blue pulse to draw attention
+        el.style.transition = 'box-shadow 0.3s ease';
+        el.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.35)';
+        setTimeout(() => {
+          if (el) el.style.boxShadow = '';
+        }, 1800);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 150); // Check every 150ms
+
+    return () => clearInterval(interval);
+  }, [invoices.length]);
 
   // Translation bundle for auto-generated descriptions
   const descTranslations = useMemo(
@@ -797,13 +841,50 @@ export default function EstimateView() {
     });
   };
 
+  const handleDeleteInvoiceDraft = async (invoiceId: string) => {
+    setDialog({
+      type: 'confirm',
+      message: lang.deleteInvoiceDraftConfirm,
+      onConfirm: async () => {
+        setDialog(null);
+        setDeletingInvoiceId(invoiceId);
+
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+          if (!session) return;
+
+          const res = await fetch('/api/delete-invoice', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ invoiceId })
+          });
+
+          if (res.ok) {
+            setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceId));
+          } else {
+            const data = await res.json();
+            setDialog({
+              type: 'alert',
+              message: data.error || lang.connectionError
+            });
+          }
+        } catch {
+          setDialog({ type: 'alert', message: lang.connectionError });
+        } finally {
+          setDeletingInvoiceId(null);
+        }
+      }
+    });
+  };
+
   const handleCreateInvoice = async () => {
-    // Pro gate check
     if (profile?.subscription_tier !== 'pro') {
-      setDialog({
-        type: 'alert',
-        message: lang.createInvoiceProOnly
-      });
+      setDialog({ type: 'alert', message: lang.createInvoiceProOnly });
       return;
     }
 
@@ -813,7 +894,6 @@ export default function EstimateView() {
       const {
         data: { session }
       } = await supabase.auth.getSession();
-
       if (!session) {
         setDialog({ type: 'alert', message: lang.sessionExpired });
         return;
@@ -830,9 +910,9 @@ export default function EstimateView() {
 
       const data = await res.json();
 
-      if (res.status === 409 && data.invoiceId) {
-        // Invoice already exists — navigate to it
-        router.push(`/invoices/${data.invoiceId}`);
+      if (res.status === 409) {
+        // Invoices already exist — go to billing hub
+        router.push(`/estimates/${estimate.id}?tab=billing`);
         return;
       }
 
@@ -844,7 +924,8 @@ export default function EstimateView() {
         return;
       }
 
-      router.push(`/invoices/${data.invoice.id}`);
+      // Navigate to the appropriate destination
+      router.push(data.redirectTo);
     } catch (err: any) {
       setDialog({ type: 'alert', message: lang.connectionError });
     } finally {
@@ -1068,11 +1149,18 @@ export default function EstimateView() {
                     estimate.client_status === 'approved' &&
                     !estimate.cancelled_at &&
                     !estimate.superseded_at &&
-                    (existingInvoiceId ? (
-                      <LinkButton
-                        href={`/invoices/${existingInvoiceId}`}
+                    (invoices.length > 0 ? (
+                      <Button
                         variant="secondary"
                         size="md"
+                        onClick={() => {
+                          setBillingOpen(true);
+                          setTimeout(() => {
+                            document
+                              .getElementById('billing-hub')
+                              ?.scrollIntoView({ behavior: 'smooth' });
+                          }, 100);
+                        }}
                         className="flex-1 sm:flex-none"
                         icon={
                           <svg
@@ -1089,8 +1177,8 @@ export default function EstimateView() {
                           </svg>
                         }
                       >
-                        {lang.viewInvoice}
-                      </LinkButton>
+                        {lang.billingProgress} ({invoices.length})
+                      </Button>
                     ) : (
                       <Button
                         variant="secondary"
@@ -1857,6 +1945,230 @@ export default function EstimateView() {
             </div>
           )}
         </div>
+
+        {/* === BILLING HUB === */}
+        {isOwner &&
+          estimate.client_status === 'approved' &&
+          !estimate.cancelled_at &&
+          !estimate.superseded_at &&
+          invoices.length > 0 && (
+            <div
+              id="billing-hub"
+              className="mt-6 bg-white shadow-xl border border-gray-200 rounded-xl overflow-hidden print:hidden max-w-4xl mx-auto w-full"
+            >
+              <button
+                type="button"
+                onClick={() => setBillingOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between p-6 sm:p-8 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <svg
+                    className="w-4 h-4 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-gray-700">
+                    {lang.billingHubTitle}
+                  </p>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {invoices.length}{' '}
+                    {profile?.country === 'FR' ? 'facture(s)' : 'invoice(s)'}
+                  </span>
+                </div>
+                <span
+                  className="text-gray-400 text-xs transition-transform duration-200"
+                  style={{
+                    transform: billingOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+                  }}
+                >
+                  ▼
+                </span>
+              </button>
+
+              {billingOpen && (
+                <div className="px-6 sm:px-8 pb-6 sm:pb-8 border-t border-gray-100">
+                  {/* Billing progress bar */}
+                  {(() => {
+                    const totalCents = estimate.total_amount_cents || 0;
+                    const billedCents = invoices
+                      .filter((inv) => !inv.is_cancelled)
+                      .reduce(
+                        (acc, inv) => acc + (inv.total_amount_cents || 0),
+                        0
+                      );
+                    const paidCents = invoices
+                      .filter((inv) => inv.payment_status === 'paid')
+                      .reduce(
+                        (acc, inv) => acc + (inv.total_amount_cents || 0),
+                        0
+                      );
+                    const billedPct =
+                      totalCents > 0
+                        ? Math.round((billedCents / totalCents) * 100)
+                        : 0;
+                    const remainingCents = totalCents - billedCents;
+
+                    return (
+                      <div className="py-4 border-b border-gray-100 mb-4">
+                        <div className="flex justify-between items-baseline mb-2">
+                          <span className="text-xs font-bold text-gray-500">
+                            {t(lang.billedOf, {
+                              billed: fmt(billedCents),
+                              total: fmt(totalCents)
+                            })}
+                          </span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                            {t(lang.billedPct, { pct: billedPct })}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${billedPct}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between mt-1.5">
+                          <span className="text-[10px] text-green-600 font-bold">
+                            ✓ {t(lang.paidAmount, { amount: fmt(paidCents) })}
+                          </span>
+                          {remainingCents > 0 && (
+                            <span className="text-[10px] text-gray-400 font-bold">
+                              {t(lang.remainingToBill, {
+                                amount: fmt(remainingCents)
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Invoice rows */}
+                  <div className="space-y-2">
+                    {invoices.map((inv) => {
+                      const isPaid = inv.payment_status === 'paid';
+                      const isSent = !!inv.last_email_sent_at;
+                      const isOverdueInv =
+                        inv.is_locked &&
+                        !inv.is_cancelled &&
+                        inv.payment_status === 'unpaid' &&
+                        inv.due_date &&
+                        new Date(inv.due_date) < new Date();
+
+                      return (
+                        <div
+                          key={inv.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                            inv.is_cancelled
+                              ? 'bg-gray-50 border-gray-100 opacity-60'
+                              : 'bg-white border-gray-200 hover:border-blue-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm shrink-0 ${
+                                inv.is_cancelled
+                                  ? 'bg-gray-100 text-gray-400'
+                                  : isPaid
+                                    ? 'bg-green-50 text-green-600'
+                                    : isOverdueInv
+                                      ? 'bg-red-50 text-red-500'
+                                      : !inv.is_locked
+                                        ? 'bg-yellow-50 text-yellow-600'
+                                        : isSent
+                                          ? 'bg-blue-50 text-blue-600'
+                                          : 'bg-gray-50 text-gray-500'
+                              }`}
+                            >
+                              {inv.is_cancelled
+                                ? lang.invoiceCancelled
+                                : isPaid
+                                  ? lang.invoicePaid
+                                  : isOverdueInv
+                                    ? lang.invoiceOverdue
+                                    : !inv.is_locked
+                                      ? lang.invoiceDraft
+                                      : isSent
+                                        ? lang.invoiceSent
+                                        : lang.invoiceUnpaid}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="font-mono text-xs font-black text-blue-600">
+                                {inv.invoice_number}
+                              </p>
+                              {inv.invoice_description && (
+                                <p className="text-[10px] text-gray-400 truncate">
+                                  {inv.invoice_description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="font-mono text-sm font-bold text-gray-800">
+                              {formatMoney(
+                                inv.total_amount_cents,
+                                inv.currency_snapshot,
+                                inv.country_snapshot === 'FR' ? 'FR' : 'US'
+                              )}
+                            </span>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1.5">
+                              <LinkButton
+                                href={`/invoices/${inv.id}`}
+                                variant="ghost"
+                                size="sm"
+                                className="!text-[9px] !px-2 !py-1.5"
+                              >
+                                {inv.is_locked
+                                  ? lang.viewInvoice
+                                  : lang.reviseInvoice}
+                              </LinkButton>
+                              {!inv.is_locked && (
+                                <button
+                                  onClick={() =>
+                                    handleDeleteInvoiceDraft(inv.id)
+                                  }
+                                  disabled={deletingInvoiceId === inv.id}
+                                  className="text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
+                                >
+                                  {deletingInvoiceId === inv.id
+                                    ? '...'
+                                    : lang.delete}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Create additional invoice button */}
+                  {invoices.filter((inv) => !inv.is_cancelled).length > 0 && (
+                    <button
+                      onClick={handleCreateInvoice}
+                      disabled={creatingInvoice}
+                      className="mt-3 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-all duration-200 cursor-pointer px-2 py-1.5 -ml-2 rounded-md disabled:opacity-40"
+                    >
+                      +{' '}
+                      {profile?.country === 'FR'
+                        ? 'Ajouter une Facture'
+                        : 'Add Another Invoice'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
         {/* --- POPUP DIALOGS --- */}
         <ConfirmDialog

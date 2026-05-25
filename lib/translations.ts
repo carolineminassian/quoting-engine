@@ -342,6 +342,28 @@ export const translations = {
     paymentLinkLabel: 'Online Payment',
     payInvoiceOnline: 'Pay Online',
 
+    // Billing tracker
+    billingProgress: 'Billing',
+    fullyBilled: 'Fully Billed',
+    partiallyBilled: 'Partially Billed',
+    unbilled: 'Unbilled',
+    unpaidInvoices: 'Unpaid Invoices',
+    overdueInvoices: 'Overdue',
+    billedOf: '{billed} of {total}',
+    billedPct: '{pct}% billed',
+    remainingToBill: '{amount} remaining',
+    paidAmount: '{amount} paid',
+    depositInvoiceLabel: 'Deposit — {ref}',
+    balanceInvoiceLabel: 'Balance — {ref}',
+    deleteInvoiceDraft: 'Delete Draft',
+    deleteInvoiceDraftConfirm:
+      'Delete this invoice draft? This cannot be undone.',
+    reviseInvoice: 'Edit Draft',
+    invoiceHub: 'Invoices for this Estimate',
+    invoiceHubEmpty: 'No invoices yet for this estimate.',
+    createInvoiceFromEstimate: 'Create Invoice',
+    billingHubTitle: 'Billing',
+
     // Cancellations
     cancelEstimate: 'Cancel Estimate',
     cancelEstimateBtn: 'Cancel Estimate',
@@ -885,6 +907,28 @@ export const translations = {
     bankWireInstructions: 'Coordonnées Bancaires / Virement',
     paymentLinkLabel: 'Paiement en Ligne',
     payInvoiceOnline: 'Payer en Ligne',
+
+    // Suivi de facturation
+    billingProgress: 'Facturation',
+    fullyBilled: 'Entièrement Facturé',
+    partiallyBilled: 'Partiellement Facturé',
+    unbilled: 'Non Facturé',
+    unpaidInvoices: 'Factures Impayées',
+    overdueInvoices: 'En Retard',
+    billedOf: '{billed} sur {total}',
+    billedPct: '{pct}% facturé',
+    remainingToBill: '{amount} restant',
+    paidAmount: '{amount} payé',
+    depositInvoiceLabel: 'Acompte — {ref}',
+    balanceInvoiceLabel: 'Solde — {ref}',
+    deleteInvoiceDraft: 'Supprimer le Brouillon',
+    deleteInvoiceDraftConfirm:
+      'Supprimer ce brouillon de facture ? Cette action est irréversible.',
+    reviseInvoice: 'Modifier le Brouillon',
+    invoiceHub: 'Factures pour ce Devis',
+    invoiceHubEmpty: 'Aucune facture pour ce devis.',
+    createInvoiceFromEstimate: 'Créer une Facture',
+    billingHubTitle: 'Facturation',
 
     // Cancellations
     cancelEstimate: 'Annuler le Devis',
