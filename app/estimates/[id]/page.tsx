@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Fragment, useState, useEffect, useMemo } from 'react';
+import React, { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -28,6 +28,9 @@ import {
 } from '@/lib/estimateCalculations';
 import { formatMoney } from '@/lib/formatMoney';
 
+// ─────────────────────────────────────────────────────────────
+// Brand Logo Component
+// ─────────────────────────────────────────────────────────────
 interface BrandLogoProps {
   country: 'US' | 'FR';
 }
@@ -64,9 +67,234 @@ const BrandLogo = ({ country }: BrandLogoProps) => (
   </div>
 );
 
+// ─────────────────────────────────────────────────────────────
+// Icon Components (cleaner than inline SVGs)
+// ─────────────────────────────────────────────────────────────
+const Icons = {
+  ArrowLeft: () => (
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  ),
+  Download: () => (
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+    </svg>
+  ),
+  Send: () => (
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+    </svg>
+  ),
+  MoreVertical: () => (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="5" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="12" cy="19" r="2" />
+    </svg>
+  ),
+  Refresh: () => (
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+    </svg>
+  ),
+  Share: () => (
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  ),
+  Cancel: () => (
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+    </svg>
+  ),
+  Plus: () => (
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="12" y1="18" x2="12" y2="12" />
+      <line x1="9" y1="15" x2="15" y2="15" />
+    </svg>
+  ),
+  Check: () => <span className="text-green-600 text-base leading-none">✓</span>,
+  Cross: () => <span className="text-red-600 text-base leading-none">✕</span>,
+  Clock: () => <span className="text-blue-600 text-base leading-none">⏳</span>,
+  Cancelled: () => (
+    <span className="text-gray-500 text-base leading-none mt-0.5">⊘</span>
+  ),
+  Superseded: () => (
+    <span className="text-amber-600 text-base leading-none mt-0.5">↻</span>
+  )
+};
+
+// ─────────────────────────────────────────────────────────────
+// Tab Button Component (Accessible)
+// ─────────────────────────────────────────────────────────────
+interface TabButtonProps {
+  id: string;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  badge?: number;
+  controls: string;
+}
+
+const TabButton = ({
+  id,
+  label,
+  isActive,
+  onClick,
+  badge,
+  controls
+}: TabButtonProps) => (
+  <button
+    id={id}
+    role="tab"
+    aria-selected={isActive}
+    aria-controls={controls}
+    tabIndex={isActive ? 0 : -1}
+    onClick={onClick}
+    className={`
+    pb-4 text-sm font-semibold tracking-wide transition-all duration-200
+    border-b-2 cursor-pointer whitespace-nowrap flex items-center gap-2
+    focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
+    ${
+      isActive
+        ? 'border-gray-900 text-gray-900'
+        : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200'
+    }
+  `}
+  >
+    {label}
+    {typeof badge === 'number' && badge > 0 && (
+      <span
+        className={`
+        text-[10px] px-2 py-0.5 rounded-full font-bold tabular-nums transition-colors
+        ${isActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}
+      `}
+      >
+        {badge}
+      </span>
+    )}
+  </button>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Status Badge Component
+// ─────────────────────────────────────────────────────────────
+interface StatusBadgeProps {
+  status:
+    | 'draft'
+    | 'pending'
+    | 'approved'
+    | 'rejected'
+    | 'cancelled'
+    | 'superseded'
+    | 'paid'
+    | 'unpaid'
+    | 'overdue'
+    | 'credit';
+  label: string;
+  size?: 'sm' | 'md';
+}
+
+const statusStyles: Record<StatusBadgeProps['status'], string> = {
+  draft: 'bg-amber-50 text-amber-700 border-amber-200',
+  pending: 'bg-blue-50 text-blue-700 border-blue-200',
+  approved: 'bg-green-50 text-green-700 border-green-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
+  cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
+  superseded: 'bg-amber-50 text-amber-700 border-amber-200',
+  paid: 'bg-green-50 text-green-700 border-green-200',
+  unpaid: 'bg-blue-50 text-blue-700 border-blue-200',
+  overdue: 'bg-red-50 text-red-600 border-red-200',
+  credit: 'bg-purple-50 text-purple-700 border-purple-200'
+};
+
+const StatusBadge = ({ status, label, size = 'sm' }: StatusBadgeProps) => (
+  <span
+    className={`
+    inline-flex items-center font-bold uppercase tracking-widest border rounded-md
+    ${statusStyles[status]}
+    ${size === 'sm' ? 'text-[9px] px-2 py-1' : 'text-[10px] px-2.5 py-1.5'}
+  `}
+  >
+    {label}
+  </span>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────
 export default function EstimateView() {
   const { id } = useParams();
   const router = useRouter();
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+
+  // ─── State ───────────────────────────────────────────────
   const [estimate, setEstimate] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -76,7 +304,10 @@ export default function EstimateView() {
   const [showDetails, setShowDetails] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
 
-  // --- COMMENT THREAD STATE ---
+  const [activeTab, setActiveTab] = useState<
+    'estimate' | 'billing' | 'discussion'
+  >('estimate');
+
   const [comments, setComments] = useState<any[]>([]);
   const [commentInput, setCommentInput] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -88,19 +319,56 @@ export default function EstimateView() {
     onConfirm?: () => void;
   } | null>(null);
 
-  // Cancellation flow — separate state because we need a reason textarea
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
-  // Invoice / billing state
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [creditNotes, setCreditNotes] = useState<any[]>([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
-  const [billingOpen, setBillingOpen] = useState(false);
-  const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(
-    null
-  );
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+
+  const refetchBillingDocs = async () => {
+    if (!estimate?.id) return;
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const [invsRes, cnRes] = await Promise.all([
+      supabase
+        .from('invoices')
+        .select(
+          'id, invoice_number, invoice_type, invoice_description, total_amount_cents, payment_status, is_locked, is_cancelled, paid_at, due_date, currency_snapshot, country_snapshot, created_at'
+        )
+        .eq('estimate_id', estimate.id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('credit_notes')
+        .select(
+          'id, credit_note_number, reason, total_amount_cents, is_locked, is_cancelled, currency_snapshot, country_snapshot, created_at'
+        )
+        .eq('estimate_id', estimate.id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+    ]);
+
+    if (invsRes.data) setInvoices(invsRes.data);
+    if (cnRes.data) setCreditNotes(cnRes.data);
+  };
+
+  // ─── Data Fetching ───────────────────────────────────────
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get('tab');
+      if (tab === 'billing' || tab === 'discussion') {
+        setActiveTab(tab);
+      }
+    }
+
     async function fetchData() {
       const {
         data: { user }
@@ -153,30 +421,32 @@ export default function EstimateView() {
       setMaterials(mats.data || []);
       setComments(comms.data || []);
 
-      // Fetch all invoices for this estimate
+      // Fetch billing docs if owner and approved
       if (user && user.id === est.user_id && est.client_status === 'approved') {
-        const { data: invs } = await supabase
-          .from('invoices')
-          .select(
-            'id, invoice_number, invoice_type, invoice_description, total_amount_cents, payment_status, is_locked, is_cancelled, paid_at, currency_snapshot, country_snapshot'
-          )
-          .eq('estimate_id', est.id)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true });
-        if (invs) setInvoices(invs);
+        const [invsRes, cnRes] = await Promise.all([
+          supabase
+            .from('invoices')
+            .select(
+              'id, invoice_number, invoice_type, invoice_description, total_amount_cents, payment_status, is_locked, is_cancelled, paid_at, due_date, currency_snapshot, country_snapshot, created_at'
+            )
+            .eq('estimate_id', est.id)
+            .eq('user_id', user.id),
+          supabase
+            .from('credit_notes')
+            .select(
+              'id, credit_note_number, reason, total_amount_cents, is_locked, is_cancelled, currency_snapshot, country_snapshot, created_at'
+            )
+            .eq('estimate_id', est.id)
+            .eq('user_id', user.id)
+        ]);
+
+        if (invsRes.data) setInvoices(invsRes.data);
+        if (cnRes.data) setCreditNotes(cnRes.data);
       }
 
       setLoading(false);
 
-      // Tab opening is handled by the invoices.length effect below
-      // (handles both fresh load and client-side navigation cases)
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('tab') === 'billing') {
-        setBillingOpen(true);
-      }
-
-      // Auto-mark this estimate as "seen" by clearing any pending notifications.
-      // Only the OWNER's notifications get cleared — guests don't have any.
+      // Clear notifications for owner
       if (user && user.id === est.user_id) {
         const { error: clearError } = await supabase
           .from('estimate_notifications')
@@ -185,17 +455,16 @@ export default function EstimateView() {
           .eq('user_id', user.id);
 
         if (!clearError) {
-          // Notify navbar to refresh count
           window.dispatchEvent(new CustomEvent('notificationsCleared'));
         }
       }
     }
     fetchData();
   }, [id]);
-  // --- REALTIME SUBSCRIPTION FOR COMMENTS ---
+
+  // ─── Realtime Comments ───────────────────────────────────
   useEffect(() => {
     if (!id) return;
-
     const channel = supabase
       .channel(`realtime-comments-${id}`)
       .on(
@@ -207,7 +476,6 @@ export default function EstimateView() {
           filter: `estimate_id=eq.${id}`
         },
         (payload) => {
-          // Évite les doublons visuels si l'auteur a déjà ajouté son message localement
           setComments((prev) => {
             if (prev.some((c) => c.id === payload.new.id)) return prev;
             return [...prev, payload.new];
@@ -221,48 +489,27 @@ export default function EstimateView() {
     };
   }, [id]);
 
-  // --- MARGIN ENGINE & MATH HELPERS ---
+  // Only auto-scroll when a NEW comment is added while viewing Discussion tab
+  const prevCommentsLength = useRef(comments.length);
 
+  useEffect(() => {
+    // Only scroll if we're on discussion tab AND a new comment was added
+    if (
+      activeTab === 'discussion' &&
+      comments.length > prevCommentsLength.current &&
+      commentsEndRef.current
+    ) {
+      commentsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevCommentsLength.current = comments.length;
+  }, [comments.length, activeTab]);
+
+  // ─── Memoized Values ─────────────────────────────────────
   const materialsById = useMemo(
     () => buildMaterialsMap(materials),
     [materials]
   );
 
-  // When invoices are first loaded (after creation redirect), auto-open + scroll
-  // Uses invoices.length as trigger so it fires when data arrives after navigation
-  useEffect(() => {
-    if (invoices.length === 0) return;
-
-    // Check both window.location AND the current URL reactively
-    const tab = new URLSearchParams(window.location.search).get('tab');
-    if (tab !== 'billing') return;
-
-    setBillingOpen(true);
-
-    // Aggressive retry loop — keeps trying until the element is in the DOM
-    let attempts = 0;
-    const maxAttempts = 20;
-    const interval = setInterval(() => {
-      attempts++;
-      const el = document.getElementById('billing-hub');
-      if (el) {
-        clearInterval(interval);
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Blue pulse to draw attention
-        el.style.transition = 'box-shadow 0.3s ease';
-        el.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.35)';
-        setTimeout(() => {
-          if (el) el.style.boxShadow = '';
-        }, 1800);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(interval);
-      }
-    }, 150); // Check every 150ms
-
-    return () => clearInterval(interval);
-  }, [invoices.length]);
-
-  // Translation bundle for auto-generated descriptions
   const descTranslations = useMemo(
     () => ({
       descBase: lang?.descBase || '',
@@ -272,14 +519,47 @@ export default function EstimateView() {
     [lang]
   );
 
-  // Convenience wrapper: bind the helper to the current profile for cleaner call-sites
   const fmt = (cents: number) =>
     formatMoney(cents, profile?.currency, profile?.country);
 
-  // Determines whether the estimate is eligible for a follow-up email.
-  // Returns: { mode: 'send' | 'cooldown' | 'hidden', cooldownUntil?: Date }
+  // ─── Computed Values ─────────────────────────────────────
+  const showDiscussionTab = estimate?.is_locked;
+  const showBillingTab =
+    isOwner &&
+    estimate?.client_status === 'approved' &&
+    !estimate?.cancelled_at &&
+    !estimate?.superseded_at;
+
+  const finalizedInvoices = invoices.filter(
+    (inv) => inv.is_locked && !inv.is_cancelled
+  );
+  const finalizedCreditNotes = creditNotes.filter(
+    (cn) => cn.is_locked && !cn.is_cancelled
+  );
+
+  const totalBilledCents = finalizedInvoices.reduce(
+    (acc, inv) => acc + (inv.total_amount_cents || 0),
+    0
+  );
+  const totalCreditedCents = finalizedCreditNotes.reduce(
+    (acc, cn) => acc + (cn.total_amount_cents || 0),
+    0
+  );
+  const netBilledCents = Math.max(0, totalBilledCents - totalCreditedCents);
+
+  const estTotalCents = estimate?.total_amount_cents || 0;
+  const canCreateInvoice = netBilledCents < estTotalCents;
+
+  const allBillingDocs = [
+    ...invoices.map((i) => ({ ...i, docType: 'invoice' as const })),
+    ...creditNotes.map((c) => ({ ...c, docType: 'credit_note' as const }))
+  ].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  // ─── Helper Functions ────────────────────────────────────
   const getFollowUpState = () => {
-    // Hidden: estimate not finalized, or already decided/cancelled/superseded
     if (
       !estimate?.is_locked ||
       estimate?.cancelled_at ||
@@ -288,13 +568,9 @@ export default function EstimateView() {
     ) {
       return { mode: 'hidden' as const };
     }
-
-    // No prior email — show plain "Email" button (handled separately)
     if (!estimate?.last_email_sent_at) {
       return { mode: 'hidden' as const };
     }
-
-    // Cooldown check (7 days since last follow-up)
     if (estimate?.last_followup_sent_at) {
       const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
       const lastSent = new Date(estimate.last_followup_sent_at).getTime();
@@ -303,11 +579,40 @@ export default function EstimateView() {
         return { mode: 'cooldown' as const, cooldownUntil: cooldownEnds };
       }
     }
-
     return { mode: 'send' as const };
   };
 
-  // Send a follow-up email for the current estimate
+  const getChargeBasisLabel = (charge: AdditionalCharge): string => {
+    if (!charge.isPercentage) return '';
+
+    const sectionIdx = charge.basisSectionIdx;
+    const itemIdx = charge.basisItemIdx;
+    const sections = estimate?.sections || [];
+
+    if (
+      charge.basisType === 'item' &&
+      typeof sectionIdx === 'number' &&
+      typeof itemIdx === 'number' &&
+      sections[sectionIdx]?.items?.[itemIdx]
+    ) {
+      const item = sections[sectionIdx].items[itemIdx];
+      const m = materialsById.get(item.materialId);
+      const name = item.name || m?.name;
+      if (name) return name;
+    }
+
+    if (
+      charge.basisType === 'section' &&
+      typeof sectionIdx === 'number' &&
+      sections[sectionIdx]?.title
+    ) {
+      return sections[sectionIdx].title;
+    }
+
+    return lang?.basisProject || 'Project';
+  };
+
+  // ─── Event Handlers ──────────────────────────────────────
   const handleSendFollowUp = async () => {
     if (!estimate?.client_email) return;
     setSending(true);
@@ -368,40 +673,6 @@ export default function EstimateView() {
     }
   };
 
-  // Resolve a percentage charge's basis into human-readable text.
-  // Falls back to "project" if a referenced section/item no longer exists.
-  const getChargeBasisLabel = (charge: AdditionalCharge): string => {
-    if (!charge.isPercentage) return '';
-
-    const sectionIdx = charge.basisSectionIdx;
-    const itemIdx = charge.basisItemIdx;
-    const sections = estimate?.sections || [];
-
-    if (
-      charge.basisType === 'item' &&
-      typeof sectionIdx === 'number' &&
-      typeof itemIdx === 'number' &&
-      sections[sectionIdx]?.items?.[itemIdx]
-    ) {
-      const item = sections[sectionIdx].items[itemIdx];
-      const m = materialsById.get(item.materialId);
-      const name = item.name || m?.name;
-      if (name) return name;
-    }
-
-    if (
-      charge.basisType === 'section' &&
-      typeof sectionIdx === 'number' &&
-      sections[sectionIdx]?.title
-    ) {
-      return sections[sectionIdx].title;
-    }
-
-    return lang?.basisProject || 'Project';
-  };
-
-  // --- ACTIONS ---
-
   const handleStatusChange = async (newStatus: 'approved' | 'rejected') => {
     setDialog({
       type: 'confirm',
@@ -420,7 +691,7 @@ export default function EstimateView() {
             body: JSON.stringify({
               estimateId: id,
               status: newStatus,
-              estimateUrl: window.location.href // Added for the email links
+              estimateUrl: window.location.href
             })
           });
           setEstimate((prev: any) =>
@@ -474,29 +745,16 @@ export default function EstimateView() {
       .single();
 
     if (error) {
-      setDialog({
-        type: 'alert',
-        message: lang.revisionError
-      });
+      setDialog({ type: 'alert', message: lang.revisionError });
       setLoading(false);
     } else if (data) {
-      // Mark the ORIGINAL estimate as superseded by this new revision
-      const { error: supersededError } = await supabase
+      await supabase
         .from('estimates')
         .update({
           superseded_at: new Date().toISOString(),
           superseded_by_estimate_id: data.id
         })
         .eq('id', estimate.id);
-
-      if (supersededError) {
-        console.error(
-          'Failed to mark original as superseded:',
-          supersededError
-        );
-        // Non-blocking — the revision was created, the supersession is just a state flag
-      }
-
       router.push(`/new-estimate?edit=${data.id}`);
     }
   };
@@ -530,20 +788,16 @@ export default function EstimateView() {
       .single();
 
     if (error) {
-      setDialog({
-        type: 'alert',
-        message: lang.failedToPostMessage
-      });
+      setDialog({ type: 'alert', message: lang.failedToPostMessage });
     } else if (data) {
       setComments((prev) => {
-        // Avoid double-add if realtime subscription already inserted it
         if (prev.some((c) => c.id === data.id)) return prev;
         return [...prev, data];
       });
       setCommentInput('');
 
+      // Notification logic
       if (!currentIsOwner && estimate?.is_locked) {
-        // CLIENT posted → notify the OWNER
         try {
           await fetch('/api/send-comment-notification', {
             method: 'POST',
@@ -553,23 +807,17 @@ export default function EstimateView() {
               customId: estimate.custom_id || estimate.id.slice(0, 8),
               clientName: payload.author_name,
               commentContent: cleanCommentText,
-              ownerId: estimate.user_id, // Pass the ID instead of the email
+              ownerId: estimate.user_id,
               estimateUrl: window.location.href,
               country: profile?.country
             })
           });
-        } catch (notificationError) {
-          console.error(
-            'Notification email failed to dispatch:',
-            notificationError
-          );
-        }
+        } catch (err) {}
       } else if (
         currentIsOwner &&
         estimate?.is_locked &&
         estimate?.client_email
       ) {
-        // OWNER posted → notify the CLIENT (only if client_email exists)
         try {
           await fetch('/api/send-owner-comment-notification', {
             method: 'POST',
@@ -584,12 +832,7 @@ export default function EstimateView() {
               country: profile?.country
             })
           });
-        } catch (notificationError) {
-          console.error(
-            'Owner→Client notification email failed to dispatch:',
-            notificationError
-          );
-        }
+        } catch (err) {}
       }
     }
     setSubmittingComment(false);
@@ -604,10 +847,7 @@ export default function EstimateView() {
     const currentUserEmail = user?.email;
 
     if (method === 'email' && !currentUserEmail) {
-      setDialog({
-        type: 'alert',
-        message: lang.senderEmailError
-      });
+      setDialog({ type: 'alert', message: lang.senderEmailError });
       setSending(false);
       return;
     }
@@ -644,7 +884,6 @@ export default function EstimateView() {
         const target =
           method === 'email' ? estimate.client_email : estimate.client_phone;
 
-        // Track that this estimate has been emailed so the button transforms to "Follow Up"
         if (method === 'email') {
           const nowIso = new Date().toISOString();
           await supabase
@@ -673,10 +912,7 @@ export default function EstimateView() {
         });
       }
     } catch (err) {
-      setDialog({
-        type: 'alert',
-        message: lang.connectionError
-      });
+      setDialog({ type: 'alert', message: lang.connectionError });
     } finally {
       setSending(false);
     }
@@ -690,14 +926,9 @@ export default function EstimateView() {
           text: t(lang.shareText, { business: profile.business_name }),
           url: window.location.href
         });
-      } catch (err) {
-        console.log('Error sharing:', err);
-      }
+      } catch (err) {}
     } else {
-      setDialog({
-        type: 'alert',
-        message: lang.nativeShareNotSupported
-      });
+      setDialog({ type: 'alert', message: lang.nativeShareNotSupported });
     }
   };
 
@@ -754,8 +985,6 @@ export default function EstimateView() {
         })
       }));
 
-      // Pre-compute charges with their resolved amounts + basis labels.
-      // The PDF receives them ready-to-render so it doesn't need access to the calc lib.
       const preparedCharges = (
         (estimate.additional_charges || []) as AdditionalCharge[]
       ).map((charge) => ({
@@ -789,6 +1018,7 @@ export default function EstimateView() {
           additionalCharges={preparedCharges}
         />
       ).toBlob();
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -798,7 +1028,7 @@ export default function EstimateView() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (pdfError) {
-      console.error('Failed to compile native vector PDF layout:', pdfError);
+      console.error(pdfError);
     } finally {
       setLoading(false);
     }
@@ -820,34 +1050,32 @@ export default function EstimateView() {
           .eq('id', id);
 
         if (error) {
-          setDialog({
-            type: 'alert',
-            message: lang.finalizeError
-          });
+          setDialog({ type: 'alert', message: lang.finalizeError });
           return;
         }
 
-        // Update local state instead of full page reload
         setEstimate((prev: any) =>
           prev
-            ? {
-                ...prev,
-                is_locked: true,
-                show_details_snapshot: showDetails
-              }
+            ? { ...prev, is_locked: true, show_details_snapshot: showDetails }
             : prev
         );
       }
     });
   };
 
-  const handleDeleteInvoiceDraft = async (invoiceId: string) => {
+  const handleDeleteDraftDoc = async (
+    docId: string,
+    type: 'invoice' | 'credit_note'
+  ) => {
     setDialog({
       type: 'confirm',
-      message: lang.deleteInvoiceDraftConfirm,
+      message:
+        type === 'invoice'
+          ? lang.deleteInvoiceDraftConfirm
+          : lang.deleteCreditNoteDraftConfirm || 'Confirm deletion',
       onConfirm: async () => {
         setDialog(null);
-        setDeletingInvoiceId(invoiceId);
+        setDeletingDocId(docId);
 
         try {
           const {
@@ -855,17 +1083,27 @@ export default function EstimateView() {
           } = await supabase.auth.getSession();
           if (!session) return;
 
-          const res = await fetch('/api/delete-invoice', {
+          const endpoint =
+            type === 'invoice'
+              ? '/api/delete-invoice'
+              : '/api/delete-credit-note';
+          const payloadKey = type === 'invoice' ? 'invoiceId' : 'creditNoteId';
+
+          const res = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({ invoiceId })
+            body: JSON.stringify({ [payloadKey]: docId })
           });
 
           if (res.ok) {
-            setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceId));
+            if (type === 'invoice') {
+              setInvoices((prev) => prev.filter((inv) => inv.id !== docId));
+            } else {
+              setCreditNotes((prev) => prev.filter((cn) => cn.id !== docId));
+            }
           } else {
             const data = await res.json();
             setDialog({
@@ -876,7 +1114,7 @@ export default function EstimateView() {
         } catch {
           setDialog({ type: 'alert', message: lang.connectionError });
         } finally {
-          setDeletingInvoiceId(null);
+          setDeletingDocId(null);
         }
       }
     });
@@ -884,7 +1122,12 @@ export default function EstimateView() {
 
   const handleCreateInvoice = async () => {
     if (profile?.subscription_tier !== 'pro') {
-      setDialog({ type: 'alert', message: lang.createInvoiceProOnly });
+      setDialog({
+        type: 'alert',
+        message:
+          lang?.createInvoiceProOnly ||
+          'Pro subscription required to create invoices.'
+      });
       return;
     }
 
@@ -894,8 +1137,13 @@ export default function EstimateView() {
       const {
         data: { session }
       } = await supabase.auth.getSession();
+
       if (!session) {
-        setDialog({ type: 'alert', message: lang.sessionExpired });
+        setDialog({
+          type: 'alert',
+          message:
+            lang?.sessionExpired || 'Session expired. Please log in again.'
+        });
         return;
       }
 
@@ -910,30 +1158,43 @@ export default function EstimateView() {
 
       const data = await res.json();
 
-      if (res.status === 409) {
-        // Invoices already exist — go to billing hub
-        router.push(`/estimates/${estimate.id}?tab=billing`);
-        return;
-      }
-
       if (!res.ok) {
         setDialog({
           type: 'alert',
-          message: data.error || lang.cancelEstimateError
+          message:
+            data.error ||
+            lang?.cancelEstimateError ||
+            'Failed to create invoice. Please try again.'
         });
         return;
       }
 
-      // Navigate to the appropriate destination
-      router.push(data.redirectTo);
+      // If API returns redirect, navigate to the new invoice
+      if (data.redirectTo) {
+        router.push(data.redirectTo);
+      } else {
+        // Otherwise, refetch billing docs to show the new invoice immediately
+        await refetchBillingDocs();
+
+        // Show success feedback
+        setDialog({
+          type: 'alert',
+          message:
+            lang?.invoiceCreatedSuccess || 'Invoice created successfully!'
+        });
+      }
     } catch (err: any) {
-      setDialog({ type: 'alert', message: lang.connectionError });
+      setDialog({
+        type: 'alert',
+        message:
+          lang?.connectionError ||
+          'Connection error. Please check your network.'
+      });
     } finally {
       setCreatingInvoice(false);
     }
   };
 
-  // Cancel a finalized estimate (pending OR approved) — sets cancelled_at + cancelled_reason
   const handleCancelLockedEstimate = async () => {
     setCancelling(true);
     const { error } = await supabase
@@ -975,26 +1236,39 @@ export default function EstimateView() {
           .from('estimates')
           .delete()
           .eq('id', id);
-
         if (error) {
           setDialog({ type: 'alert', message: error.message });
           return;
         }
-
         router.push('/dashboard');
       }
     });
   };
+
+  // ─── Loading State ───────────────────────────────────────
   if (loading) return <LoadingDots />;
 
   if (!estimate) {
     return (
-      <div className="p-10 text-center font-sans text-xl font-black uppercase text-gray-400">
-        {lang?.notFound || 'Estimate Not Found'}
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <p className="text-lg font-bold text-gray-400 uppercase tracking-widest">
+            {lang?.notFound || 'Estimate Not Found'}
+          </p>
+          <LinkButton
+            href="/dashboard"
+            variant="secondary"
+            size="md"
+            className="mt-4"
+          >
+            {lang?.dashboard || 'Dashboard'}
+          </LinkButton>
+        </div>
       </div>
     );
   }
 
+  // ─── Computed Render Values ──────────────────────────────
   const { subtotalCents, taxGroups } = getTaxSummary(
     estimate,
     estimate.sections || [],
@@ -1002,6 +1276,7 @@ export default function EstimateView() {
     materialsById,
     estimate.additional_charges || []
   );
+
   const isShowingDetails = estimate.is_locked
     ? estimate.show_details_snapshot === true
     : showDetails;
@@ -1012,9 +1287,12 @@ export default function EstimateView() {
     ? 30
     : parseInt(rawTerms.replace('_days', '')) || 30;
 
+  // ─────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 text-black font-sans print:bg-white flex flex-col">
-      {/* --- GUEST NAVBAR --- */}
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans print:bg-white flex flex-col">
+      {/* Client-facing navbar (only for non-owners) */}
       {!isOwner && (
         <nav className="w-full bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center print:hidden shadow-sm sticky top-0 z-50">
           <Link href="/" className="flex items-center outline-none">
@@ -1023,32 +1301,34 @@ export default function EstimateView() {
         </nav>
       )}
 
-      <main className="flex-1 p-4 sm:p-8 relative print:p-0">
+      <main className="flex-1 p-4 sm:p-8 print:p-0">
         <div className="max-w-4xl mx-auto print:max-w-none print:w-full">
-          {/* === ACTION TOOLBAR (owner controls + buttons) === */}
-          <div
-            className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6 print:hidden ${isOwner ? 'justify-between' : 'justify-end'}`}
-          >
+          {/* ════════════════════════════════════════════════════════
+  ACTION TOOLBAR - Consistent across all tabs
+════════════════════════════════════════════════════════ */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
+            {/* Left side - Always show dashboard link */}
             {isOwner && (
-              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full sm:w-auto">
+              <div className="flex items-center gap-3">
                 <LinkButton href="/dashboard" variant="secondary" size="sm">
                   ← {lang.dashboard}
                 </LinkButton>
 
-                {!estimate.is_locked && (
-                  <div className="flex justify-between sm:justify-start items-center gap-2.5 bg-white px-3.5 py-2 rounded-lg border border-gray-200 shadow-sm">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                {/* Details toggle - only on Estimate tab for drafts */}
+                {!estimate.is_locked && activeTab === 'estimate' && (
+                  <div className="flex items-center gap-2.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
                       {lang.internalDetails}
                     </span>
                     <button
                       onClick={() => setShowDetails(!showDetails)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
-                        showDetails ? 'bg-blue-600' : 'bg-gray-300'
-                      }`}
+                      role="switch"
+                      aria-checked={showDetails}
                       aria-label={lang.internalDetails}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
                     >
                       <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
                       />
                     </button>
                   </div>
@@ -1056,25 +1336,20 @@ export default function EstimateView() {
               </div>
             )}
 
-            <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
-              {estimate.is_locked ? (
+            {/* Right side - Tab-specific actions */}
+            <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+              {/* ─── ESTIMATE TAB ACTIONS ─── */}
+              {activeTab === 'estimate' && (
                 <>
-                  {/* PRIMARY ACTIONS (always visible) */}
-
-                  {/* Email / Follow-Up — primary communication action.
-                    The button transforms based on follow-up state:
-                    - No prior email → "Email" button calls handleSend
-                    - Already emailed, cooldown ok → "Follow Up" button calls handleSendFollowUp
-                    - Already emailed, in cooldown → "Follow Up" disabled with date in title */}
-                  {isOwner &&
-                    estimate.client_email &&
-                    !estimate.cancelled_at &&
-                    !estimate.superseded_at && (
-                      <>
-                        {(() => {
+                  {estimate.is_locked ? (
+                    <>
+                      {/* Send / Follow-up button */}
+                      {isOwner &&
+                        estimate.client_email &&
+                        !estimate.cancelled_at &&
+                        !estimate.superseded_at &&
+                        (() => {
                           const followUpState = getFollowUpState();
-
-                          // No prior email → standard Email button
                           if (followUpState.mode === 'hidden') {
                             return (
                               <Button
@@ -1083,14 +1358,13 @@ export default function EstimateView() {
                                 loading={sending}
                                 loadingText={lang.sending}
                                 onClick={() => handleSend('email')}
-                                className="flex-1"
+                                className="flex-1 sm:flex-none"
+                                icon={<Icons.Send />}
                               >
                                 {lang.emailBtn}
                               </Button>
                             );
                           }
-
-                          // Cooldown active → disabled button with tooltip
                           if (followUpState.mode === 'cooldown') {
                             const dateStr =
                               followUpState.cooldownUntil!.toLocaleDateString(
@@ -1103,20 +1377,18 @@ export default function EstimateView() {
                               );
                             return (
                               <Button
-                                variant="dark"
+                                variant="secondary"
                                 size="md"
                                 disabled
                                 title={t(lang.followUpCooldown, {
                                   date: dateStr
                                 })}
-                                className="flex-1"
+                                className="flex-1 sm:flex-none opacity-60"
                               >
-                                {lang.followUpBtn}
+                                {lang.followUpBtn} · {dateStr}
                               </Button>
                             );
                           }
-
-                          // Cooldown clear → active Follow Up button
                           return (
                             <Button
                               variant="dark"
@@ -1124,294 +1396,176 @@ export default function EstimateView() {
                               loading={sending}
                               loadingText={lang.followUpSending}
                               onClick={handleSendFollowUp}
-                              className="flex-1"
+                              className="flex-1 sm:flex-none"
+                              icon={<Icons.Send />}
                             >
                               {lang.followUpBtn}
                             </Button>
                           );
                         })()}
-                      </>
-                    )}
 
-                  {/* Download PDF — always available (even for cancelled — record keeping) */}
-                  <Button
-                    variant="primary"
-                    size="md"
-                    loading={loading}
-                    loadingText={lang.generating}
-                    onClick={handleDownloadPDF}
-                    className="flex-1 sm:flex-none px-6"
-                  >
-                    {lang.downloadPdf}
-                  </Button>
-                  {/* Create Invoice / View Invoice — only on approved non-cancelled estimates */}
-                  {isOwner &&
-                    estimate.client_status === 'approved' &&
-                    !estimate.cancelled_at &&
-                    !estimate.superseded_at &&
-                    (invoices.length > 0 ? (
+                      {/* Download PDF */}
                       <Button
-                        variant="secondary"
+                        variant="primary"
                         size="md"
-                        onClick={() => {
-                          setBillingOpen(true);
-                          setTimeout(() => {
-                            document
-                              .getElementById('billing-hub')
-                              ?.scrollIntoView({ behavior: 'smooth' });
-                          }, 100);
-                        }}
+                        loading={loading}
+                        loadingText={lang.generating}
+                        onClick={handleDownloadPDF}
                         className="flex-1 sm:flex-none"
-                        icon={
-                          <svg
-                            className="w-3.5 h-3.5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                          </svg>
-                        }
+                        icon={<Icons.Download />}
                       >
-                        {lang.billingProgress} ({invoices.length})
+                        <span className="hidden sm:inline">
+                          {lang.downloadPdf}
+                        </span>
+                        <span className="sm:hidden">PDF</span>
                       </Button>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        size="md"
-                        loading={creatingInvoice}
-                        loadingText="..."
-                        onClick={handleCreateInvoice}
-                        className="flex-1 sm:flex-none"
-                        icon={
-                          <svg
-                            className="w-3.5 h-3.5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="12" y1="18" x2="12" y2="12" />
-                            <line x1="9" y1="15" x2="15" y2="15" />
-                          </svg>
-                        }
-                      >
-                        {lang.createInvoice}
-                      </Button>
-                    ))}
 
-                  {/* SECONDARY ACTIONS MENU — kebab dropdown for owner-only actions
-                    Hidden when the estimate is cancelled (no actions remain).
-                    Contains: Create Revision · Share · Cancel Estimate */}
-                  {isOwner && !estimate.cancelled_at && (
-                    <Menu as="div" className="relative shrink-0">
-                      <MenuButton
-                        className="inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 cursor-pointer select-none whitespace-nowrap text-[10px] rounded-xl bg-white text-gray-700 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:shadow hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] data-[open]:bg-gray-50 data-[open]:border-gray-300 px-3.5 h-[38px]"
-                        aria-label="More actions"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
+                      {/* Owner menu */}
+                      {isOwner && !estimate.cancelled_at && (
+                        <Menu as="div" className="relative">
+                          <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:shadow transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                            <Icons.MoreVertical />
+                          </MenuButton>
+                          <Transition
+                            as={Fragment}
+                            enter="transition ease-out duration-100"
+                            enterFrom="opacity-0 scale-95"
+                            enterTo="opacity-100 scale-100"
+                            leave="transition ease-in duration-75"
+                            leaveFrom="opacity-100 scale-100"
+                            leaveTo="opacity-0 scale-95"
+                          >
+                            <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none divide-y divide-gray-100">
+                              <div className="py-1">
+                                {!estimate.superseded_at && (
+                                  <MenuItem>
+                                    {({ active }) => (
+                                      <button
+                                        onClick={handleCreateRevision}
+                                        className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                      >
+                                        <Icons.Refresh />
+                                        {lang.createRevision}
+                                      </button>
+                                    )}
+                                  </MenuItem>
+                                )}
+                                <MenuItem>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={handleNativeShare}
+                                      className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                    >
+                                      <Icons.Share />
+                                      {lang.share}
+                                    </button>
+                                  )}
+                                </MenuItem>
+                              </div>
+                              <div className="py-1">
+                                <MenuItem>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={() => setCancelModalOpen(true)}
+                                      className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
+                                    >
+                                      <Icons.Cancel />
+                                      {lang.cancelEstimateBtn}
+                                    </button>
+                                  )}
+                                </MenuItem>
+                              </div>
+                            </MenuItems>
+                          </Transition>
+                        </Menu>
+                      )}
+                    </>
+                  ) : (
+                    // Draft actions
+                    isOwner && (
+                      <>
+                        <LinkButton
+                          href={`/new-estimate?edit=${id}`}
+                          variant="soft-primary"
+                          size="md"
+                          className="flex-1 sm:flex-none"
                         >
-                          <circle cx="12" cy="5" r="2" />
-                          <circle cx="12" cy="12" r="2" />
-                          <circle cx="12" cy="19" r="2" />
-                        </svg>
-                      </MenuButton>
-                      <Transition
-                        as={Fragment}
-                        enter="transition ease-out duration-100"
-                        enterFrom="opacity-0 scale-95"
-                        enterTo="opacity-100 scale-100"
-                        leave="transition ease-in duration-75"
-                        leaveFrom="opacity-100 scale-100"
-                        leaveTo="opacity-0 scale-95"
-                      >
-                        <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none">
-                          {/* Create Revision — hidden if estimate already superseded */}
-                          {!estimate.superseded_at && (
-                            <MenuItem>
-                              {({ active }) => (
-                                <button
-                                  onClick={handleCreateRevision}
-                                  className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-2.5 ${
-                                    active
-                                      ? 'bg-gray-50 text-gray-900'
-                                      : 'text-gray-700'
-                                  }`}
-                                >
-                                  <svg
-                                    className="w-3.5 h-3.5 shrink-0"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <polyline points="23 4 23 10 17 10" />
-                                    <polyline points="1 20 1 14 7 14" />
-                                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-                                  </svg>
-                                  {lang.createRevision}
-                                </button>
-                              )}
-                            </MenuItem>
-                          )}
-
-                          {/* Native share — keep available; mobile uses native sheet,
-                            desktop falls back to a friendly dialog if unsupported */}
-                          <MenuItem>
-                            {({ active }) => (
-                              <button
-                                onClick={handleNativeShare}
-                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-2.5 ${
-                                  active
-                                    ? 'bg-gray-50 text-gray-900'
-                                    : 'text-gray-700'
-                                }`}
-                              >
-                                <svg
-                                  className="w-3.5 h-3.5 shrink-0"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <circle cx="18" cy="5" r="3" />
-                                  <circle cx="6" cy="12" r="3" />
-                                  <circle cx="18" cy="19" r="3" />
-                                  <line
-                                    x1="8.59"
-                                    y1="13.51"
-                                    x2="15.42"
-                                    y2="17.49"
-                                  />
-                                  <line
-                                    x1="15.41"
-                                    y1="6.51"
-                                    x2="8.59"
-                                    y2="10.49"
-                                  />
-                                </svg>
-                                {lang.share}
-                              </button>
-                            )}
-                          </MenuItem>
-
-                          {/* Cancel Estimate — destructive, separated by a divider */}
-                          <MenuItem>
-                            {({ active }) => (
-                              <button
-                                onClick={() => setCancelModalOpen(true)}
-                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-2.5 border-t border-gray-100 ${
-                                  active
-                                    ? 'bg-red-50 text-red-700'
-                                    : 'text-red-600'
-                                }`}
-                              >
-                                <svg
-                                  className="w-3.5 h-3.5 shrink-0"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <circle cx="12" cy="12" r="10" />
-                                  <line
-                                    x1="4.93"
-                                    y1="4.93"
-                                    x2="19.07"
-                                    y2="19.07"
-                                  />
-                                </svg>
-                                {lang.cancelEstimateBtn}
-                              </button>
-                            )}
-                          </MenuItem>
-                        </MenuItems>
-                      </Transition>
-                    </Menu>
+                          {lang.edit}
+                        </LinkButton>
+                        <Button
+                          variant="soft-danger"
+                          size="md"
+                          onClick={handleCancelDraft}
+                          className="flex-1 sm:flex-none"
+                        >
+                          {lang.cancel}
+                        </Button>
+                        <Button
+                          variant="success"
+                          size="md"
+                          onClick={handleFinalize}
+                          className="flex-1 sm:flex-none"
+                        >
+                          {lang.finalize}
+                        </Button>
+                      </>
+                    )
                   )}
                 </>
-              ) : (
-                isOwner && (
-                  <div className="flex w-full gap-2">
-                    <LinkButton
-                      href={`/new-estimate?edit=${id}`}
-                      variant="soft-primary"
-                      size="md"
-                      className="flex-1"
-                    >
-                      {lang.edit}
-                    </LinkButton>
-                    <Button
-                      variant="soft-danger"
-                      size="md"
-                      onClick={handleCancelDraft}
-                      className="flex-1"
-                    >
-                      {lang.cancel}
-                    </Button>
-                    <Button
-                      variant="success"
-                      size="md"
-                      onClick={handleFinalize}
-                      className="flex-1"
-                    >
-                      {lang.finalize}
-                    </Button>
-                  </div>
-                )
               )}
+
+              {/* ─── BILLING TAB ACTIONS ─── */}
+              {activeTab === 'billing' && canCreateInvoice && (
+                <Button
+                  variant="primary"
+                  size="md"
+                  loading={creatingInvoice}
+                  loadingText={lang?.creating || 'Creating...'}
+                  onClick={handleCreateInvoice}
+                  icon={<Icons.Plus />}
+                >
+                  {lang?.createInvoice || 'Create Invoice'}
+                </Button>
+              )}
+
+              {/* ─── DISCUSSION TAB ACTIONS ─── */}
+              {/* Currently no actions needed, but you could add "Mark all read" etc here */}
             </div>
           </div>
 
-          {/* === STATUS BANNER (refined, with cancelled + superseded states) === */}
+          {/* ════════════════════════════════════════════════════════
+  STATUS BANNER - Always visible when estimate is locked
+════════════════════════════════════════════════════════ */}
           {estimate.is_locked && (
             <div
-              className={`mb-6 px-5 py-3.5 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden ${
+              className={`mb-6 px-5 py-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden transition-colors ${
                 estimate.cancelled_at
-                  ? 'bg-gray-100 border-gray-300'
+                  ? 'bg-gray-50 border-gray-200'
                   : estimate.superseded_at
-                    ? 'bg-amber-50/60 border-amber-200'
+                    ? 'bg-amber-50/50 border-amber-200'
                     : estimate.client_status === 'approved'
-                      ? 'bg-green-50/60 border-green-200'
+                      ? 'bg-green-50/50 border-green-200'
                       : estimate.client_status === 'rejected'
-                        ? 'bg-red-50/60 border-red-200'
-                        : 'bg-blue-50/60 border-blue-200'
+                        ? 'bg-red-50/50 border-red-200'
+                        : 'bg-blue-50/50 border-blue-200'
               }`}
             >
-              <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                {/* CANCELLED takes precedence over all other statuses */}
+              <div className="flex items-start gap-3 flex-1 min-w-0">
                 {estimate.cancelled_at ? (
                   <>
                     <span className="text-gray-500 text-base leading-none mt-0.5">
                       ⊘
                     </span>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-gray-700 font-bold text-sm">
+                      <span className="text-gray-700 font-semibold text-sm">
                         {lang.estimateCancelled}
                       </span>
                       {estimate.cancelled_reason && (
                         <span className="text-gray-500 text-xs italic mt-0.5 break-words">
-                          “{estimate.cancelled_reason}”
+                          "{estimate.cancelled_reason}"
                         </span>
                       )}
-                      <span className="text-gray-400 text-[10px] uppercase tracking-widest font-bold mt-1">
+                      <span className="text-gray-400 text-[10px] uppercase tracking-wider font-medium mt-1.5">
                         {t(lang.cancelledOn, {
                           date: new Date(
                             estimate.cancelled_at
@@ -1429,10 +1583,10 @@ export default function EstimateView() {
                       ↻
                     </span>
                     <div className="flex flex-col">
-                      <span className="text-amber-700 font-bold text-sm">
+                      <span className="text-amber-700 font-semibold text-sm">
                         {lang.supersededBadge}
                       </span>
-                      <span className="text-amber-600 text-xs mt-0.5">
+                      <span className="text-amber-600/80 text-xs mt-0.5">
                         {lang.supersededLabel}
                       </span>
                     </div>
@@ -1442,7 +1596,7 @@ export default function EstimateView() {
                     <span className="text-green-600 text-base leading-none">
                       ✓
                     </span>
-                    <span className="text-green-700 font-bold text-sm">
+                    <span className="text-green-700 font-semibold text-sm">
                       {lang.estimateApproved}
                     </span>
                   </>
@@ -1451,7 +1605,7 @@ export default function EstimateView() {
                     <span className="text-red-600 text-base leading-none">
                       ✕
                     </span>
-                    <span className="text-red-700 font-bold text-sm">
+                    <span className="text-red-700 font-semibold text-sm">
                       {lang.estimateRejected}
                     </span>
                   </>
@@ -1460,17 +1614,18 @@ export default function EstimateView() {
                     <span className="text-blue-600 text-base leading-none">
                       ⏳
                     </span>
-                    <span className="text-blue-700 font-bold text-sm">
+                    <span className="text-blue-700 font-semibold text-sm">
                       {lang.pendingApproval}
                     </span>
                   </>
                 )}
               </div>
 
-              {/* Approve/Reject buttons — only for non-cancelled, non-superseded, pending estimates by clients */}
+              {/* Client approve/reject actions - only show on Estimate tab for pending estimates */}
               {!isOwner &&
                 !estimate.cancelled_at &&
                 !estimate.superseded_at &&
+                activeTab === 'estimate' &&
                 (estimate.client_status === 'pending' ||
                   !estimate.client_status) && (
                   <div className="flex w-full sm:w-auto gap-2.5">
@@ -1478,7 +1633,7 @@ export default function EstimateView() {
                       variant="soft-danger"
                       size="md"
                       onClick={() => handleStatusChange('rejected')}
-                      className="flex-1 sm:flex-none px-5"
+                      className="flex-1 sm:flex-none px-6"
                     >
                       {lang.reject}
                     </Button>
@@ -1486,7 +1641,7 @@ export default function EstimateView() {
                       variant="success"
                       size="md"
                       onClick={() => handleStatusChange('approved')}
-                      className="flex-1 sm:flex-none px-5"
+                      className="flex-1 sm:flex-none px-6"
                     >
                       {lang.approveEstimate}
                     </Button>
@@ -1495,740 +1650,815 @@ export default function EstimateView() {
             </div>
           )}
 
-          {/* === MAIN ESTIMATE DOCUMENT === */}
-          <article className="bg-white shadow-xl border border-gray-200 rounded-xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
-            <div className="p-8 sm:p-14 print:p-12">
-              {/* === LETTERHEAD — stays horizontal at all viewports === */}
-              <header className="flex items-start justify-between gap-4 sm:gap-6 pb-8 mb-12 border-b border-gray-200">
-                {/* Left: business identity */}
-                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  {profile.subscription_tier === 'pro' && profile.logo_url && (
-                    <img
-                      src={profile.logo_url}
-                      alt=""
-                      className="h-10 sm:h-14 w-auto object-contain shrink-0"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <h2 className="text-base sm:text-2xl font-black text-gray-900 tracking-tight break-words leading-tight">
-                      {profile.business_name}
-                    </h2>
+          {/* ════════════════════════════════════════════════════════
+  TAB NAVIGATION - Now stays stationary
+════════════════════════════════════════════════════════ */}
+          <div
+            role="tablist"
+            aria-label={lang?.tabsLabel || 'Document sections'}
+            className="flex gap-6 sm:gap-8 border-b border-gray-200 mb-8 print:hidden overflow-x-auto scrollbar-hide"
+          >
+            <TabButton
+              id="tab-estimate"
+              label={lang?.estimateTab || 'Estimate'}
+              isActive={activeTab === 'estimate'}
+              onClick={() => setActiveTab('estimate')}
+              controls="panel-estimate"
+            />
+
+            {showBillingTab && (
+              <TabButton
+                id="tab-billing"
+                label={lang?.billingTab || 'Billing'}
+                isActive={activeTab === 'billing'}
+                onClick={() => setActiveTab('billing')}
+                controls="panel-billing"
+              />
+            )}
+
+            {showDiscussionTab && (
+              <TabButton
+                id="tab-discussion"
+                label={lang?.discussionTab || 'Discussion'}
+                isActive={activeTab === 'discussion'}
+                onClick={() => setActiveTab('discussion')}
+                badge={comments.length}
+                controls="panel-discussion"
+              />
+            )}
+          </div>
+
+          {/* ════════════════════════════════════════════════════════
+            TAB PANEL: ESTIMATE DOCUMENT
+        ════════════════════════════════════════════════════════ */}
+          <div
+            id="panel-estimate"
+            role="tabpanel"
+            aria-labelledby="tab-estimate"
+            className={
+              activeTab === 'estimate' ? 'block' : 'hidden print:block'
+            }
+          >
+            <article className="bg-white shadow-xl border border-gray-200 rounded-2xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
+              <div className="p-8 sm:p-12 lg:p-14 print:p-12">
+                {/* Document Header */}
+                <header className="flex items-start justify-between gap-6 pb-8 mb-10 border-b border-gray-100">
+                  <div className="flex items-center gap-4 min-w-0">
+                    {profile.subscription_tier === 'pro' &&
+                      profile.logo_url && (
+                        <img
+                          src={profile.logo_url}
+                          alt=""
+                          className="h-12 sm:h-14 w-auto object-contain shrink-0"
+                        />
+                      )}
+                    <div className="min-w-0">
+                      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight break-words leading-tight">
+                        {profile.business_name}
+                      </h1>
+                    </div>
                   </div>
-                </div>
 
-                {/* Right: document metadata — always right-aligned */}
-                <div className="text-right shrink-0">
-                  <p className="text-[9px] sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] font-bold text-gray-400 mb-1.5 sm:mb-2">
-                    {lang.estimateLabel}
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] font-semibold text-gray-400 mb-2">
+                      {lang.estimateLabel}
+                    </p>
+                    <p className="font-mono text-sm sm:text-base font-bold text-gray-900">
+                      #{estimate.custom_id || estimate.id.slice(0, 8)}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1 font-medium">
+                      {new Date(estimate.created_at).toLocaleDateString(
+                        profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                        { year: 'numeric', month: 'short', day: 'numeric' }
+                      )}
+                    </p>
+                  </div>
+                </header>
+
+                {/* Client Info */}
+                <section className="mb-12">
+                  <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-gray-400 mb-3">
+                    {lang.clientLabel}
                   </p>
-                  <p className="font-mono text-xs sm:text-sm font-bold text-gray-900 break-all">
-                    #{estimate.custom_id || estimate.id.slice(0, 8)}
-                  </p>
-                  <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 font-medium whitespace-nowrap">
-                    {new Date(estimate.created_at).toLocaleDateString(
-                      profile.country === 'FR' ? 'fr-FR' : 'en-US',
-                      { year: 'numeric', month: 'short', day: 'numeric' }
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-gray-900 break-words">
+                      {estimate.client_name}
+                    </p>
+                    {estimate.client_address && (
+                      <p className="text-sm text-gray-600 whitespace-pre-wrap break-words leading-relaxed">
+                        {estimate.client_address}
+                      </p>
                     )}
-                  </p>
-                </div>
-              </header>
-
-              {/* === BILL TO === */}
-              <section className="mb-12">
-                <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-gray-400 mb-3">
-                  {lang.clientLabel}
-                </p>
-                <div className="space-y-1">
-                  <p className="text-lg font-bold text-gray-900 break-words">
-                    {estimate.client_name}
-                  </p>
-                  {estimate.client_address && (
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap break-words leading-relaxed">
-                      {estimate.client_address}
-                    </p>
-                  )}
-                  {estimate.client_phone && (
-                    <p className="text-sm text-gray-500 break-words">
-                      {estimate.client_phone}
-                    </p>
-                  )}
-                  {estimate.client_email && (
-                    <p className="text-sm text-gray-500 break-words">
-                      {estimate.client_email}
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              {/* === SERVICES === */}
-              <section className="mb-10">
-                <div className="flex items-baseline justify-between pb-3 mb-2 border-b-4 border-black">
-                  <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-700">
-                    {lang.serviceCategoryHeader}
-                  </p>
-                  <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-700">
-                    {lang.amountHeader}
-                  </p>
-                </div>
-
-                <div>
-                  {estimate.sections.map((sec: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="py-6 border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="flex justify-between items-baseline gap-4 mb-2">
-                        <h3 className="text-[16px] font-bold text-gray-900 break-words flex-1 min-w-0">
-                          {sec.title || lang.professionalServices}
-                        </h3>
-                        <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0">
-                          {fmt(
-                            getSectionTotal(estimate, sec, materialsById) * 100
-                          )}
-                        </span>
+                    {(estimate.client_phone || estimate.client_email) && (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                        {estimate.client_phone && (
+                          <p className="text-sm text-gray-500">
+                            {estimate.client_phone}
+                          </p>
+                        )}
+                        {estimate.client_email && (
+                          <p className="text-sm text-gray-500">
+                            {estimate.client_email}
+                          </p>
+                        )}
                       </div>
+                    )}
+                  </div>
+                </section>
 
-                      {/* Description constrained to left column only — never bleeds under the amount */}
-                      <div className="pr-24 sm:pr-32">
-                        <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
-                          {generateDescription(
-                            estimate,
-                            sec,
-                            descTranslations,
-                            materialsById
-                          )}
-                        </p>
-                      </div>
-                      {/* Items — subtle inline list, or detailed breakdown when toggled */}
-                      {isShowingDetails ? (
-                        <div className="mt-4 pl-4 border-l-2 border-gray-100 space-y-1.5 max-w-3xl">
-                          {sec.laborHours > 0 && (
-                            <p className="text-xs text-gray-500 leading-relaxed break-words">
-                              <span className="text-gray-400">
-                                {lang.laborLabel}:
-                              </span>{' '}
-                              {sec.laborHours}
-                              {sec.laborType === 'daily'
-                                ? lang.laborDayUnit
-                                : 'h'}{' '}
-                              × {fmt(getEffectiveLaborRateCents(estimate, sec))}
-                              {sec.laborType === 'daily'
-                                ? lang.laborDayPerUnit
-                                : '/h'}{' '}
-                              <span className="text-gray-400">
-                                ({lang.tax}{' '}
-                                {sec.laborTaxRate !== undefined
-                                  ? sec.laborTaxRate
-                                  : profile.tax_rate}
-                                %)
-                              </span>
-                            </p>
-                          )}
-                          {sec.items.map((item: any, i: number) => {
-                            const m = materialsById.get(item.materialId);
-                            const displayName =
-                              item.name || m?.name || 'Material Item';
-                            const displayCostCents = getEffectiveItemCostCents(
+                {/* Services Table */}
+                <section className="mb-10">
+                  <div className="flex items-baseline justify-between pb-3 mb-4 border-b-2 border-gray-900">
+                    <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-700">
+                      {lang.serviceCategoryHeader}
+                    </p>
+                    <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-700">
+                      {lang.amountHeader}
+                    </p>
+                  </div>
+
+                  <div className="divide-y divide-gray-100">
+                    {estimate.sections.map((sec: any, idx: number) => (
+                      <div key={idx} className="py-6 first:pt-2">
+                        <div className="flex justify-between items-start gap-4 mb-2">
+                          <h3 className="text-base font-semibold text-gray-900 break-words flex-1 min-w-0">
+                            {sec.title || lang.professionalServices}
+                          </h3>
+                          <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap shrink-0 tabular-nums">
+                            {fmt(
+                              getSectionTotal(estimate, sec, materialsById) *
+                                100
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="pr-20 sm:pr-28">
+                          <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+                            {generateDescription(
                               estimate,
                               sec,
-                              item,
+                              descTranslations,
                               materialsById
-                            );
-                            const rawUnit = item.unit || m?.unit || '';
-                            const displayUnit =
-                              lang?.units?.[rawUnit] || rawUnit;
-                            return (
-                              <p
-                                key={i}
-                                className="text-xs text-gray-500 leading-relaxed break-words"
-                              >
-                                <span className="text-gray-700 font-medium">
-                                  {displayName}:
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Detailed breakdown */}
+                        {isShowingDetails ? (
+                          <div className="mt-4 pl-4 border-l-2 border-gray-100 space-y-1.5">
+                            {sec.laborHours > 0 && (
+                              <p className="text-xs text-gray-500">
+                                <span className="text-gray-400">
+                                  {lang.laborLabel}:
                                 </span>{' '}
-                                {item.qty}
-                                {displayUnit ? ` ${displayUnit}` : ''} ×{' '}
-                                {fmt(displayCostCents)}{' '}
+                                {sec.laborHours}
+                                {sec.laborType === 'daily'
+                                  ? lang.laborDayUnit
+                                  : 'h'}{' '}
+                                ×{' '}
+                                {fmt(getEffectiveLaborRateCents(estimate, sec))}
+                                {sec.laborType === 'daily'
+                                  ? lang.laborDayPerUnit
+                                  : '/h'}{' '}
                                 <span className="text-gray-400">
                                   ({lang.tax}{' '}
-                                  {item.taxRate !== undefined
-                                    ? item.taxRate
+                                  {sec.laborTaxRate !== undefined
+                                    ? sec.laborTaxRate
                                     : profile.tax_rate}
                                   %)
                                 </span>
                               </p>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        sec.items.length > 0 && (
-                          <div className="mt-3 space-y-1 max-w-3xl">
+                            )}
                             {sec.items.map((item: any, i: number) => {
                               const m = materialsById.get(item.materialId);
                               const displayName =
                                 item.name || m?.name || 'Material Item';
+                              const displayCostCents =
+                                getEffectiveItemCostCents(
+                                  estimate,
+                                  sec,
+                                  item,
+                                  materialsById
+                                );
                               const rawUnit = item.unit || m?.unit || '';
                               const displayUnit =
                                 lang?.units?.[rawUnit] || rawUnit;
-                              const hasQtyInfo = item.qty > 0 || displayUnit;
-
                               return (
-                                <p
-                                  key={i}
-                                  className="text-xs text-gray-600 break-words"
-                                >
-                                  <span>{displayName}</span>
-                                  {hasQtyInfo && (
-                                    <span className="text-gray-400">
-                                      {' '}
-                                      · {item.qty}
-                                      {displayUnit ? ` ${displayUnit}` : ''}
-                                    </span>
-                                  )}
+                                <p key={i} className="text-xs text-gray-500">
+                                  <span className="text-gray-700 font-medium">
+                                    {displayName}:
+                                  </span>{' '}
+                                  {item.qty}
+                                  {displayUnit ? ` ${displayUnit}` : ''} ×{' '}
+                                  {fmt(displayCostCents)}{' '}
+                                  <span className="text-gray-400">
+                                    ({lang.tax}{' '}
+                                    {item.taxRate !== undefined
+                                      ? item.taxRate
+                                      : profile.tax_rate}
+                                    %)
+                                  </span>
                                 </p>
                               );
                             })}
                           </div>
-                        )
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* === ADDITIONAL CHARGES === */}
-              {Array.isArray(estimate.additional_charges) &&
-                estimate.additional_charges.length > 0 && (
-                  <section className="mb-10">
-                    <div className="flex items-baseline justify-between pb-3 mb-2 border-b-2 border-gray-300">
-                      <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-400">
-                        {lang.additionalCharges}
-                      </p>
-                      <p className="text-[11px] uppercase tracking-[0.25em] font-bold text-gray-400">
-                        {lang.amountHeader}
-                      </p>
-                    </div>
-
-                    <div>
-                      {estimate.additional_charges.map(
-                        (charge: AdditionalCharge, idx: number) => {
-                          const amountCents = getAdditionalChargeAmountCents(
-                            estimate,
-                            charge,
-                            estimate.sections || [],
-                            materialsById
-                          );
-
-                          // Subtitle: percentage charges show "X% · basis"; flat charges
-                          // show "qty unit × post-margin unit price" (matching items style).
-                          let subtitle = '';
-                          if (charge.isPercentage) {
-                            subtitle = `${charge.percentageRate || 0}% · ${getChargeBasisLabel(charge)}`;
-                          } else {
-                            const unitLabel =
-                              lang.units?.[charge.unit || 'ea'] ||
-                              charge.unit ||
-                              '';
-                            const qty = charge.qty || 1;
-                            const effectivePerUnitCents =
-                              qty > 0 ? amountCents / qty : 0;
-                            subtitle = `${qty} ${unitLabel} × ${fmt(effectivePerUnitCents)}`;
-                          }
-
-                          return (
-                            <div
-                              key={idx}
-                              className="py-4 border-b border-gray-100 last:border-b-0"
-                            >
-                              <div className="flex justify-between items-baseline gap-4">
-                                <div className="min-w-0">
-                                  <h4 className="text-[14px] font-bold text-gray-900 break-words">
-                                    {charge.name || lang.additionalCharges}
-                                  </h4>
-                                  <p className="text-xs text-gray-500 mt-0.5">
-                                    {subtitle}
-                                  </p>
-                                </div>
-                                <span className="font-mono font-bold text-base text-gray-900 whitespace-nowrap shrink-0">
-                                  {fmt(amountCents)}
-                                </span>
-                              </div>
+                        ) : (
+                          sec.items.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                              {sec.items.map((item: any, i: number) => {
+                                const m = materialsById.get(item.materialId);
+                                const displayName =
+                                  item.name || m?.name || 'Material Item';
+                                const rawUnit = item.unit || m?.unit || '';
+                                const displayUnit =
+                                  lang?.units?.[rawUnit] || rawUnit;
+                                return (
+                                  <span
+                                    key={i}
+                                    className="text-xs text-gray-500"
+                                  >
+                                    {displayName}
+                                    {(item.qty > 0 || displayUnit) && (
+                                      <span className="text-gray-400">
+                                        {' '}
+                                        · {item.qty}
+                                        {displayUnit ? ` ${displayUnit}` : ''}
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                              })}
                             </div>
-                          );
-                        }
-                      )}
-                    </div>
-                  </section>
-                )}
-
-              {/* === TOTALS === */}
-              <section className="flex justify-end pt-10 mb-12 border-t-4 border-gray-200">
-                <div className="w-full sm:w-80 space-y-3">
-                  <div className="flex justify-between items-baseline text-sm">
-                    <span className="text-gray-500 font-medium">
-                      {lang.subtotalHT}
-                    </span>
-                    <span className="font-mono font-bold text-gray-900 whitespace-nowrap">
-                      {fmt(subtotalCents)}
-                    </span>
-                  </div>
-
-                  {Object.entries(taxGroups)
-                    .sort((a, b) => Number(b[0]) - Number(a[0]))
-                    .map(([rate, amt]) => (
-                      <div
-                        key={rate}
-                        className="flex justify-between items-baseline text-sm"
-                      >
-                        <span className="text-gray-500 font-medium">
-                          {lang.tax} ({rate}%)
-                        </span>
-                        <span className="font-mono font-bold text-gray-900 whitespace-nowrap">
-                          {fmt(amt)}
-                        </span>
+                          )
+                        )}
                       </div>
                     ))}
-
-                  <div className="flex justify-between items-baseline pt-6 border-t-4 border-black">
-                    <span className="text-base font-bold text-gray-900 uppercase tracking-wide">
-                      {lang.grandTotalLabel}
-                    </span>
-                    <span className="text-2xl font-black font-mono text-blue-600 whitespace-nowrap">
-                      {fmt(estimate.total_amount_cents)}
-                    </span>
                   </div>
+                </section>
 
-                  {/* Conditional Deposit Breakdown */}
-                  {estimate.deposit_enabled && (
-                    <div className="pt-4 border-t border-dashed border-gray-200 space-y-2">
-                      <div className="flex justify-between items-baseline text-sm bg-blue-50/50 px-3 py-2 rounded">
-                        <span className="text-blue-600 font-medium">
-                          {lang.depositLabel} ({estimate.deposit_percentage}%)
-                        </span>
-                        <span className="font-mono font-bold text-blue-600 whitespace-nowrap">
-                          {fmt(
-                            (estimate.total_amount_cents *
-                              (estimate.deposit_percentage || 20)) /
-                              100
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-baseline text-sm px-3">
-                        <span className="text-gray-500 font-medium">
-                          {lang.balanceDue}
-                        </span>
-                        <span className="font-mono font-bold text-gray-700 whitespace-nowrap">
-                          {fmt(
-                            (estimate.total_amount_cents *
-                              (100 - (estimate.deposit_percentage || 20))) /
-                              100
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* === COMPLIANCE / TERMS FOOTER (left untouched per user request) === */}
-              <div className="mt-16 pt-8 border-t border-gray-100 print:mt-16 print:break-inside-avoid">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
-                      {lang.complianceLegal}
-                    </p>
-                    <p className="text-[10px] text-gray-400 leading-relaxed italic break-words">
-                      {lang.complianceText}
-                    </p>
-                  </div>
-                  <div className="text-left sm:text-right min-w-0 sm:pl-16">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-4">
-                      {lang.termsHeader}
-                    </p>
-                    <p className="text-[10px] text-gray-400 leading-relaxed font-bold break-words sm:pl-16">
-                      {(() => {
-                        const balanceText = isUponReceipt
-                          ? lang.termsBalanceUponReceipt
-                          : t(lang.termsBalanceWithinDays, {
-                              days: displayPaymentDays
-                            });
-                        return estimate.deposit_enabled
-                          ? t(lang.termsWithDeposit, {
-                              pct: estimate.deposit_percentage || 0,
-                              balance: balanceText
-                            })
-                          : t(lang.termsNoDeposit, { balance: balanceText });
-                      })()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          {/* === COMMENTS THREAD (refined, separate block) === */}
-          {estimate.is_locked && (
-            <div className="mt-6 bg-white shadow-xl border border-gray-200 rounded-xl overflow-hidden print:hidden">
-              <div className="p-8 sm:p-12">
-                <div className="mb-8 pb-4 border-b border-gray-200">
-                  <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-gray-400 mb-1">
-                    {lang.discussionMods}
-                  </p>
-                </div>
-
-                {/* Messages */}
-                <div className="space-y-3 max-h-96 overflow-y-auto mb-6 pr-2">
-                  {comments.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic">
-                      {lang.noMessagesYet}
-                    </p>
-                  ) : (
-                    comments.map((comm) => (
-                      <div
-                        key={comm.id}
-                        className={`flex flex-col max-w-[85%] rounded-lg p-4 ${
-                          comm.is_owner
-                            ? 'ml-auto bg-blue-50/70 border border-blue-100 items-end'
-                            : 'mr-auto bg-gray-50 border border-gray-100 items-start'
-                        }`}
-                      >
-                        <div className="flex items-baseline gap-2 mb-1.5">
-                          <span
-                            className={`text-[10px] font-black uppercase tracking-wider ${comm.is_owner ? 'text-blue-600' : 'text-gray-500'}`}
-                          >
-                            {comm.author_name}
-                          </span>
-                          <span className="text-[9px] text-gray-300 font-mono">
-                            {new Date(comm.created_at).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
-                          {comm.content}
+                {/* Additional Charges */}
+                {Array.isArray(estimate.additional_charges) &&
+                  estimate.additional_charges.length > 0 && (
+                    <section className="mb-10">
+                      <div className="flex items-baseline justify-between pb-3 mb-4 border-b border-gray-200">
+                        <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-500">
+                          {lang.additionalCharges}
+                        </p>
+                        <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-500">
+                          {lang.amountHeader}
                         </p>
                       </div>
-                    ))
-                  )}
-                </div>
 
-                {/* Submission Input */}
-                <form
-                  onSubmit={handlePostComment}
-                  className="mt-4 pt-4 border-t border-gray-200"
-                >
-                  <label className="block text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400 mb-2">
-                    {lang.addMessage}
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-2 items-stretch">
-                    <textarea
-                      rows={2}
-                      value={commentInput}
-                      onChange={(e) => setCommentInput(e.target.value)}
-                      placeholder={lang.requestRevisions}
-                      className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-600 resize-none text-gray-900 placeholder-gray-400 bg-white transition-colors"
-                    />
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      loading={submittingComment}
-                      loadingText={lang.sending}
-                      disabled={!commentInput.trim()}
-                      className="self-end sm:self-stretch w-full sm:w-auto min-w-[120px] px-6"
-                    >
-                      {lang.send}
-                    </Button>
+                      <div className="divide-y divide-gray-100">
+                        {estimate.additional_charges.map(
+                          (charge: AdditionalCharge, idx: number) => {
+                            const amountCents = getAdditionalChargeAmountCents(
+                              estimate,
+                              charge,
+                              estimate.sections || [],
+                              materialsById
+                            );
+                            let subtitle = '';
+                            if (charge.isPercentage) {
+                              subtitle = `${charge.percentageRate || 0}% · ${getChargeBasisLabel(charge)}`;
+                            } else {
+                              const unitLabel =
+                                lang.units?.[charge.unit || 'ea'] ||
+                                charge.unit ||
+                                '';
+                              const qty = charge.qty || 1;
+                              const effectivePerUnitCents =
+                                qty > 0 ? amountCents / qty : 0;
+                              subtitle = `${qty} ${unitLabel} × ${fmt(effectivePerUnitCents)}`;
+                            }
+
+                            return (
+                              <div key={idx} className="py-4 first:pt-2">
+                                <div className="flex justify-between items-start gap-4">
+                                  <div className="min-w-0">
+                                    <h4 className="text-sm font-semibold text-gray-900 break-words">
+                                      {charge.name || lang.additionalCharges}
+                                    </h4>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                      {subtitle}
+                                    </p>
+                                  </div>
+                                  <span className="font-mono font-bold text-base text-gray-900 whitespace-nowrap shrink-0 tabular-nums">
+                                    {fmt(amountCents)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                {/* Totals */}
+                <section className="flex justify-end pt-8 mb-10 border-t-2 border-gray-200">
+                  <div className="w-full sm:w-80 space-y-3">
+                    <div className="flex justify-between items-baseline text-sm">
+                      <span className="text-gray-500">{lang.subtotalHT}</span>
+                      <span className="font-mono font-semibold text-gray-900 tabular-nums">
+                        {fmt(subtotalCents)}
+                      </span>
+                    </div>
+
+                    {Object.entries(taxGroups)
+                      .sort((a, b) => Number(b[0]) - Number(a[0]))
+                      .map(([rate, amt]) => (
+                        <div
+                          key={rate}
+                          className="flex justify-between items-baseline text-sm"
+                        >
+                          <span className="text-gray-500">
+                            {lang.tax} ({rate}%)
+                          </span>
+                          <span className="font-mono font-semibold text-gray-900 tabular-nums">
+                            {fmt(amt as number)}
+                          </span>
+                        </div>
+                      ))}
+
+                    <div className="flex justify-between items-baseline pt-5 border-t-2 border-gray-900">
+                      <span className="text-base font-bold text-gray-900 uppercase tracking-wide">
+                        {lang.grandTotalLabel}
+                      </span>
+                      <span className="text-2xl font-black font-mono text-blue-600 tabular-nums">
+                        {fmt(estimate.total_amount_cents)}
+                      </span>
+                    </div>
+
+                    {/* Deposit info */}
+                    {estimate.deposit_enabled && (
+                      <div className="pt-4 border-t border-dashed border-gray-200 space-y-2">
+                        <div className="flex justify-between items-baseline text-sm bg-blue-50/60 px-3 py-2 rounded-lg">
+                          <span className="text-blue-700 font-medium">
+                            {lang.depositLabel} ({estimate.deposit_percentage}%)
+                          </span>
+                          <span className="font-mono font-bold text-blue-700 tabular-nums">
+                            {fmt(
+                              (estimate.total_amount_cents *
+                                (estimate.deposit_percentage || 20)) /
+                                100
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-baseline text-sm px-3">
+                          <span className="text-gray-500">
+                            {lang.balanceDue}
+                          </span>
+                          <span className="font-mono font-semibold text-gray-700 tabular-nums">
+                            {fmt(
+                              (estimate.total_amount_cents *
+                                (100 - (estimate.deposit_percentage || 20))) /
+                                100
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </form>
+                </section>
+
+                {/* Footer */}
+                <footer className="mt-12 pt-8 border-t border-gray-100 print:mt-12">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-gray-300 mb-3">
+                        {lang.complianceLegal}
+                      </p>
+                      <p className="text-[10px] text-gray-400 leading-relaxed italic">
+                        {lang.complianceText}
+                      </p>
+                    </div>
+                    <div className="sm:text-right">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-gray-300 mb-3">
+                        {lang.termsHeader}
+                      </p>
+                      <p className="text-[10px] text-gray-400 leading-relaxed font-medium">
+                        {(() => {
+                          const balanceText = isUponReceipt
+                            ? lang.termsBalanceUponReceipt
+                            : t(lang.termsBalanceWithinDays, {
+                                days: displayPaymentDays
+                              });
+                          return estimate.deposit_enabled
+                            ? t(lang.termsWithDeposit, {
+                                pct: estimate.deposit_percentage || 0,
+                                balance: balanceText
+                              })
+                            : t(lang.termsNoDeposit, { balance: balanceText });
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                </footer>
+              </div>
+            </article>
+          </div>
+
+          {/* ════════════════════════════════════════════════════════
+            TAB PANEL: DISCUSSION / MESSAGES
+        ════════════════════════════════════════════════════════ */}
+          {/* ════════════════════════════════════════════════════════
+  TAB PANEL: DISCUSSION
+════════════════════════════════════════════════════════ */}
+          {showDiscussionTab && (
+            <div
+              id="panel-discussion"
+              role="tabpanel"
+              aria-labelledby="tab-discussion"
+              className={
+                activeTab === 'discussion'
+                  ? 'block print:hidden'
+                  : 'hidden print:hidden'
+              }
+            >
+              <div className="bg-white shadow-xl border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="p-6 sm:p-8">
+                  {/* Messages List - No header needed */}
+                  <div className="space-y-3 max-h-[450px] overflow-y-auto mb-6 pr-1 scroll-smooth">
+                    {comments.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                          <svg
+                            className="w-6 h-6 text-gray-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {lang?.noMessagesYet || 'No messages yet'}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {lang?.startConversation ||
+                            'Start the conversation below'}
+                        </p>
+                      </div>
+                    ) : (
+                      comments.map((comm) => (
+                        <div
+                          key={comm.id}
+                          className={`flex flex-col max-w-[85%] rounded-2xl p-4 ${
+                            comm.is_owner
+                              ? 'ml-auto bg-blue-50 border border-blue-100'
+                              : 'mr-auto bg-gray-50 border border-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span
+                              className={`text-[10px] font-bold uppercase tracking-wider ${comm.is_owner ? 'text-blue-600' : 'text-gray-500'}`}
+                            >
+                              {comm.author_name}
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-mono">
+                              {new Date(comm.created_at).toLocaleTimeString(
+                                [],
+                                { hour: '2-digit', minute: '2-digit' }
+                              )}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
+                            {comm.content}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                    <div ref={commentsEndRef} />
+                  </div>
+
+                  {/* Input Form */}
+                  <form
+                    onSubmit={handlePostComment}
+                    className="pt-4 border-t border-gray-100"
+                  >
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <textarea
+                        rows={2}
+                        value={commentInput}
+                        onChange={(e) => setCommentInput(e.target.value)}
+                        placeholder={
+                          lang?.messagePlaceholder || 'Write a message...'
+                        }
+                        className="flex-1 p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-400 bg-white transition-shadow"
+                      />
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        size="md"
+                        loading={submittingComment}
+                        loadingText={lang?.sending || 'Sending...'}
+                        disabled={!commentInput.trim()}
+                        className="self-end sm:self-stretch w-full sm:w-auto min-w-[100px]"
+                      >
+                        {lang?.send || 'Send'}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
           )}
-        </div>
-
-        {/* === BILLING HUB === */}
-        {isOwner &&
-          estimate.client_status === 'approved' &&
-          !estimate.cancelled_at &&
-          !estimate.superseded_at &&
-          invoices.length > 0 && (
+          {/* ════════════════════════════════════════════════════════
+            TAB PANEL: BILLING HUB
+        ════════════════════════════════════════════════════════ */}
+          {showBillingTab && (
             <div
-              id="billing-hub"
-              className="mt-6 bg-white shadow-xl border border-gray-200 rounded-xl overflow-hidden print:hidden max-w-4xl mx-auto w-full"
+              id="panel-billing"
+              role="tabpanel"
+              aria-labelledby="tab-billing"
+              className={
+                activeTab === 'billing'
+                  ? 'block print:hidden'
+                  : 'hidden print:hidden'
+              }
             >
-              <button
-                type="button"
-                onClick={() => setBillingOpen((prev) => !prev)}
-                className="w-full flex items-center justify-between p-6 sm:p-8 cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                  <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-gray-700">
-                    {lang.billingHubTitle}
-                  </p>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                    {invoices.length}{' '}
-                    {profile?.country === 'FR' ? 'facture(s)' : 'invoice(s)'}
-                  </span>
-                </div>
-                <span
-                  className="text-gray-400 text-xs transition-transform duration-200"
-                  style={{
-                    transform: billingOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-                  }}
-                >
-                  ▼
-                </span>
-              </button>
-
-              {billingOpen && (
-                <div className="px-6 sm:px-8 pb-6 sm:pb-8 border-t border-gray-100">
-                  {/* Billing progress bar */}
+              <div className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100">
                   {(() => {
-                    const totalCents = estimate.total_amount_cents || 0;
-                    const billedCents = invoices
-                      .filter((inv) => !inv.is_cancelled)
-                      .reduce(
-                        (acc, inv) => acc + (inv.total_amount_cents || 0),
-                        0
-                      );
-                    const paidCents = invoices
-                      .filter((inv) => inv.payment_status === 'paid')
-                      .reduce(
-                        (acc, inv) => acc + (inv.total_amount_cents || 0),
-                        0
-                      );
                     const billedPct =
-                      totalCents > 0
-                        ? Math.round((billedCents / totalCents) * 100)
+                      estTotalCents > 0
+                        ? Math.min(
+                            100,
+                            Math.round((netBilledCents / estTotalCents) * 100)
+                          )
                         : 0;
-                    const remainingCents = totalCents - billedCents;
+                    const remainingCents = Math.max(
+                      0,
+                      estTotalCents - netBilledCents
+                    );
 
                     return (
-                      <div className="py-4 border-b border-gray-100 mb-4">
-                        <div className="flex justify-between items-baseline mb-2">
-                          <span className="text-xs font-bold text-gray-500">
-                            {t(lang.billedOf, {
-                              billed: fmt(billedCents),
-                              total: fmt(totalCents)
-                            })}
+                      <div>
+                        <div className="flex justify-between items-baseline mb-3">
+                          <span className="text-sm font-medium text-gray-600">
+                            {lang.finalizedBillingTracking ||
+                              'Billing Progress'}
                           </span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                            {t(lang.billedPct, { pct: billedPct })}
-                          </span>
+                          <div className="text-right">
+                            <span className="text-sm font-bold text-gray-900 tabular-nums">
+                              {fmt(netBilledCents)}
+                            </span>
+                            <span className="text-sm text-gray-400">
+                              {' '}
+                              / {fmt(estTotalCents)}
+                            </span>
+                          </div>
                         </div>
                         <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                           <div
-                            className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                            className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500"
                             style={{ width: `${billedPct}%` }}
                           />
                         </div>
-                        <div className="flex justify-between mt-1.5">
-                          <span className="text-[10px] text-green-600 font-bold">
-                            ✓ {t(lang.paidAmount, { amount: fmt(paidCents) })}
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="text-xs text-gray-400">
+                            {billedPct}% {lang?.billed || 'billed'}
                           </span>
                           {remainingCents > 0 && (
-                            <span className="text-[10px] text-gray-400 font-bold">
-                              {t(lang.remainingToBill, {
-                                amount: fmt(remainingCents)
-                              })}
+                            <span className="text-xs text-gray-500 font-medium">
+                              {fmt(remainingCents)}{' '}
+                              {lang?.remaining || 'remaining'}
                             </span>
                           )}
                         </div>
                       </div>
                     );
                   })()}
+                </div>
 
-                  {/* Invoice rows */}
-                  <div className="space-y-2">
-                    {invoices.map((inv) => {
-                      const isPaid = inv.payment_status === 'paid';
-                      const isSent = !!inv.last_email_sent_at;
-                      const isOverdueInv =
-                        inv.is_locked &&
-                        !inv.is_cancelled &&
-                        inv.payment_status === 'unpaid' &&
-                        inv.due_date &&
-                        new Date(inv.due_date) < new Date();
-
-                      return (
-                        <div
-                          key={inv.id}
-                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                            inv.is_cancelled
-                              ? 'bg-gray-50 border-gray-100 opacity-60'
-                              : 'bg-white border-gray-200 hover:border-blue-200'
-                          }`}
+                {/* Documents List */}
+                <div className="p-4 sm:p-6 bg-gray-50/50">
+                  {allBillingDocs.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span
-                              className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-sm shrink-0 ${
-                                inv.is_cancelled
-                                  ? 'bg-gray-100 text-gray-400'
-                                  : isPaid
-                                    ? 'bg-green-50 text-green-600'
-                                    : isOverdueInv
-                                      ? 'bg-red-50 text-red-500'
-                                      : !inv.is_locked
-                                        ? 'bg-yellow-50 text-yellow-600'
-                                        : isSent
-                                          ? 'bg-blue-50 text-blue-600'
-                                          : 'bg-gray-50 text-gray-500'
-                              }`}
-                            >
-                              {inv.is_cancelled
-                                ? lang.invoiceCancelled
-                                : isPaid
-                                  ? lang.invoicePaid
-                                  : isOverdueInv
-                                    ? lang.invoiceOverdue
-                                    : !inv.is_locked
-                                      ? lang.invoiceDraft
-                                      : isSent
-                                        ? lang.invoiceSent
-                                        : lang.invoiceUnpaid}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="font-mono text-xs font-black text-blue-600">
-                                {inv.invoice_number}
-                              </p>
-                              {inv.invoice_description && (
-                                <p className="text-[10px] text-gray-400 truncate">
-                                  {inv.invoice_description}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        {lang.noInvoicesYet || 'No billing documents yet'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {lang?.createFirstInvoice ||
+                          'Create your first invoice to get started'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allBillingDocs.map((doc) => {
+                        const isInv = doc.docType === 'invoice';
+                        const isPaid = isInv
+                          ? doc.payment_status === 'paid'
+                          : false;
+                        const isOverdueInv =
+                          isInv &&
+                          doc.is_locked &&
+                          !doc.is_cancelled &&
+                          doc.payment_status === 'unpaid' &&
+                          doc.due_date &&
+                          new Date(doc.due_date) < new Date();
 
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono text-sm font-bold text-gray-800">
-                              {formatMoney(
-                                inv.total_amount_cents,
-                                inv.currency_snapshot,
-                                inv.country_snapshot === 'FR' ? 'FR' : 'US'
-                              )}
-                            </span>
+                        // Determine status
+                        let docStatus: StatusBadgeProps['status'];
+                        let statusLabel: string;
 
-                            {/* Actions */}
-                            <div className="flex items-center gap-1.5">
-                              <LinkButton
-                                href={`/invoices/${inv.id}`}
-                                variant="ghost"
-                                size="sm"
-                                className="!text-[9px] !px-2 !py-1.5"
-                              >
-                                {inv.is_locked
-                                  ? lang.viewInvoice
-                                  : lang.reviseInvoice}
-                              </LinkButton>
-                              {!inv.is_locked && (
-                                <button
-                                  onClick={() =>
-                                    handleDeleteInvoiceDraft(inv.id)
-                                  }
-                                  disabled={deletingInvoiceId === inv.id}
-                                  className="text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
+                        if (doc.is_cancelled) {
+                          docStatus = 'cancelled';
+                          statusLabel = isInv
+                            ? lang.invoiceCancelled || 'Cancelled'
+                            : lang.creditNoteCancelled || 'Cancelled';
+                        } else if (!doc.is_locked) {
+                          docStatus = 'draft';
+                          statusLabel = isInv
+                            ? lang.invoiceDraft || 'Draft'
+                            : lang.creditNoteDraft || 'Draft';
+                        } else if (!isInv) {
+                          docStatus = 'credit';
+                          statusLabel = lang.creditNoteLabel || 'Credit Note';
+                        } else if (isPaid) {
+                          docStatus = 'paid';
+                          statusLabel = lang.invoicePaid || 'Paid';
+                        } else if (isOverdueInv) {
+                          docStatus = 'overdue';
+                          statusLabel = lang.invoiceOverdue || 'Overdue';
+                        } else {
+                          docStatus = 'unpaid';
+                          statusLabel = lang.invoiceUnpaid || 'Unpaid';
+                        }
+
+                        return (
+                          <div
+                            key={`${doc.docType}-${doc.id}`}
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border bg-white transition-all ${
+                              doc.is_cancelled
+                                ? 'border-gray-100 opacity-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                            }`}
+                          >
+                            <div className="flex items-center gap-4 mb-3 sm:mb-0">
+                              <StatusBadge
+                                status={docStatus}
+                                label={statusLabel}
+                              />
+                              <div>
+                                <p
+                                  className={`font-mono text-sm font-bold ${
+                                    !isInv ? 'text-purple-600' : 'text-gray-900'
+                                  }`}
                                 >
-                                  {deletingInvoiceId === inv.id
-                                    ? '...'
-                                    : lang.delete}
-                                </button>
-                              )}
+                                  {isInv
+                                    ? doc.invoice_number
+                                    : doc.credit_note_number}
+                                </p>
+                                {doc.is_locked && (
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {new Date(
+                                      doc.created_at
+                                    ).toLocaleDateString(
+                                      profile.country === 'FR'
+                                        ? 'fr-FR'
+                                        : 'en-US',
+                                      {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric'
+                                      }
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-4">
+                              <span
+                                className={`font-mono text-base font-bold tabular-nums ${
+                                  !isInv ? 'text-purple-600' : 'text-gray-800'
+                                }`}
+                              >
+                                {!isInv && '−'}
+                                {formatMoney(
+                                  doc.total_amount_cents,
+                                  doc.currency_snapshot,
+                                  doc.country_snapshot === 'FR' ? 'FR' : 'US'
+                                )}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <LinkButton
+                                  href={`/${isInv ? 'invoices' : 'credit-notes'}/${doc.id}`}
+                                  variant="ghost"
+                                  size="sm"
+                                >
+                                  {doc.is_locked
+                                    ? isInv
+                                      ? lang.viewInvoice || 'View'
+                                      : lang.viewCreditNote || 'View'
+                                    : isInv
+                                      ? lang.reviseInvoice || 'Edit'
+                                      : lang.editCreditNote || 'Edit'}
+                                </LinkButton>
+                                {!doc.is_locked && (
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteDraftDoc(doc.id, doc.docType)
+                                    }
+                                    disabled={deletingDocId === doc.id}
+                                    className="text-[10px] font-bold uppercase tracking-wider text-red-400 hover:text-red-600 hover:bg-red-50 px-2.5 py-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
+                                  >
+                                    {deletingDocId === doc.id
+                                      ? '...'
+                                      : lang.delete || 'Delete'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Create additional invoice button */}
-                  {invoices.filter((inv) => !inv.is_cancelled).length > 0 && (
-                    <button
-                      onClick={handleCreateInvoice}
-                      disabled={creatingInvoice}
-                      className="mt-3 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-all duration-200 cursor-pointer px-2 py-1.5 -ml-2 rounded-md disabled:opacity-40"
-                    >
-                      +{' '}
-                      {profile?.country === 'FR'
-                        ? 'Ajouter une Facture'
-                        : 'Add Another Invoice'}
-                    </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
           )}
 
-        {/* --- POPUP DIALOGS --- */}
-        <ConfirmDialog
-          dialog={dialog}
-          onClose={() => setDialog(null)}
-          labels={{
-            notice: lang.notice,
-            cancel: lang.cancel,
-            confirmOk: lang.confirmOk
-          }}
-        />
+          {/* ════════════════════════════════════════════════════════
+            DIALOGS
+        ════════════════════════════════════════════════════════ */}
+          <ConfirmDialog
+            dialog={dialog}
+            onClose={() => setDialog(null)}
+            labels={{
+              notice: lang?.notice,
+              cancel: lang?.cancel,
+              confirmOk: lang?.confirmOk
+            }}
+          />
 
-        {/* --- CANCEL ESTIMATE MODAL (with optional reason input) --- */}
-        {cancelModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-gray-100 animate-scale-up">
-              <h3 className="text-sm font-black uppercase tracking-widest mb-3 text-gray-900">
-                {lang.cancelEstimate}
-              </h3>
-              <p className="text-xs text-gray-500 font-bold mb-5 leading-relaxed">
-                {lang.cancelEstimateConfirm}
-              </p>
-
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                {lang.cancelEstimateReasonLabel}
-              </label>
-              <textarea
-                rows={3}
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder={lang.cancelEstimateReasonPlaceholder}
-                maxLength={300}
-                className="w-full p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-600 resize-none text-gray-900 placeholder-gray-400 bg-white transition-colors mb-5"
-              />
-
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="ghost"
-                  size="md"
-                  onClick={() => {
-                    setCancelModalOpen(false);
-                    setCancelReason('');
-                  }}
-                  disabled={cancelling}
-                >
-                  {lang.cancel}
-                </Button>
-                <Button
-                  variant="danger"
-                  size="md"
-                  loading={cancelling}
-                  loadingText={lang.cancel}
-                  onClick={handleCancelLockedEstimate}
-                >
-                  {lang.cancelEstimateConfirmBtn}
-                </Button>
+          {/* Cancel Estimate Modal */}
+          {cancelModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+                <h3 className="text-base font-bold text-gray-900 mb-2">
+                  {lang.cancelEstimate}
+                </h3>
+                <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+                  {lang.cancelEstimateConfirm}
+                </p>
+                <label className="block text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                  {lang.cancelEstimateReasonLabel}
+                </label>
+                <textarea
+                  rows={3}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder={lang.cancelEstimateReasonPlaceholder}
+                  maxLength={300}
+                  className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-400 bg-white transition-shadow mb-5"
+                />
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    onClick={() => {
+                      setCancelModalOpen(false);
+                      setCancelReason('');
+                    }}
+                    disabled={cancelling}
+                  >
+                    {lang.cancel}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="md"
+                    loading={cancelling}
+                    loadingText={lang.cancel}
+                    onClick={handleCancelLockedEstimate}
+                  >
+                    {lang.cancelEstimateConfirmBtn}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );

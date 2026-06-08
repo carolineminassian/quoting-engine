@@ -1264,7 +1264,7 @@ export default function DashboardPage() {
             {/* Billing filter — only shown for Pro users since billing is Pro-only */}
             {profile?.subscription_tier === 'pro' && (
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-[9px] font-black uppercase tracking-widests text-gray-400 shrink-0">
+                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
                   {lang.billingProgress}:
                 </span>
                 <Listbox
@@ -1272,7 +1272,7 @@ export default function DashboardPage() {
                   onChange={(val) => setFilterBilling(val as any)}
                 >
                   <div className="relative w-full sm:w-44">
-                    <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widests text-gray-700 flex justify-between items-center cursor-pointer">
+                    <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
                       <span className="block truncate">
                         {filterBilling === 'all' &&
                           (profile?.country === 'FR'
@@ -1293,7 +1293,7 @@ export default function DashboardPage() {
                       leaveFrom="opacity-100"
                       leaveTo="opacity-0"
                     >
-                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[9px] uppercase tracking-widests font-bold">
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[9px] uppercase tracking-widest font-bold">
                         <ListboxOption
                           value="all"
                           className={({ active }) =>

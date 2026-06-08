@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { invoiceId, amountCents, isFullCredit, reason } =
+    const { invoiceId, amountCents, isFullCredit, reason, poNumber } =
       await request.json();
 
     if (!invoiceId || !amountCents) {
@@ -114,7 +114,8 @@ export async function POST(request: Request) {
           country_snapshot: invoice.country_snapshot,
           client_name: invoice.client_name,
           client_email: invoice.client_email,
-          business_name_snapshot: invoice.business_name_snapshot
+          business_name_snapshot: invoice.business_name_snapshot,
+          po_number: poNumber?.trim() || invoice.po_number || null
         }
       ])
       .select()

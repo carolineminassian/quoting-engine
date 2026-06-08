@@ -116,7 +116,7 @@ export const translations = {
     untitledProject: 'Untitled Project',
     noContactEmail: 'No contact email',
     filterByClient: 'Filter by client name...',
-    filterLabel: 'Filter:',
+    filterLabel: 'Estimate Status:',
     sortByLabel: 'Sort by:',
     allProjects: 'All Projects',
     draftsOnly: 'Drafts',
@@ -278,8 +278,37 @@ export const translations = {
     sendError: 'Error: {msg}',
     failedToSend: 'Failed to send',
 
+    // Tab names (these were missing or inconsistent)
+    estimateTab: 'Estimate', // FR: 'Devis'
+    billingTab: 'Billing', // FR: 'Facturation'
+    discussionTab: 'Discussion', // FR: 'Messages'
+
+    // Additional missing keys
+    discussionSubtitle:
+      'Communicate directly with your client about this estimate',
+    // FR: 'Communiquez directement avec votre client concernant ce devis'
+
+    tabsLabel: 'Document sections', // FR: 'Sections du document'
+    billed: 'billed', // FR: 'facturé'
+    remaining: 'remaining', // FR: 'restant'
+
+    // Content headers (can be slightly different/longer)
+    billingHubTitle: 'Billing',
+    billingHubSubtitle: 'Manage invoices and credit notes for this project',
+    discussionTitle: 'Discussion',
+
+    // New keys
+    invoiceCreatedSuccess: 'Invoice created successfully!',
+    creating: 'Creating...',
+
     // ===== INVOICING =====
-    invoices: 'Invoices',
+    invoices: 'Billing',
+    poNumber: 'PO Number',
+    poPlaceholder: 'e.g. PO-12345',
+    bankDetails: 'Bank Details',
+    vatNumber: 'VAT Number',
+    companyRegNumber: 'Company Reg / SIRET',
+    originalInvoiceRef: 'Original Invoice N°: {ref} dated {date}',
     invoiceLabel: 'Invoice',
     createInvoice: 'Create Invoice',
     viewInvoice: 'View Invoice',
@@ -317,6 +346,39 @@ export const translations = {
     noInvoicesYet: 'No invoices yet.',
     invoiceFromEstimate: 'Invoice from Estimate',
     createInvoiceProOnly: 'Invoicing is available on the Pro plan.',
+    depositInvoiceTitle: 'Deposit Invoice',
+    balanceInvoiceTitle: 'Balance Invoice',
+    depositDueUponReceipt: 'Deposit due upon receipt.',
+    paymentDueUponReceipt: 'Payment due upon receipt.',
+    paymentDueWithinDays: 'Payment due within {days} days.',
+    pdfError: 'Failed to generate PDF.',
+
+    // Invoice editor UI
+    description: 'Description',
+    descriptionPlaceholder: 'Enter item description...',
+    removeItem: 'Remove item',
+    quantity: 'Qty',
+    unitPrice: 'Unit Price',
+    lineItems: 'Line Items',
+    addLineItem: 'Add Line Item',
+    previewPdf: 'Preview PDF',
+    waitingToSave: 'Waiting to save...',
+    saved: 'Saved',
+    savingPleaseWait:
+      'Please wait a moment while your changes are saved automatically.',
+    invoiceItemFallback: 'Invoice Item',
+    itemLabel: 'Item',
+    sectionDescPlaceholder: 'Enter category description...',
+    approvedProjectSubtotal: 'Approved project subtotal',
+    approvedProjectTotal: 'Approved project total',
+    fullProjectSubtotal: 'Approved project subtotal',
+    fullProjectTotal: 'Approved project total',
+    invoiceSubtotal: 'Invoice subtotal',
+    depositSubtotal: 'Deposit subtotal',
+    balanceSubtotal: 'Balance subtotal',
+    approvedEstimateExceededTitle: 'Approved estimate exceeded',
+    approvedEstimateExceededMessage:
+      'This invoice exceeds the remaining billable amount on the approved estimate by {amount}. Do you still want to finalize it?',
 
     // Credit notes
     createCreditNote: 'Create Credit Note',
@@ -337,7 +399,7 @@ export const translations = {
     relatedCreditNotes: 'Related Credit Notes',
     viewCreditNote: 'View Credit Note',
 
-    // Payment instructions (shown on invoice PDF + email)
+    // Payment instructions
     paymentInstructions: 'Payment Instructions',
     bankWireInstructions: 'Bank / Wire Transfer Details',
     paymentLinkLabel: 'Online Payment',
@@ -363,7 +425,16 @@ export const translations = {
     invoiceHub: 'Invoices for this Estimate',
     invoiceHubEmpty: 'No invoices yet for this estimate.',
     createInvoiceFromEstimate: 'Create Invoice',
-    billingHubTitle: 'Billing',
+
+    // NEW BILLING KEYS ADDED HERE
+    approvedEstimateTotalInclTax: 'Approved estimate #{ref} total (incl. tax)',
+    finalizedBillingTracking: 'Finalized Billing Tracking',
+    creditNoteCancelled: 'Cancelled',
+    creditNoteDraft: 'Draft',
+    creditNoteLabel: 'Credit Note',
+    editCreditNote: 'Edit',
+    deleteCreditNoteDraftConfirm:
+      'Are you sure you want to delete this draft credit note?',
 
     // Cancellations
     cancelEstimate: 'Cancel Estimate',
@@ -679,7 +750,7 @@ export const translations = {
     untitledProject: 'Projet sans nom',
     noContactEmail: 'Aucun contact',
     filterByClient: 'Filtrer par nom de client...',
-    filterLabel: 'Statut:',
+    filterLabel: 'Statut du Devis:',
     sortByLabel: 'Trier par:',
     allProjects: 'Tous les Projets',
     draftsOnly: 'Brouillons',
@@ -845,8 +916,35 @@ export const translations = {
     sendError: 'Erreur : {msg}',
     failedToSend: "L'envoi a échoué",
 
+    // Tab names (these were missing or inconsistent)
+    estimateTab: 'Devis', // FR: 'Devis'
+    billingTab: 'Facturation', // FR: 'Facturation'
+    discussionTab: 'Messages', // FR: 'Messages'
+
+    // Additional missing keys
+    discussionSubtitle:
+      'Communiquez directement avec votre client concernant ce devis',
+    // FR: 'Communiquez directement avec votre client concernant ce devis'
+
+    tabsLabel: 'Sections du document', // FR: 'Sections du document'
+    billed: 'facturé', // FR: 'facturé'
+    remaining: 'restant', // FR: 'restant'
+
+    billingHubTitle: 'Facturation',
+    billingHubSubtitle: 'Gérer les factures et avoirs pour ce projet',
+    discussionTitle: 'Discussion',
+
+    invoiceCreatedSuccess: 'Facture créée avec succès !',
+    creating: 'Création...',
+
     // ===== FACTURATION =====
-    invoices: 'Factures',
+    invoices: 'Facturation',
+    poNumber: 'N° de commande (PO)',
+    poPlaceholder: 'Ex: PO-12345',
+    bankDetails: 'Coordonnées Bancaires',
+    vatNumber: 'Numéro de TVA',
+    companyRegNumber: 'SIRET',
+    originalInvoiceRef: "Facture d'origine N° : {ref} du {date}",
     invoiceLabel: 'Facture',
     createInvoice: 'Créer une Facture',
     viewInvoice: 'Voir la Facture',
@@ -884,7 +982,33 @@ export const translations = {
     noInvoicesYet: 'Aucune facture pour le moment.',
     invoiceFromEstimate: 'Facture depuis Devis',
     createInvoiceProOnly: 'La facturation est disponible avec le plan Pro.',
-
+    approvedEstimateTotalInclTax: 'Total du devis approuvé #{ref} (TTC)',
+    // Interface éditeur de facture
+    description: 'Description',
+    descriptionPlaceholder: 'Saisir la description de la ligne...',
+    removeItem: 'Supprimer la ligne',
+    quantity: 'Qté',
+    unitPrice: 'Prix unitaire',
+    lineItems: 'Lignes de facture',
+    addLineItem: 'Ajouter une ligne',
+    previewPdf: 'Aperçu PDF',
+    waitingToSave: 'Modifications en attente...',
+    saved: 'Enregistré',
+    savingPleaseWait:
+      'Veuillez patienter pendant l’enregistrement automatique des modifications.',
+    invoiceItemFallback: 'Élément de facture',
+    itemLabel: 'Élément',
+    sectionDescPlaceholder: 'Saisir la description de la catégorie...',
+    approvedProjectSubtotal: 'Sous-total du projet approuvé',
+    approvedProjectTotal: 'Total du projet approuvé',
+    fullProjectSubtotal: 'Sous-total du projet approuvé',
+    fullProjectTotal: 'Total du projet approuvé',
+    invoiceSubtotal: 'Sous-total facturé',
+    depositSubtotal: 'Sous-total de l’acompte',
+    balanceSubtotal: 'Sous-total du solde',
+    approvedEstimateExceededTitle: 'Dépassement du devis approuvé',
+    approvedEstimateExceededMessage:
+      'Cette facture dépasse le montant restant facturable du devis approuvé de {amount}. Voulez-vous quand même la finaliser ?',
     // Avoirs
     createCreditNote: 'Créer un Avoir',
     creditNote: 'Avoir',
@@ -930,7 +1054,21 @@ export const translations = {
     invoiceHub: 'Factures pour ce Devis',
     invoiceHubEmpty: 'Aucune facture pour ce devis.',
     createInvoiceFromEstimate: 'Créer une Facture',
-    billingHubTitle: 'Facturation',
+    depositInvoiceTitle: "Facture d'Acompte",
+    balanceInvoiceTitle: 'Facture de Solde',
+    depositDueUponReceipt: 'Acompte payable dès réception.',
+    paymentDueUponReceipt: 'Règlement dès réception.',
+    paymentDueWithinDays: 'Règlement sous {days} jours.',
+    pdfError: 'Échec de la génération du PDF.',
+    // NEW BILLING KEYS ADDED HERE
+
+    finalizedBillingTracking: 'Suivi de la facturation finalisée',
+    creditNoteCancelled: 'Annulé',
+    creditNoteDraft: 'Brouillon',
+    creditNoteLabel: 'Avoir',
+    editCreditNote: 'Modifier',
+    deleteCreditNoteDraftConfirm:
+      "Êtes-vous sûr de vouloir supprimer ce brouillon d'avoir ?",
 
     // Cancellations
     cancelEstimate: 'Annuler le Devis',

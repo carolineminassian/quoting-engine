@@ -22,6 +22,7 @@ export default function CreateCreditNotePage() {
   const [partialAmount, setPartialAmount] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const [poNumber, setPoNumber] = useState('');
 
   useEffect(() => {
     async function fetchData() {
@@ -70,6 +71,9 @@ export default function CreateCreditNotePage() {
       const invoiceCurrency = inv.currency_snapshot || prof?.currency || 'USD';
 
       setLang(invoiceCountry === 'FR' ? translations.FR : translations.US);
+
+      setPoNumber(inv.po_number || '');
+
       setInvoice(inv);
       // Create a merged profile object that enforces the invoice's currency/country
       setProfile({
@@ -141,7 +145,8 @@ export default function CreateCreditNotePage() {
           invoiceId: id,
           amountCents,
           isFullCredit,
-          reason
+          reason,
+          poNumber
         })
       });
 
@@ -286,7 +291,7 @@ export default function CreateCreditNotePage() {
 
           {/* Reason */}
           <div className="mb-6">
-            <label className="block text-[10px] font-black uppercase tracking-widests text-gray-400 mb-2">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
               {lang.creditNoteReason} *
             </label>
             <textarea
@@ -296,6 +301,23 @@ export default function CreateCreditNotePage() {
               placeholder={lang.creditNoteReasonPlaceholder}
               maxLength={500}
               className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 resize-none text-gray-900 placeholder-gray-400"
+            />
+          </div>
+
+          {/* PO Number */}
+          <div className="mb-6">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+              {lang.poNumber}{' '}
+              <span className="font-medium normal-case tracking-normal opacity-70">
+                (Optional)
+              </span>
+            </label>
+            <input
+              type="text"
+              value={poNumber}
+              onChange={(e) => setPoNumber(e.target.value)}
+              placeholder={lang.poPlaceholder}
+              className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
 

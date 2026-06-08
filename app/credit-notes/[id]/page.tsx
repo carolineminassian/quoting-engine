@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import LoadingDots from '@/components/LoadingDots';
 import LinkButton from '@/components/LinkButton';
-import { translations } from '@/lib/translations';
+import Button from '@/components/Button';
+import { translations, t } from '@/lib/translations';
 import { formatMoney } from '@/lib/formatMoney';
 
 export default function CreditNoteView() {
@@ -27,9 +28,18 @@ export default function CreditNoteView() {
         return;
       }
 
+      // Fetch credit note AND the related invoice details for the reference line
       const { data: cn } = await supabase
         .from('credit_notes')
-        .select('*')
+        .select(
+          `
+          *,
+          invoices (
+            invoice_number,
+            invoice_date
+          )
+        `
+        )
         .eq('id', id)
         .single();
 
@@ -82,6 +92,8 @@ export default function CreditNoteView() {
     );
   }
 
+  const isFR = profile?.country === 'FR';
+
   return (
     <div className="min-h-screen bg-gray-50 text-black font-sans print:bg-white flex flex-col">
       <main className="flex-1 p-4 sm:p-8 relative print:p-0">
@@ -101,12 +113,14 @@ export default function CreditNoteView() {
                 {lang.viewInvoice} ↗
               </LinkButton>
             </div>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => window.print()}
-              className="bg-white px-4 py-2 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-colors shadow-sm"
+              className="print:hidden"
             >
               {lang.downloadPdf}
-            </button>
+            </Button>
           </div>
 
           {/* Document */}
@@ -126,13 +140,34 @@ export default function CreditNoteView() {
                   <p className="font-mono text-sm font-black text-gray-900">
                     {creditNote.credit_note_number}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1 font-medium">
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1 font-medium">
                     {lang.dateLabel}{' '}
                     {new Date(creditNote.credit_note_date).toLocaleDateString(
-                      profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                      isFR ? 'fr-FR' : 'en-US',
                       { year: 'numeric', month: 'short', day: 'numeric' }
                     )}
                   </p>
+
+                  {/* Original Invoice Reference & PO */}
+                  {creditNote.invoices && (
+                    <p className="text-[10px] sm:text-xs text-purple-700 mt-2 font-bold">
+                      {t(lang.originalInvoiceRef, {
+                        ref: creditNote.invoices.invoice_number,
+                        date: new Date(
+                          creditNote.invoices.invoice_date
+                        ).toLocaleDateString(isFR ? 'fr-FR' : 'en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })
+                      })}
+                    </p>
+                  )}
+                  {creditNote.po_number && (
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 font-medium">
+                      {lang.poNumber}: {creditNote.po_number}
+                    </p>
+                  )}
                 </div>
               </header>
 
@@ -199,6 +234,32 @@ export default function CreditNoteView() {
                   </div>
                 </div>
               </section>
+
+              {/* Legal & Banking Footer */}
+              <div className="mt-16 pt-8 border-t border-gray-200 text-xs text-gray-500">
+                {profile?.bank_details && (
+                  <div className="mb-4">
+                    <p className="font-bold text-gray-900 uppercase tracking-widest text-[10px] mb-1">
+                      {lang.bankDetails}
+                    </p>
+                    <p className="whitespace-pre-wrap">
+                      {profile.bank_details}
+                    </p>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-4 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                  {profile?.company_reg_number && (
+                    <span>
+                      {lang.companyRegNumber}: {profile.company_reg_number}
+                    </span>
+                  )}
+                  {profile?.vat_number && (
+                    <span>
+                      {lang.vatNumber}: {profile.vat_number}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </article>
         </div>
