@@ -784,6 +784,7 @@ export default function InvoiceView() {
     }, 1000);
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isDirty,
     draftData.invoiceDate,
@@ -1567,6 +1568,7 @@ export default function InvoiceView() {
 
   const approvedEstimateRef =
     estimate?.custom_id || estimate?.id?.slice(0, 8) || '';
+
   const docTitleLabel = isDepositInvoice
     ? lang.depositInvoiceTitle
     : isBalanceInvoice
