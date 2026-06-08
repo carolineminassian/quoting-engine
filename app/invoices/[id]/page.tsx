@@ -357,7 +357,7 @@ export default function InvoiceView() {
     title?: string;
     message: string;
     onConfirm?: () => void;
-  } | null>();
+  } | null>(null);
 
   const [markPaidModalOpen, setMarkPaidModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -982,7 +982,11 @@ export default function InvoiceView() {
 
     if (!remaining || !baseTotals.totalCents) return;
 
-    const multiplier = remaining / baseTotals.totalCents;
+    // Use the stored estimate total (ground truth) not the recomputed
+    // baseTotals which can drift by a few cents due to rounding across
+    // multiple items and tax groups.
+    const base = estimate?.total_amount_cents || baseTotals.totalCents;
+    const multiplier = remaining / base;
 
     setSections((prev) =>
       prev.map((sec) => ({
@@ -2235,7 +2239,12 @@ export default function InvoiceView() {
                                       type="number"
                                       min="0"
                                       step="0.5"
-                                      value={sec.laborHours || 0}
+                                      value={
+                                        (sec.laborHours || 0) === 0
+                                          ? ''
+                                          : sec.laborHours
+                                      }
+                                      placeholder="0"
                                       onChange={(e) =>
                                         handleUpdateSectionLabor(
                                           secIdx,
@@ -2257,13 +2266,9 @@ export default function InvoiceView() {
                                       min="0"
                                       step="0.01"
                                       value={
-                                        getInvoiceLaborRateCents(sec) / 100 ===
-                                        0
+                                        (sec.hourlyRate || 0) === 0
                                           ? ''
-                                          : (
-                                              getInvoiceLaborRateCents(sec) /
-                                              100
-                                            ).toFixed(2)
+                                          : sec.hourlyRate
                                       }
                                       placeholder="0.00"
                                       onChange={(e) =>
@@ -2288,10 +2293,15 @@ export default function InvoiceView() {
                                       max="100"
                                       step="0.1"
                                       value={
-                                        sec.laborTaxRate ??
-                                        profile?.tax_rate ??
-                                        0
+                                        (sec.laborTaxRate ??
+                                          profile?.tax_rate ??
+                                          0) === 0
+                                          ? ''
+                                          : (sec.laborTaxRate ??
+                                            profile?.tax_rate ??
+                                            0)
                                       }
+                                      placeholder="0"
                                       onChange={(e) =>
                                         handleUpdateSectionLabor(
                                           secIdx,
@@ -2303,9 +2313,40 @@ export default function InvoiceView() {
                                       disabled={!isStructurallyEditable}
                                     />
                                   </div>
+
+                                  {(sec.laborHours || 0) > 0 && (
+                                    <div className="flex flex-col items-end justify-center px-3 bg-gray-50 border border-gray-200 rounded-xl h-[46px] min-w-[80px]">
+                                      <span className="text-sm font-mono font-bold text-gray-700 tabular-nums">
+                                        {fmt(
+                                          Math.round(
+                                            (sec.laborHours || 0) *
+                                              getInvoiceLaborRateCents(sec)
+                                          )
+                                        )}
+                                      </span>
+                                      {invoiceContext.margin_mode_snapshot &&
+                                        invoiceContext.margin_mode_snapshot !==
+                                          'none' &&
+                                        (sec.hourlyRate || 0) > 0 &&
+                                        getInvoiceLaborRateCents(sec) !==
+                                          Math.round(
+                                            (sec.hourlyRate || 0) * 100
+                                          ) && (
+                                          <span className="text-[9px] text-blue-400 font-bold whitespace-nowrap">
+                                            +
+                                            {Math.round(
+                                              (getInvoiceLaborRateCents(sec) /
+                                                ((sec.hourlyRate || 1) * 100) -
+                                                1) *
+                                                100
+                                            )}
+                                            % mgn
+                                          </span>
+                                        )}
+                                    </div>
+                                  )}
                                 </div>
                               )}
-
                               {sec.items && sec.items.length > 0 && (
                                 <div className="space-y-3">
                                   {sec.items.map(
