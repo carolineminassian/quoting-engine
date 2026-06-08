@@ -598,23 +598,12 @@ export default function InvoiceView() {
     [invoiceContext, descTranslations, materialsById]
   );
 
+  // Always apply margins so amounts match the approved estimate.
+  // The COST input shows the raw pre-margin cost; this returns the effective
+  // (post-margin) price the client pays.
   const getInvoiceItemUnitCostCents = useCallback(
-    (sec: any, item: any) => {
-      if (typeof item.cost_per_unit_cents === 'number') {
-        return item.cost_per_unit_cents;
-      }
-
-      if (typeof item.costPerUnitCents === 'number') {
-        return item.costPerUnitCents;
-      }
-
-      return getEffectiveItemCostCents(
-        invoiceContext,
-        sec,
-        item,
-        materialsById
-      );
-    },
+    (sec: any, item: any) =>
+      getEffectiveItemCostCents(invoiceContext, sec, item, materialsById),
     [invoiceContext, materialsById]
   );
 
@@ -678,9 +667,14 @@ export default function InvoiceView() {
     );
 
     return {
-      subtotalCents: result.subtotalCents,
-      taxGroups: result.taxGroups,
-      totalCents: result.subtotalCents + taxTotalCents
+      subtotalCents: Math.round(result.subtotalCents),
+      taxGroups: Object.fromEntries(
+        Object.entries(result.taxGroups).map(([k, v]) => [
+          k,
+          Math.round(Number(v))
+        ])
+      ),
+      totalCents: Math.round(result.subtotalCents + taxTotalCents)
     };
   }, [
     isLineItemInvoice,
@@ -977,6 +971,46 @@ export default function InvoiceView() {
 
       return next;
     });
+
+    setIsDirty(true);
+  };
+  const handleScaleToRemaining = () => {
+    const remaining = Math.max(
+      0,
+      (estimate?.total_amount_cents || 0) - finalizedNetOtherInvoicesCents
+    );
+
+    if (!remaining || !baseTotals.totalCents) return;
+
+    const multiplier = remaining / baseTotals.totalCents;
+
+    setSections((prev) =>
+      prev.map((sec) => ({
+        ...sec,
+        laborHours: sec.laborHours
+          ? Math.round(sec.laborHours * multiplier * 100) / 100
+          : 0,
+        items: (sec.items || []).map((item: any) => ({
+          ...item,
+          qty: item.qty ? Math.round(item.qty * multiplier * 100) / 100 : 0
+        }))
+      }))
+    );
+
+    // Flat additional charges need explicit scaling.
+    // Percentage charges auto-recalculate from the scaled section totals
+    // so they don't need to be touched.
+    setAdditionalCharges((prev) =>
+      prev.map((charge) => {
+        if (charge.isPercentage) return charge;
+        return {
+          ...charge,
+          costPerUnitCents: Math.round(
+            (charge.costPerUnitCents || 0) * multiplier
+          )
+        };
+      })
+    );
 
     setIsDirty(true);
   };
@@ -1815,6 +1849,62 @@ export default function InvoiceView() {
                         ? lang.waitingToSave
                         : lang.saved}
                   </span>
+
+                  {estimate &&
+                    (() => {
+                      const remaining = Math.max(
+                        0,
+                        (estimate.total_amount_cents || 0) -
+                          finalizedNetOtherInvoicesCents
+                      );
+                      const current = billedTotals.totalCents;
+                      const over = current - remaining;
+                      const alreadyMatches = Math.abs(current - remaining) <= 1;
+                      const showAdjustBtn =
+                        isStructurallyEditable &&
+                        !isLineItemInvoice &&
+                        !alreadyMatches &&
+                        remaining > 0 &&
+                        baseTotals.totalCents > 0 &&
+                        finalizedNetOtherInvoicesCents > 0;
+
+                      return (
+                        <span className="ml-3 pl-3 border-l border-amber-200 text-xs text-amber-600 font-medium flex items-center gap-2">
+                          {over > 0 ? (
+                            <span className="text-red-500 font-bold">
+                              ⚠ {fmt(over)}{' '}
+                              {lang.overBudget || 'over remaining'}
+                            </span>
+                          ) : (
+                            <>
+                              {lang.remainingOnEstimate ||
+                                'Remaining on estimate'}
+                              :{' '}
+                              <span className="font-bold text-amber-800">
+                                {fmt(remaining)}
+                              </span>
+                              {current > 0 && (
+                                <span className="text-amber-500">
+                                  ({lang.thisInvoice || 'this invoice'}:{' '}
+                                  {fmt(current)})
+                                </span>
+                              )}
+                            </>
+                          )}
+                          {showAdjustBtn && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleScaleToRemaining}
+                              className="!text-amber-700 !border !border-amber-300 hover:!bg-amber-100 !py-0.5 !px-2 !text-[10px] !font-bold !uppercase !tracking-wider !h-auto"
+                            >
+                              {lang.adjustToRemaining || 'Adjust to remaining'}
+                            </Button>
+                          )}
+                        </span>
+                      );
+                    })()}
                 </>
               )}
 
@@ -2333,9 +2423,11 @@ export default function InvoiceView() {
                                                   placeholder="0.00"
                                                   className="w-full py-2 pl-10 pr-2 border border-gray-200 rounded-lg text-right text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                                                   value={
-                                                    unitCostCents === 0
+                                                    (item.cost_per_unit_cents ||
+                                                      0) === 0
                                                       ? ''
-                                                      : unitCostCents / 100
+                                                      : item.cost_per_unit_cents /
+                                                        100
                                                   }
                                                   onChange={(e) =>
                                                     handleUpdateSectionItem(
@@ -2384,14 +2476,34 @@ export default function InvoiceView() {
                                                 </span>
                                               </div>
 
-                                              {/* AMOUNT (read-only computed) */}
-                                              <div className="w-24 h-[42px] flex items-center justify-end px-3 bg-gray-50 border border-gray-100 rounded-lg text-sm font-mono font-bold text-gray-700 tabular-nums">
-                                                {fmt(
-                                                  Math.round(
-                                                    (item.qty || 0) *
-                                                      unitCostCents
-                                                  )
-                                                )}
+                                              {/* AMOUNT (read-only computed, post-margin) */}
+                                              <div className="flex flex-col items-end justify-center w-24 h-[42px] px-3 bg-gray-50 border border-gray-100 rounded-lg">
+                                                <span className="text-sm font-mono font-bold text-gray-700 tabular-nums">
+                                                  {fmt(
+                                                    Math.round(
+                                                      (item.qty || 0) *
+                                                        unitCostCents
+                                                    )
+                                                  )}
+                                                </span>
+                                                {invoiceContext.margin_mode_snapshot &&
+                                                  invoiceContext.margin_mode_snapshot !==
+                                                    'none' &&
+                                                  item.cost_per_unit_cents >
+                                                    0 &&
+                                                  unitCostCents !==
+                                                    item.cost_per_unit_cents && (
+                                                    <span className="text-[9px] text-blue-400 font-bold whitespace-nowrap">
+                                                      +
+                                                      {Math.round(
+                                                        (unitCostCents /
+                                                          item.cost_per_unit_cents -
+                                                          1) *
+                                                          100
+                                                      )}
+                                                      % mgn
+                                                    </span>
+                                                  )}
                                               </div>
 
                                               {/* DELETE */}

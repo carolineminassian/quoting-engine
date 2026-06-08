@@ -660,7 +660,7 @@ export default function InvoicePDF({
             <Text
               style={[
                 styles.documentTypeLabel,
-                isDraft && { color: '#92400e' }
+                isDraft ? { color: '#92400e' } : {}
               ]}
             >
               {baseDocTitle}

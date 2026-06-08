@@ -379,7 +379,10 @@ export const translations = {
     approvedEstimateExceededTitle: 'Approved estimate exceeded',
     approvedEstimateExceededMessage:
       'This invoice exceeds the remaining billable amount on the approved estimate by {amount}. Do you still want to finalize it?',
-
+    remainingOnEstimate: 'Remaining on estimate',
+    thisInvoice: 'this invoice',
+    overBudget: 'over remaining',
+    adjustToRemaining: 'Adjust to remaining',
     // Credit notes
     createCreditNote: 'Create Credit Note',
     creditNote: 'Credit Note',
@@ -1069,6 +1072,12 @@ export const translations = {
     editCreditNote: 'Modifier',
     deleteCreditNoteDraftConfirm:
       "Êtes-vous sûr de vouloir supprimer ce brouillon d'avoir ?",
+
+    // Remaining Estimate Amount
+    remainingOnEstimate: 'Restant sur le devis',
+    thisInvoice: 'cette facture',
+    overBudget: 'au-dessus du solde',
+    adjustToRemaining: 'Ajuster au solde restant',
 
     // Cancellations
     cancelEstimate: 'Annuler le Devis',
