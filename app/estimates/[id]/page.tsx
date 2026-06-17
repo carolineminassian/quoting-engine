@@ -2120,9 +2120,15 @@ export default function EstimateView() {
                               {comm.author_name}
                             </span>
                             <span className="text-[9px] text-gray-400 font-mono">
-                              {new Date(comm.created_at).toLocaleTimeString(
-                                [],
-                                { hour: '2-digit', minute: '2-digit' }
+                              {new Date(comm.created_at).toLocaleString(
+                                profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                                {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                }
                               )}
                             </span>
                           </div>

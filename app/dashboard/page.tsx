@@ -49,7 +49,11 @@ export default function DashboardPage() {
   >('all');
 
   const [filterBilling, setFilterBilling] = useState<
-    'all' | 'fully-billed' | 'partially-billed' | 'unbilled'
+    'all' | 'with-invoices' | 'fully-billed' | 'partially-billed' | 'unbilled'
+  >('all');
+
+  const [filterDate, setFilterDate] = useState<
+    'all' | 'this-month' | 'last-30' | 'this-year' | 'last-year'
   >('all');
 
   // Set of estimate IDs that have at least one unread notification.
@@ -126,7 +130,7 @@ export default function DashboardPage() {
       >();
 
       (billingsRes.data || []).forEach((inv: any) => {
-        if (!inv.estimate_id || inv.is_cancelled) return;
+        if (!inv.estimate_id || inv.is_cancelled || !inv.is_locked) return;
         const existing = billingMap.get(inv.estimate_id) || {
           billedCents: 0,
           paidCents: 0,
@@ -630,6 +634,12 @@ export default function DashboardPage() {
 
       // When status = 'all', also apply billing filter if set
       if (filterBilling !== 'all') {
+        if (filterBilling === 'with-invoices')
+          return (
+            est.client_status === 'approved' &&
+            !est.cancelled_at &&
+            billedCents > 0
+          );
         if (filterBilling === 'fully-billed')
           return (
             est.client_status === 'approved' &&
@@ -650,6 +660,25 @@ export default function DashboardPage() {
             !est.cancelled_at &&
             (!billing || billedCents === 0)
           );
+      }
+
+      if (filterDate !== 'all') {
+        const now = new Date();
+        const created = new Date(est.created_at);
+        if (filterDate === 'this-month')
+          return (
+            created.getMonth() === now.getMonth() &&
+            created.getFullYear() === now.getFullYear()
+          );
+        if (filterDate === 'last-30') {
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          return created >= d;
+        }
+        if (filterDate === 'this-year')
+          return created.getFullYear() === now.getFullYear();
+        if (filterDate === 'last-year')
+          return created.getFullYear() === now.getFullYear() - 1;
       }
 
       return true;
@@ -1274,10 +1303,8 @@ export default function DashboardPage() {
                   <div className="relative w-full sm:w-44">
                     <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
                       <span className="block truncate">
-                        {filterBilling === 'all' &&
-                          (profile?.country === 'FR'
-                            ? 'Tous les statuts'
-                            : 'All Statuses')}
+                        {filterBilling === 'all' && lang.allProjects}
+                        {filterBilling === 'with-invoices' && lang.withInvoices}
                         {filterBilling === 'fully-billed' && lang.fullyBilled}
                         {filterBilling === 'partially-billed' &&
                           lang.partiallyBilled}
@@ -1300,9 +1327,15 @@ export default function DashboardPage() {
                             `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                           }
                         >
-                          {profile?.country === 'FR'
-                            ? 'Toutes les factures'
-                            : 'All Invoices'}
+                          {lang.allProjects}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="with-invoices"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative py-2 px-3 border-b border-gray-50 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.withInvoices}
                         </ListboxOption>
                         <ListboxOption
                           value="fully-billed"
@@ -1334,6 +1367,60 @@ export default function DashboardPage() {
                 </Listbox>
               </div>
             )}
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
+                {lang.dateFilterLabel}
+              </span>
+              <Listbox value={filterDate} onChange={setFilterDate}>
+                <div className="relative w-full sm:w-36">
+                  <ListboxButton className="w-full py-2 px-3 border border-gray-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[9px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {filterDate === 'all' && lang.allTime}
+                      {filterDate === 'this-month' && lang.thisMonth}
+                      {filterDate === 'last-30' && lang.last30Days}
+                      {filterDate === 'this-year' && lang.thisYear}
+                      {filterDate === 'last-year' && lang.lastYear}
+                    </span>
+                    <span className="pointer-events-none text-gray-400 text-[8px]">
+                      ▼
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl max-h-60 overflow-auto focus:outline-none text-[9px] uppercase tracking-widest font-bold">
+                      {(
+                        [
+                          ['all', lang.allTime],
+                          ['this-month', lang.thisMonth],
+                          ['last-30', lang.last30Days],
+                          ['this-year', lang.thisYear],
+                          ['last-year', lang.lastYear]
+                        ] as const
+                      ).map(([val, label], i, arr) => (
+                        <ListboxOption
+                          key={val}
+                          value={val}
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative py-2 px-3 ${
+                              i < arr.length - 1
+                                ? 'border-b border-gray-50'
+                                : ''
+                            } ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {label}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">
@@ -1495,7 +1582,6 @@ export default function DashboardPage() {
                               : 0;
                           const isFullyPaid =
                             paidCents >= totalCents && totalCents > 0;
-                          const hasOverdue = est._billing.hasOverdue;
 
                           return (
                             <div>
@@ -1505,9 +1591,7 @@ export default function DashboardPage() {
                                     className={`h-full rounded-full transition-all duration-500 ${
                                       isFullyPaid
                                         ? 'bg-green-500'
-                                        : hasOverdue
-                                          ? 'bg-red-400'
-                                          : 'bg-blue-500'
+                                        : 'bg-blue-500'
                                     }`}
                                     style={{
                                       width: `${Math.min(billedPct, 100)}%`
@@ -1518,16 +1602,12 @@ export default function DashboardPage() {
                                   className={`text-[9px] font-black uppercase tracking-widest shrink-0 ${
                                     isFullyPaid
                                       ? 'text-green-600'
-                                      : hasOverdue
-                                        ? 'text-red-500'
-                                        : 'text-gray-400'
+                                      : 'text-gray-400'
                                   }`}
                                 >
                                   {isFullyPaid
                                     ? lang.invoicePaid
-                                    : hasOverdue
-                                      ? lang.invoiceOverdue
-                                      : t(lang.billedPct, { pct: billedPct })}
+                                    : t(lang.billedPct, { pct: billedPct })}
                                 </span>
                               </div>
                             </div>

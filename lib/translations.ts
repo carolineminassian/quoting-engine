@@ -115,6 +115,7 @@ export const translations = {
     // === NEW: DASHBOARD ===
     untitledProject: 'Untitled Project',
     noContactEmail: 'No contact email',
+    withInvoices: 'With Invoices',
     filterByClient: 'Filter by client name...',
     filterLabel: 'Estimate Status:',
     sortByLabel: 'Sort by:',
@@ -610,7 +611,13 @@ export const translations = {
       'Your Pro subscription will end on {date}. You can now purchase credits to use after that date.',
     switchToPayAsYouGoFailed:
       'Failed to schedule cancellation. Please try again.',
-
+    // Date filters
+    dateFilterLabel: 'Period',
+    allTime: 'All Time',
+    thisMonth: 'This Month',
+    last30Days: 'Last 30 Days',
+    thisYear: 'This Year',
+    lastYear: 'Last Year',
     // Email notification preferences
     notificationSettings: 'Email Notifications',
     notificationSettingsDesc:
@@ -639,6 +646,7 @@ export const translations = {
   FR: {
     // === EXISTING KEYS (preserved) ===
     dashboard: 'Tableau de Bord',
+    withInvoices: 'Avec factures',
     privacyPolicy: 'Politique de Confidentialité',
     termsOfService: 'Conditions Générales',
     projects: 'Projets',
@@ -735,7 +743,13 @@ export const translations = {
       l: 'Litre',
       kg: 'Kilogramme'
     },
-
+    // === DATE FILTERS ===
+    dateFilterLabel: 'Période',
+    allTime: 'Tout',
+    thisMonth: 'Ce mois',
+    last30Days: '30 derniers jours',
+    thisYear: 'Cette année',
+    lastYear: "L'an dernier",
     // === NEW: COMMON / DIALOGS ===
     notice: 'Notification',
     confirm: 'Confirmer',

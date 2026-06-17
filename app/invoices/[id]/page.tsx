@@ -983,40 +983,134 @@ export default function InvoiceView() {
 
     if (!remaining || !baseTotals.totalCents) return;
 
-    // Use the stored estimate total (ground truth) not the recomputed
-    // baseTotals which can drift by a few cents due to rounding across
-    // multiple items and tax groups.
-    const base = estimate?.total_amount_cents || baseTotals.totalCents;
-    const multiplier = remaining / base;
+    const multiplier = remaining / baseTotals.totalCents;
 
-    setSections((prev) =>
-      prev.map((sec) => ({
-        ...sec,
-        laborHours: sec.laborHours
-          ? Math.round(sec.laborHours * multiplier * 100) / 100
-          : 0,
-        items: (sec.items || []).map((item: any) => ({
-          ...item,
-          qty: item.qty ? Math.round(item.qty * multiplier * 100) / 100 : 0
-        }))
+    // Scale section qty/hours — 4dp keeps fractional precision
+    // (2dp gives 0.01 when target is 0.0080; 4dp gives 0.0080 → ~12× less drift)
+    let newSections = sections.map((sec: any) => ({
+      ...sec,
+      laborHours: sec.laborHours
+        ? Math.round(sec.laborHours * multiplier * 10000) / 10000
+        : 0,
+      items: (sec.items || []).map((item: any) => ({
+        ...item,
+        qty: item.qty ? Math.round(item.qty * multiplier * 10000) / 10000 : 0
       }))
-    );
+    }));
 
-    // Flat additional charges need explicit scaling.
-    // Percentage charges auto-recalculate from the scaled section totals
-    // so they don't need to be touched.
-    setAdditionalCharges((prev) =>
-      prev.map((charge) => {
-        if (charge.isPercentage) return charge;
-        return {
-          ...charge,
-          costPerUnitCents: Math.round(
-            (charge.costPerUnitCents || 0) * multiplier
-          )
-        };
-      })
-    );
+    // Scale flat charge COSTS (not qty).
+    // qty=0.01 on a flat charge makes the 1-cent nudge move total by 0.012 cents —
+    // you'd need thousands of iterations. qty stays meaningful (1 permit fee at $X).
+    let newCharges = additionalCharges.map((charge: AdditionalCharge) => {
+      if (charge.isPercentage) return charge;
+      return {
+        ...charge,
+        costPerUnitCents: Math.round(
+          (charge.costPerUnitCents || 0) * multiplier
+        )
+      };
+    });
 
+    // computeTotal must match baseTotals exactly so the strip reads 0 after update
+    const computeTotal = (secs: any[], chs: AdditionalCharge[]): number => {
+      const r = getTaxSummary(
+        invoiceContext,
+        secs,
+        profile?.tax_rate || 0,
+        materialsById,
+        chs
+      );
+      const taxTotal = Object.values(r.taxGroups).reduce(
+        (sum: number, v: any) => sum + Math.round(Number(v)),
+        0
+      );
+      return Math.round(r.subtotalCents) + taxTotal;
+    };
+
+    // Find best correction candidate: flat charge first (qty=1, known tax),
+    // then largest section item
+    const adjChargeIdx = newCharges.findIndex(
+      (c) => !c.isPercentage && (c.costPerUnitCents || 0) > 0
+    );
+    let adjSecIdx = -1;
+    let adjItemIdx = -1;
+    if (adjChargeIdx < 0) {
+      outer: for (let si = 0; si < newSections.length; si++) {
+        for (let ii = 0; ii < (newSections[si].items || []).length; ii++) {
+          if ((newSections[si].items[ii].cost_per_unit_cents || 0) > 0) {
+            adjSecIdx = si;
+            adjItemIdx = ii;
+            break outer;
+          }
+        }
+      }
+    }
+
+    // Direct mathematical correction — compute the exact cost adjustment needed
+    // rather than nudging 1 cent at a time
+    const deltaBefore = computeTotal(newSections, newCharges) - remaining;
+    if (deltaBefore !== 0 && adjChargeIdx >= 0) {
+      const charge = newCharges[adjChargeIdx];
+      const taxRate = charge.taxRate ?? profile?.tax_rate ?? 0;
+      // Each 1 cent of costPerUnitCents moves total by qty × (1 + tax%)
+      const impactPerCent = (charge.qty || 1) * (1 + taxRate / 100);
+      const costAdj =
+        deltaBefore > 0
+          ? Math.ceil(deltaBefore / impactPerCent)
+          : Math.floor(deltaBefore / impactPerCent);
+      newCharges = newCharges.map((c: AdditionalCharge, i: number) =>
+        i === adjChargeIdx
+          ? {
+              ...c,
+              costPerUnitCents: Math.max(0, (c.costPerUnitCents || 0) - costAdj)
+            }
+          : c
+      );
+    }
+
+    // Fine-tune: up to 10 iterations for any residual rounding
+    // With qty=1 on charges, each step moves total by ~(1 + taxRate%) ≈ 1.2 cents — converges fast
+    for (let iter = 0; iter < 10; iter++) {
+      const tot = computeTotal(newSections, newCharges);
+      if (tot === remaining) break;
+      const dir = tot > remaining ? -1 : 1;
+
+      if (adjChargeIdx >= 0) {
+        newCharges = newCharges.map((c: AdditionalCharge, i: number) =>
+          i === adjChargeIdx
+            ? {
+                ...c,
+                costPerUnitCents: Math.max(0, (c.costPerUnitCents || 0) + dir)
+              }
+            : c
+        );
+      } else if (adjSecIdx >= 0) {
+        newSections = newSections.map((sec: any, si: number) =>
+          si === adjSecIdx
+            ? {
+                ...sec,
+                items: sec.items.map((item: any, ii: number) => {
+                  if (ii !== adjItemIdx) return item;
+                  const newCost = Math.max(
+                    0,
+                    (item.cost_per_unit_cents || 0) + dir
+                  );
+                  return {
+                    ...item,
+                    cost_per_unit_cents: newCost,
+                    costPerUnitCents: newCost
+                  };
+                })
+              }
+            : sec
+        );
+      } else {
+        break;
+      }
+    }
+
+    setSections(newSections);
+    setAdditionalCharges(newCharges);
     setIsDirty(true);
   };
   const handleUpdateSectionItemMaterial = (
@@ -2914,7 +3008,7 @@ export default function InvoiceView() {
             notice: lang.notice,
             cancel: lang.cancel,
             confirmOk: lang.confirmOk,
-            deletePermanently: lang.cancelInvoice
+            deletePermanently: lang.deleteInvoiceDraft
           }}
         />
 
