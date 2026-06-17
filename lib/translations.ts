@@ -615,7 +615,6 @@ export const translations = {
     dateFilterLabel: 'Period',
 
     last30Days: 'Last 30 Days',
-    thisYear: 'This Year',
     lastYear: 'Last Year',
     // Email notification preferences
     notificationSettings: 'Email Notifications',
