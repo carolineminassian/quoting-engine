@@ -613,8 +613,7 @@ export const translations = {
       'Failed to schedule cancellation. Please try again.',
     // Date filters
     dateFilterLabel: 'Period',
-    allTime: 'All Time',
-    thisMonth: 'This Month',
+
     last30Days: 'Last 30 Days',
     thisYear: 'This Year',
     lastYear: 'Last Year',
@@ -1202,9 +1201,6 @@ export const translations = {
     revenueTrend: 'Évolution des Revenus',
     timePeriod: 'Période',
     displayCurrency: "Devise d'Affichage",
-    allTime: 'Tout le temps',
-    thisYear: 'Cette Année',
-    thisMonth: 'Ce Mois',
     last6MonthsFilter: '6 Derniers Mois',
     revenueVsMargin: 'CA Brut vs. Marge Nette',
     grossRevenue: 'CA Brut (HT)',
