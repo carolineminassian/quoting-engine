@@ -268,7 +268,7 @@ export default function DashboardPage() {
     // Collect IDs of all visible pending estimates with a client email.
     // The server will further filter for cooldown / status edge cases.
     const candidateIds = processedEstimates
-      .filter((est) => est.client_email)
+      .filter((est) => est.client_email && est.last_email_sent_at)
       .map((est) => est.id);
 
     if (candidateIds.length === 0) {

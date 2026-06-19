@@ -322,7 +322,9 @@ export default function InvoicesPage() {
                   name: item.name || m?.name || currentLang.itemLabel,
                   qty: item.qty || 0,
                   unit:
-                    currentLang?.units?.[item.unit || m?.unit || ''] ||
+                    (currentLang?.units as Record<string, string>)?.[
+                      item.unit || m?.unit || ''
+                    ] ||
                     item.unit ||
                     m?.unit ||
                     '',
@@ -345,7 +347,10 @@ export default function InvoicesPage() {
             isPercentage: !!charge.isPercentage,
             percentageRate: charge.percentageRate || 0,
             qty: charge.qty || 1,
-            unit: currentLang?.units?.[charge.unit] || charge.unit || 'ea',
+            unit:
+              (currentLang?.units as Record<string, string>)?.[charge.unit] ||
+              charge.unit ||
+              'ea',
             costPerUnitCents: charge.costPerUnitCents || 0,
             taxRate: charge.taxRate ?? taxRate,
             amountCents: getAdditionalChargeAmountCents(
@@ -450,14 +455,16 @@ export default function InvoicesPage() {
     if (candidateIds.length === 0) {
       setDialog({
         type: 'alert',
-        message: lang.followUpAllNothingToSend
+        message: lang.invoiceFollowUpAllNothingToSend
       });
       return;
     }
 
     setDialog({
       type: 'confirm',
-      message: t(lang.followUpAllConfirm, { count: candidateIds.length }),
+      message: t(lang.invoiceFollowUpAllConfirm, {
+        count: candidateIds.length
+      }),
       onConfirm: async () => {
         setDialog(null);
         setBulkFollowupSending(true);
@@ -502,7 +509,7 @@ export default function InvoicesPage() {
 
           setDialog({
             type: 'alert',
-            message: t(lang.followUpAllResult, {
+            message: t(lang.invoiceFollowUpAllResult, {
               sent: result.sent ?? 0,
               skipped: result.skipped ?? 0,
               failed: result.failed ?? 0

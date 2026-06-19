@@ -307,6 +307,12 @@ export const translations = {
     poNumber: 'PO Number',
     poPlaceholder: 'e.g. PO-12345',
     bankDetails: 'Bank Details',
+    invoiceFollowUpAllConfirm:
+      'Send a follow-up to all {count} unpaid invoice(s) with a client email? Invoices contacted in the last 7 days will be skipped.',
+    invoiceFollowUpAllResult:
+      '{sent} follow-up(s) sent · {skipped} skipped · {failed} failed.',
+    invoiceFollowUpAllNothingToSend:
+      'No eligible invoices to follow up on. Invoices must have been sent at least once and not contacted in the last 7 days.',
     statusLabel: 'Status',
     selectAll: 'Select All',
     deselectAll: 'Deselect All',
@@ -963,6 +969,13 @@ export const translations = {
     statusLabel: 'Statut',
     selectAll: 'Tout sélectionner',
     deselectAll: 'Tout désélectionner',
+    invoiceFollowUpAllConfirm:
+      'Envoyer une relance à {count} facture(s) impayée(s) avec un email client ? Les factures relancées dans les 7 derniers jours seront ignorées.',
+    invoiceFollowUpAllResult:
+      '{sent} relance(s) envoyée(s) · {skipped} ignorée(s) · {failed} échouée(s).',
+    invoiceFollowUpAllNothingToSend:
+      'Aucune facture éligible à relancer. Les factures doivent avoir été envoyées au moins une fois et ne pas avoir été contactées dans les 7 derniers jours.',
+
     vatNumber: 'Numéro de TVA',
     companyRegNumber: 'SIRET',
     originalInvoiceRef: "Facture d'origine N° : {ref} du {date}",
