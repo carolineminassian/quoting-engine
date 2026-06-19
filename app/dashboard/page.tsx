@@ -64,7 +64,8 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<
     'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
   >('date_desc');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [clientSearchText, setClientSearchText] = useState('');
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
@@ -570,8 +571,12 @@ export default function DashboardPage() {
       }
     });
   };
+  const toggleClient = (name: string) => {
+    setSelectedClients((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
 
-  const query = searchQuery.toLowerCase();
   // Build the client list from estimates that match the current STATUS filter
   // (so the dropdown only shows clients you'd actually see on the dashboard).
   // Important: we apply only the status filter, not the search filter — otherwise
@@ -598,21 +603,50 @@ export default function DashboardPage() {
   ).sort((a, b) => a.localeCompare(b));
 
   const filteredClientNames = uniqueClientNames.filter((name) =>
-    name.toLowerCase().includes(searchQuery.toLowerCase())
+    name.toLowerCase().includes(clientSearchText.toLowerCase())
   );
   const processedEstimates = [...estimates]
     .filter((est) => {
-      // Text search
-      if (query && !(est.client_name || '').toLowerCase().includes(query)) {
-        return false;
+      // 1. Client filter — chip selections take priority over typed text.
+      //    If no chips, text alone filters the list as you type.
+      if (selectedClients.length > 0) {
+        if (!selectedClients.includes(est.client_name || '')) return false;
+      } else if (clientSearchText) {
+        if (
+          !(est.client_name || '')
+            .toLowerCase()
+            .includes(clientSearchText.toLowerCase())
+        )
+          return false;
+      }
+
+      // 2. Date filter — uses return false so it always compounds with
+      //    every other filter, not just the fallthrough path
+      if (filterDate !== 'all') {
+        const now = new Date();
+        const created = new Date(est.created_at);
+        if (filterDate === 'this-month') {
+          if (
+            created.getMonth() !== now.getMonth() ||
+            created.getFullYear() !== now.getFullYear()
+          )
+            return false;
+        } else if (filterDate === 'last-30') {
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          if (created < d) return false;
+        } else if (filterDate === 'this-year') {
+          if (created.getFullYear() !== now.getFullYear()) return false;
+        } else if (filterDate === 'last-year') {
+          if (created.getFullYear() !== now.getFullYear() - 1) return false;
+        }
       }
 
       const billing = est._billing;
       const totalCents = est.total_amount_cents || 0;
       const billedCents = billing?.billedCents || 0;
 
-      // Status filter
-      if (filterStatus === 'draft' && !!est.is_locked) return false;
+      // 3. Status filter
       if (filterStatus === 'draft') return !est.is_locked;
       if (filterStatus === 'pending')
         return (
@@ -632,7 +666,7 @@ export default function DashboardPage() {
       if (filterStatus === 'unread')
         return estimatesWithNotifications.has(est.id);
 
-      // When status = 'all', also apply billing filter if set
+      // 4. Billing filter (only when status = 'all')
       if (filterBilling !== 'all') {
         if (filterBilling === 'with-invoices')
           return (
@@ -660,25 +694,6 @@ export default function DashboardPage() {
             !est.cancelled_at &&
             (!billing || billedCents === 0)
           );
-      }
-
-      if (filterDate !== 'all') {
-        const now = new Date();
-        const created = new Date(est.created_at);
-        if (filterDate === 'this-month')
-          return (
-            created.getMonth() === now.getMonth() &&
-            created.getFullYear() === now.getFullYear()
-          );
-        if (filterDate === 'last-30') {
-          const d = new Date();
-          d.setDate(d.getDate() - 30);
-          return created >= d;
-        }
-        if (filterDate === 'this-year')
-          return created.getFullYear() === now.getFullYear();
-        if (filterDate === 'last-year')
-          return created.getFullYear() === now.getFullYear() - 1;
       }
 
       return true;
@@ -969,81 +984,190 @@ export default function DashboardPage() {
             {/* Live Text Filter input — also acts as a dropdown of past clients */}
             <div className="relative flex-1 max-w-md">
               {/* Input group: input + buttons in a single row that looks like one input */}
-              <div className="flex items-center h-[52px] border border-gray-200 rounded-xl bg-white shadow-sm focus-within:border-blue-500 transition-colors px-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    if (e.target.value.length > 0) {
-                      setShowClientDropdown(true);
-                    } else {
-                      setShowClientDropdown(false);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      setShowClientDropdown(false);
-                    }
-                    if (e.key === 'Escape') {
-                      setShowClientDropdown(false);
-                    }
-                  }}
-                  placeholder={lang.filterByClient}
-                  className="flex-1 min-w-0 h-full px-2 bg-transparent outline-none text-xs font-bold text-black placeholder-gray-400"
-                />
+              <div className="flex items-start min-h-[52px] border border-gray-200 rounded-xl bg-white shadow-sm focus-within:border-blue-500 transition-colors px-2 py-1.5 cursor-text gap-1">
+                {/* Chips + input — flex-wrap so they flow freely */}
+                <div className="flex flex-wrap gap-1.5 flex-1 min-w-0 items-center">
+                  {selectedClients.map((name) => (
+                    <span
+                      key={name}
+                      className="flex items-center gap-1 bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-1 rounded-lg shrink-0"
+                    >
+                      {name}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleClient(name);
+                        }}
+                        className="text-blue-500 hover:text-blue-800 leading-none cursor-pointer"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
 
-                {searchQuery && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setShowClientDropdown(false);
+                  <input
+                    type="text"
+                    value={clientSearchText}
+                    onChange={(e) => {
+                      setClientSearchText(e.target.value);
+                      if (e.target.value.length > 0) {
+                        setShowClientDropdown(true);
+                      }
                     }}
-                    className="shrink-0 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
-                    type="button"
-                    aria-label="Clear filter"
-                  >
-                    ✕
-                  </button>
-                )}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setShowClientDropdown(false);
+                    }}
+                    placeholder={
+                      selectedClients.length === 0 ? lang.filterByClient : ''
+                    }
+                    className="flex-1 min-w-[80px] h-[32px] px-2 bg-transparent outline-none text-xs font-bold text-black placeholder-gray-400"
+                  />
+                </div>
 
-                {uniqueClientNames.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowClientDropdown((prev) => !prev)}
-                    className="shrink-0 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 rounded-md text-[10px] transition-colors cursor-pointer"
-                    aria-label="Toggle client list"
-                  >
-                    ▼
-                  </button>
-                )}
+                {/* Clear + arrow — always pinned to top-right */}
+                <div className="flex items-center gap-0.5 shrink-0 pt-2">
+                  {(selectedClients.length > 0 || clientSearchText) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedClients([]);
+                        setClientSearchText('');
+                        setShowClientDropdown(false);
+                      }}
+                      className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
+                      aria-label="Clear filter"
+                    >
+                      ✕
+                    </button>
+                  )}
+
+                  {uniqueClientNames.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowClientDropdown((prev) => !prev);
+                      }}
+                      className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 rounded-md text-[10px] transition-colors cursor-pointer"
+                      aria-label="Toggle client list"
+                    >
+                      ▼
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Dropdown panel */}
+              {/* Dropdown panel */}
               {showClientDropdown && uniqueClientNames.length > 0 && (
                 <>
-                  {/* Click-outside overlay */}
                   <div
                     className="fixed inset-0 z-40"
                     onClick={() => setShowClientDropdown(false)}
                   />
-
                   <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto p-1">
+                    {filteredClientNames.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allSelected = filteredClientNames.every((n) =>
+                            selectedClients.includes(n)
+                          );
+                          if (allSelected) {
+                            setSelectedClients((prev) =>
+                              prev.filter(
+                                (n) => !filteredClientNames.includes(n)
+                              )
+                            );
+                          } else {
+                            setSelectedClients((prev) => [
+                              ...new Set([...prev, ...filteredClientNames])
+                            ]);
+                          }
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2 py-2 mb-0.5 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 rounded-lg border-b border-gray-100 pb-2.5"
+                      >
+                        {(() => {
+                          const allSelected = filteredClientNames.every((n) =>
+                            selectedClients.includes(n)
+                          );
+                          const someSelected = filteredClientNames.some((n) =>
+                            selectedClients.includes(n)
+                          );
+                          return (
+                            <>
+                              <span
+                                className={`w-4 h-4 flex items-center justify-center rounded border-2 shrink-0 transition-colors ${
+                                  allSelected
+                                    ? 'bg-blue-600 border-blue-600 text-white'
+                                    : someSelected
+                                      ? 'bg-blue-50 border-blue-400'
+                                      : 'border-gray-300'
+                                }`}
+                              >
+                                {allSelected ? (
+                                  <svg
+                                    className="w-2.5 h-2.5"
+                                    viewBox="0 0 12 12"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                  >
+                                    <polyline points="2 6 5 9 10 3" />
+                                  </svg>
+                                ) : someSelected ? (
+                                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-sm inline-block" />
+                                ) : null}
+                              </span>
+                              <span>
+                                {allSelected
+                                  ? lang.deselectAll || 'Deselect All'
+                                  : lang.selectAll || 'Select All'}
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </button>
+                    )}
                     {filteredClientNames.length > 0 ? (
-                      filteredClientNames.map((name, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setSearchQuery(name);
-                            setShowClientDropdown(false);
-                          }}
-                          className="w-full text-left p-2 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg cursor-pointer block truncate transition-colors"
-                        >
-                          {name}
-                        </button>
-                      ))
+                      filteredClientNames.map((name, idx) => {
+                        const isSelected = selectedClients.includes(name);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              toggleClient(name);
+                              // Keep text so the filtered list stays visible
+                              // for continued multi-selection
+                            }}
+                            className="w-full flex items-center gap-2.5 text-left p-2 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-900 rounded-lg cursor-pointer transition-colors"
+                          >
+                            <span
+                              className={`w-4 h-4 flex items-center justify-center rounded border-2 shrink-0 transition-colors ${
+                                isSelected
+                                  ? 'bg-blue-600 border-blue-600 text-white'
+                                  : 'border-gray-300'
+                              }`}
+                            >
+                              {isSelected && (
+                                <svg
+                                  className="w-2.5 h-2.5"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                >
+                                  <polyline points="2 6 5 9 10 3" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="truncate">{name}</span>
+                          </button>
+                        );
+                      })
                     ) : (
                       <p className="p-3 text-[10px] font-bold text-gray-400 italic uppercase tracking-widest">
                         {lang.noEstimatesMatch}
