@@ -118,6 +118,8 @@ export const translations = {
     withInvoices: 'With Invoices',
     filterByClient: 'Filter by client name...',
     filterLabel: 'Estimate Status:',
+    proLockBulkFollowupMessage:
+      'Bulk follow-up emails are a Pro feature. Upgrade to send follow-ups to all pending estimates in one click.',
     sortByLabel: 'Sort by:',
     allProjects: 'All Projects',
     draftsOnly: 'Drafts',
@@ -797,6 +799,8 @@ export const translations = {
     untitledProject: 'Projet sans nom',
     noContactEmail: 'Aucun contact',
     filterByClient: 'Filtrer par nom de client...',
+    proLockBulkFollowupMessage:
+      'Les relances groupées sont une fonctionnalité Pro. Passez à Pro pour envoyer des relances à tous vos devis en attente en un clic.',
     filterLabel: 'Statut du Devis:',
     sortByLabel: 'Trier par:',
     allProjects: 'Tous les Projets',

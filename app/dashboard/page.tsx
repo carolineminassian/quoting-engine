@@ -77,7 +77,9 @@ export default function DashboardPage() {
     onConfirm?: () => void;
   } | null>(null);
   const [exportModal, setExportModal] = useState(false);
-  const [proLockModal, setProLockModal] = useState<null | 'csv' | 'zip'>(null);
+  const [proLockModal, setProLockModal] = useState<
+    null | 'csv' | 'zip' | 'bulkFollowup'
+  >(null);
   const [bulkFollowupSending, setBulkFollowupSending] = useState(false);
 
   useEffect(() => {
@@ -1189,7 +1191,11 @@ export default function DashboardPage() {
                   disabled={
                     bulkFollowupSending || processedEstimates.length === 0
                   }
-                  onClick={handleBulkFollowUp}
+                  onClick={
+                    profile?.subscription_tier === 'pro'
+                      ? handleBulkFollowUp
+                      : () => setProLockModal('bulkFollowup')
+                  }
                   className="flex-1 sm:flex-none"
                   icon={
                     <svg
@@ -1885,7 +1891,9 @@ export default function DashboardPage() {
               ? lang.proLockCsvMessage
               : proLockModal === 'zip'
                 ? lang.proLockZipMessage
-                : '',
+                : proLockModal === 'bulkFollowup'
+                  ? lang.proLockBulkFollowupMessage
+                  : '',
           upgrade: lang.proLockUpgradeBtn,
           cancel: lang.cancel
         }}

@@ -404,15 +404,16 @@ export default function InvoiceView() {
           .single();
 
         if (!inv) {
-          const { data: prof } = await supabase
-            .from('profiles')
-            .select('country')
-            .eq('id', user.id)
-            .single();
-
-          const fallbackLang =
-            prof?.country === 'FR' ? translations.FR : translations.US;
-          setLang(fallbackLang);
+          if (user) {
+            const { data: prof } = await supabase
+              .from('profiles')
+              .select('country')
+              .eq('id', user.id)
+              .single();
+            setLang(prof?.country === 'FR' ? translations.FR : translations.US);
+          } else {
+            setLang(translations.US);
+          }
           setLoading(false);
           return;
         }
