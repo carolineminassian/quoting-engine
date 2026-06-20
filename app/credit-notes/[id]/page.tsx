@@ -84,12 +84,16 @@ export default function CreditNoteView() {
         .single();
 
       if (!cn) {
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('country')
-          .eq('id', user.id)
-          .single();
-        setLang(prof?.country === 'FR' ? translations.FR : translations.US);
+        if (user) {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('country')
+            .eq('id', user.id)
+            .single();
+          setLang(prof?.country === 'FR' ? translations.FR : translations.US);
+        } else {
+          setLang(translations.US);
+        }
         setLoading(false);
         return;
       }
