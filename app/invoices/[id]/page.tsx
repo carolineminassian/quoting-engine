@@ -2119,9 +2119,29 @@ export default function InvoiceView() {
                       className="h-12 sm:h-14 w-auto object-contain shrink-0"
                     />
                   )}
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight break-words leading-tight">
-                    {profile.business_name}
-                  </h1>
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight break-words leading-tight">
+                      {profile.business_name}
+                    </h1>
+                    {(profile.business_address || profile.business_city) && (
+                      <div className="mt-1 text-xs text-gray-500 font-medium leading-relaxed">
+                        {profile.business_address && (
+                          <p>{profile.business_address}</p>
+                        )}
+                        {(profile.business_city ||
+                          profile.business_state ||
+                          profile.business_zip) && (
+                          <p>
+                            {profile.country === 'US'
+                              ? `${profile.business_city || ''}${profile.business_state ? `, ${profile.business_state}` : ''} ${profile.business_zip || ''}`.trim()
+                              : [profile.business_zip, profile.business_city]
+                                  .filter(Boolean)
+                                  .join(' ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="text-right shrink-0 space-y-1">
@@ -2924,14 +2944,41 @@ export default function InvoiceView() {
                     {lang.paymentInstructions}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {profile.bank_wire_instructions && (
+                    {(profile.bank_name || profile.bank_account_number) && (
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widests text-gray-400 mb-2">
                           {lang.bankWireInstructions}
                         </p>
-                        <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                          {profile.bank_wire_instructions}
-                        </p>
+                        <div className="text-sm text-gray-600 space-y-0.5">
+                          {profile.bank_name && (
+                            <p>
+                              <span className="font-semibold text-gray-500">
+                                {lang.bankLabel}:
+                              </span>{' '}
+                              {profile.bank_name}
+                            </p>
+                          )}
+                          {profile.bank_account_number && (
+                            <p>
+                              <span className="font-semibold text-gray-500">
+                                {lang.bankAccountNumberLabel}:
+                              </span>{' '}
+                              <span className="font-mono tracking-wider">
+                                {profile.bank_account_number}
+                              </span>
+                            </p>
+                          )}
+                          {profile.bank_routing_number && (
+                            <p>
+                              <span className="font-semibold text-gray-500">
+                                {lang.bicSwiftLabel}:
+                              </span>{' '}
+                              <span className="font-mono tracking-wider">
+                                {profile.bank_routing_number}
+                              </span>
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                     {profile.payment_link_url && (
@@ -2979,6 +3026,20 @@ export default function InvoiceView() {
                     </p>
                   </div>
                 </div>
+
+                {profile?.contact_email && (
+                  <div className="mt-6 text-center">
+                    <p className="text-[10px] text-gray-400">
+                      {lang.invoiceContactNote}{' '}
+                      <a
+                        href={`mailto:${profile.contact_email}`}
+                        className="text-blue-500 hover:underline font-semibold"
+                      >
+                        {profile.contact_email}
+                      </a>
+                    </p>
+                  </div>
+                )}
 
                 {(profile?.company_reg_number || profile?.vat_number) && (
                   <div className="mt-8 pt-6 border-t border-gray-100">

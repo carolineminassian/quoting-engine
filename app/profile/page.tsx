@@ -50,6 +50,20 @@ export default function ProfilePage() {
   const [notifyOnApproved, setNotifyOnApproved] = useState(true);
   const [notifyOnRejected, setNotifyOnRejected] = useState(true);
 
+  // Invoicing & Legal State
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankRoutingNumber, setBankRoutingNumber] = useState('');
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessCity, setBusinessCity] = useState('');
+  const [businessState, setBusinessState] = useState('');
+  const [businessZip, setBusinessZip] = useState('');
+  const [vatNumber, setVatNumber] = useState('');
+  const [companyRegNumber, setCompanyRegNumber] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [savingInvoicing, setSavingInvoicing] = useState(false);
+
   // Security Profile State
   const [authEmail, setAuthEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -83,6 +97,17 @@ export default function ProfilePage() {
         setNotifyOnComment(prof.notify_on_comment ?? true);
         setNotifyOnApproved(prof.notify_on_approved ?? true);
         setNotifyOnRejected(prof.notify_on_rejected ?? true);
+        setBankName(prof.bank_name || '');
+        setBankAccountNumber(prof.bank_account_number || '');
+        setBankRoutingNumber(prof.bank_routing_number || '');
+        setPaymentLinkUrl(prof.payment_link_url || '');
+        setBusinessAddress(prof.business_address || '');
+        setBusinessCity(prof.business_city || '');
+        setBusinessState(prof.business_state || '');
+        setBusinessZip(prof.business_zip || '');
+        setVatNumber(prof.vat_number || '');
+        setCompanyRegNumber(prof.company_reg_number || '');
+        setContactEmail(prof.contact_email || '');
         if (prof.logo_url) {
           setSelectedFileName('Uploaded Logo');
         }
@@ -95,6 +120,40 @@ export default function ProfilePage() {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
       setSelectedFileName(e.target.files[0].name);
+    }
+  };
+
+  const handleSaveInvoicing = async () => {
+    setSavingInvoicing(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        bank_name: bankName.trim() || null,
+        bank_account_number:
+          bankAccountNumber.trim().replace(/\s/g, '') || null,
+        bank_routing_number: bankRoutingNumber.trim() || null,
+        payment_link_url: paymentLinkUrl.trim() || null,
+        vat_number: vatNumber.trim() || null,
+        company_reg_number: companyRegNumber.trim() || null,
+        contact_email: contactEmail.trim() || null
+      })
+      .eq('id', profile.id);
+    setSavingInvoicing(false);
+    if (error) {
+      setDialog({ type: 'alert', message: error.message });
+    } else {
+      setProfile((prev: any) => ({
+        ...prev,
+        bank_name: bankName.trim() || null,
+        bank_account_number:
+          bankAccountNumber.trim().replace(/\s/g, '') || null,
+        bank_routing_number: bankRoutingNumber.trim() || null,
+        payment_link_url: paymentLinkUrl.trim() || null,
+        vat_number: vatNumber.trim() || null,
+        company_reg_number: companyRegNumber.trim() || null,
+        contact_email: contactEmail.trim() || null
+      }));
+      setDialog({ type: 'alert', message: lang.profileUpdated });
     }
   };
 
@@ -145,7 +204,11 @@ export default function ProfilePage() {
         currency: currency,
         logo_url: finalLogoUrl,
         default_deposit_enabled: depositEnabled,
-        default_deposit_percentage: depositPercentage
+        default_deposit_percentage: depositPercentage,
+        business_address: businessAddress.trim() || null,
+        business_city: businessCity.trim() || null,
+        business_state: businessState.trim() || null,
+        business_zip: businessZip.trim() || null
       })
       .eq('id', profile.id);
 
@@ -170,7 +233,10 @@ export default function ProfilePage() {
       default_hourly_rate: hourlyRate,
       default_daily_rate: dailyRate,
       default_deposit_enabled: depositEnabled,
-      default_deposit_percentage: depositPercentage
+      default_deposit_percentage: depositPercentage,
+      business_address: businessAddress.trim() || null,
+      business_city: businessCity.trim() || null,
+      business_zip: businessZip.trim() || null
     }));
     setLang(country === 'FR' ? translations.FR : translations.US);
     localStorage.setItem('public_lang', country === 'FR' ? 'FR' : 'US');
@@ -845,8 +911,72 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Business Address */}
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                {lang.businessAddress}
+              </label>
+              <input
+                type="text"
+                placeholder={lang.businessAddress}
+                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
+                value={businessAddress}
+                onChange={(e) => setBusinessAddress(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {lang.zipCode}
+                </label>
+                <input
+                  type="text"
+                  placeholder={lang.zipCode}
+                  maxLength={10}
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors bg-gray-50/40 shadow-inner"
+                  value={businessZip}
+                  onChange={(e) => setBusinessZip(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {lang.city}
+                </label>
+                <input
+                  type="text"
+                  placeholder={lang.city}
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
+                  value={businessCity}
+                  onChange={(e) => setBusinessCity(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* State — US only */}
+            {country === 'US' && (
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {lang.stateLabel}
+                </label>
+                <input
+                  type="text"
+                  placeholder="NY"
+                  maxLength={2}
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold uppercase transition-colors bg-gray-50/40 shadow-inner"
+                  value={businessState}
+                  onChange={(e) =>
+                    setBusinessState(e.target.value.toUpperCase())
+                  }
+                />
+                <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                  {lang.stateFormat}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widests">
                 {lang.logo}{' '}
                 {isFreePlan && (
                   <span className="text-blue-600 font-black ml-1.5">
@@ -894,6 +1024,164 @@ export default function ProfilePage() {
               {lang.save}
             </Button>
           </form>
+        </div>
+
+        {/* INVOICING & LEGAL SECTION */}
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
+          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-50 pb-3">
+            {lang.invoicingLegal}
+          </p>
+
+          <div className="space-y-6">
+            {/* Structured bank fields */}
+            <div className="space-y-4">
+              <p className="text-[10px] text-gray-400 font-medium leading-relaxed">
+                {lang.bankWireDesc}
+              </p>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 tracking-widest">
+                  {lang.bankName}
+                </label>
+                <input
+                  type="text"
+                  placeholder={lang.bankName}
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 tracking-widest">
+                  {lang.bankAccountNumberLabel}
+                </label>
+                <input
+                  type="text"
+                  placeholder={lang.bankAccountNumberLabel}
+                  maxLength={country === 'FR' ? 34 : 17}
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold tracking-widest transition-colors bg-gray-50/40 shadow-inner uppercase"
+                  value={bankAccountNumber}
+                  onChange={(e) =>
+                    setBankAccountNumber(e.target.value.toUpperCase())
+                  }
+                />
+                <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                  {lang.bankAccountFormat}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 tracking-widest">
+                  {lang.bankRoutingLabel}
+                </label>
+                <input
+                  type="text"
+                  placeholder={lang.bankRoutingLabel}
+                  maxLength={country === 'FR' ? 11 : 9}
+                  pattern={country === 'FR' ? '[A-Za-z0-9]{8,11}' : '[0-9]{9}'}
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold tracking-widest transition-colors bg-gray-50/40 shadow-inner uppercase"
+                  value={bankRoutingNumber}
+                  onChange={(e) =>
+                    setBankRoutingNumber(e.target.value.toUpperCase())
+                  }
+                />
+                <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                  {lang.bankRoutingFormat}
+                </p>
+              </div>
+            </div>
+
+            {/* Payment link */}
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                {lang.paymentLinkLabel ||
+                  (country === 'FR'
+                    ? 'Lien de paiement en ligne'
+                    : 'Online payment link')}
+              </label>
+              <p className="text-[10px] text-gray-400 mb-2 font-medium leading-relaxed">
+                {lang.paymentLinkUrlDesc}
+              </p>
+              <input
+                type="url"
+                placeholder="https://..."
+                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono text-sm transition-colors bg-gray-50/40 shadow-inner"
+                value={paymentLinkUrl}
+                onChange={(e) => setPaymentLinkUrl(e.target.value)}
+              />
+            </div>
+
+            {/* Contact email */}
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                {lang.contactEmailFieldLabel}
+              </label>
+              <p className="text-[10px] text-gray-400 mb-2 font-medium leading-relaxed">
+                {lang.contactEmailFieldDesc}
+              </p>
+              <input
+                type="email"
+                placeholder={
+                  country === 'FR'
+                    ? 'contact@votreentreprise.fr'
+                    : 'contact@yourbusiness.com'
+                }
+                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* VAT number */}
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {lang.vatNumber ||
+                    (country === 'FR'
+                      ? 'N° TVA intracommunautaire'
+                      : 'VAT number')}
+                </label>
+                <input
+                  type="text"
+                  placeholder={
+                    country === 'FR' ? 'FR00000000000' : 'GB123456789'
+                  }
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors bg-gray-50/40 shadow-inner"
+                  value={vatNumber}
+                  onChange={(e) => setVatNumber(e.target.value)}
+                />
+              </div>
+
+              {/* Company reg number */}
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widests">
+                  {lang.companyRegNumber ||
+                    (country === 'FR' ? 'SIRET' : 'Company reg. number')}
+                </label>
+                <input
+                  type="text"
+                  placeholder={
+                    country === 'FR' ? '000 000 000 00000' : '12345678'
+                  }
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors bg-gray-50/40 shadow-inner"
+                  value={companyRegNumber}
+                  onChange={(e) => setCompanyRegNumber(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            loading={savingInvoicing}
+            loadingText="..."
+            className="px-8 mt-6"
+            onClick={handleSaveInvoicing}
+          >
+            {lang.save}
+          </Button>
         </div>
 
         {/* ACCOUNT SECURITY SECTION */}

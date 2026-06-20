@@ -693,6 +693,16 @@ export default function InvoicePDF({
                 </View>
               )}
 
+              {isCredit && docData?.relatedInvoiceNumber && (
+                <View style={styles.metadataRow}>
+                  <Text style={styles.metadataLabel}>
+                    {isFr ? 'Facture :' : 'Invoice:'}
+                  </Text>
+                  <Text style={styles.metadataValue}>
+                    {docData.relatedInvoiceNumber}
+                  </Text>
+                </View>
+              )}
               {docData?.po_number && (
                 <View style={styles.metadataRow}>
                   <Text style={styles.metadataLabel}>
@@ -967,8 +977,8 @@ export default function InvoicePDF({
         ═══════════════════════════════════════════════ */}
         <View style={styles.totalsContainer} wrap={false}>
           <View style={styles.totalsBox}>
-            {/* Show Subtotal & Tax except for credit notes */}
-            {!isCredit && subtotal > 0 && (
+            {/* Show Subtotal & Tax for invoices and full credit notes */}
+            {(!isCredit || docData?.is_full_credit) && subtotal > 0 && (
               <>
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>
@@ -1069,7 +1079,7 @@ export default function InvoicePDF({
           >
             {!isCredit && (
               <>
-                {profile.bank_details || profile.bank_wire_instructions ? (
+                {profile.bank_name || profile.bank_account_number ? (
                   <>
                     <Text
                       style={[
@@ -1080,15 +1090,41 @@ export default function InvoicePDF({
                       {lang?.bankDetails ||
                         (isFr ? 'Coordonnées Bancaires' : 'Bank Details')}
                     </Text>
-                    <Text
-                      style={[
-                        styles.footerText,
-                        styles.footerTextRight,
-                        { width: '100%' }
-                      ]}
-                    >
-                      {profile.bank_details || profile.bank_wire_instructions}
-                    </Text>
+                    {profile.bank_name && (
+                      <Text
+                        style={[
+                          styles.footerText,
+                          styles.footerTextRight,
+                          { width: '100%' }
+                        ]}
+                      >
+                        {lang?.bankLabel || 'Bank'}: {profile.bank_name}
+                      </Text>
+                    )}
+                    {profile.bank_account_number && (
+                      <Text
+                        style={[
+                          styles.footerText,
+                          styles.footerTextRight,
+                          { width: '100%' }
+                        ]}
+                      >
+                        {lang?.bankAccountNumberLabel || 'Account'}:{' '}
+                        {profile.bank_account_number}
+                      </Text>
+                    )}
+                    {profile.bank_routing_number && (
+                      <Text
+                        style={[
+                          styles.footerText,
+                          styles.footerTextRight,
+                          { width: '100%' }
+                        ]}
+                      >
+                        {lang?.bicSwiftLabel || 'Routing'}:{' '}
+                        {profile.bank_routing_number}
+                      </Text>
+                    )}
                   </>
                 ) : (
                   <>
