@@ -32,6 +32,8 @@ export default function AnalyticsPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilterType>('ALL');
   const [targetCurrency, setTargetCurrency] = useState<CurrencyType>('USD');
   const [rawEstimates, setRawEstimates] = useState<any[]>([]);
+  const [rawInvoices, setRawInvoices] = useState<any[]>([]);
+  const [rawCreditNotes, setRawCreditNotes] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(1.1);
 
   useEffect(() => {
@@ -88,18 +90,32 @@ export default function AnalyticsPage() {
       }
 
       // Pull cancelled_at + cancelled_reason so we can categorize cancelled estimates
-      const { data: ests } = await supabase
-        .from('estimates')
-        .select(
-          'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot, client_status, cancelled_at, cancelled_reason'
-        )
-        .eq('user_id', user.id)
-        .eq('is_locked', true)
-        .order('created_at', { ascending: false });
+      const [estsRes, invsRes, cnsRes] = await Promise.all([
+        supabase
+          .from('estimates')
+          .select(
+            'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot, client_status, cancelled_at, cancelled_reason'
+          )
+          .eq('user_id', user.id)
+          .eq('is_locked', true)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('invoices')
+          .select(
+            'id, total_amount_cents, paid_amount_cents, credited_amount_cents, payment_status, due_date, created_at, currency_snapshot'
+          )
+          .eq('user_id', user.id)
+          .eq('is_locked', true)
+          .eq('is_cancelled', false),
+        supabase
+          .from('credit_notes')
+          .select('id, amount_cents, created_at, currency_snapshot')
+          .eq('user_id', user.id)
+      ]);
 
-      if (ests) {
-        setRawEstimates(ests);
-      }
+      if (estsRes.data) setRawEstimates(estsRes.data);
+      if (invsRes.data) setRawInvoices(invsRes.data);
+      if (cnsRes.data) setRawCreditNotes(cnsRes.data);
 
       setLoading(false);
     }
@@ -336,6 +352,142 @@ export default function AnalyticsPage() {
   });
   const maxChartVal = Math.max(...chartData.map((d) => d.val), 10000) * 1.15;
 
+  // ── Invoicing Analytics ────────────────────────────────────────────────────
+
+  const applyTimeFilter = (dateStr: string) => {
+    const date = new Date(dateStr);
+    if (timeFilter === 'YEAR') return date.getFullYear() === now.getFullYear();
+    if (timeFilter === 'MONTH')
+      return (
+        date.getMonth() === now.getMonth() &&
+        date.getFullYear() === now.getFullYear()
+      );
+    if (timeFilter === '6MOS') {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      return date >= sixMonthsAgo;
+    }
+    return true;
+  };
+
+  const filteredInvoices = rawInvoices.filter((inv) =>
+    applyTimeFilter(inv.created_at)
+  );
+  const filteredCreditNotes = rawCreditNotes.filter((cn) =>
+    applyTimeFilter(cn.created_at)
+  );
+
+  let totalInvoicedCents = 0;
+  let totalCollectedCents = 0;
+  let totalOutstandingCents = 0;
+  let totalOverdueCents = 0;
+  let countPaidInvoices = 0;
+  let countUnpaidInvoices = 0;
+  let countOverdueInvoices = 0;
+
+  filteredInvoices.forEach((inv) => {
+    const currency = inv.currency_snapshot || 'USD';
+    const gross = getAmountInTargetCurrency(
+      inv.total_amount_cents || 0,
+      currency
+    );
+    const credited = getAmountInTargetCurrency(
+      inv.credited_amount_cents || 0,
+      currency
+    );
+    const net = Math.max(0, gross - credited);
+
+    totalInvoicedCents += gross;
+
+    if (inv.payment_status === 'paid') {
+      totalCollectedCents += getAmountInTargetCurrency(
+        inv.paid_amount_cents || inv.total_amount_cents || 0,
+        currency
+      );
+      countPaidInvoices++;
+    } else {
+      const isInvOverdue = inv.due_date && new Date(inv.due_date) < new Date();
+      if (isInvOverdue) {
+        totalOverdueCents += net;
+        countOverdueInvoices++;
+      } else {
+        totalOutstandingCents += net;
+        countUnpaidInvoices++;
+      }
+    }
+  });
+
+  let totalCreditedCents = 0;
+  filteredCreditNotes.forEach((cn) => {
+    totalCreditedCents += getAmountInTargetCurrency(
+      cn.amount_cents || 0,
+      cn.currency_snapshot || 'USD'
+    );
+  });
+
+  const collectionRate =
+    totalInvoicedCents > 0
+      ? Math.round((totalCollectedCents / totalInvoicedCents) * 100)
+      : 0;
+
+  const billingRate =
+    totalRevenueCents > 0
+      ? Math.min(
+          100,
+          Math.round((totalInvoicedCents / totalRevenueCents) * 100)
+        )
+      : 0;
+
+  // Billing trend: monthly invoiced vs collected (last 6 months)
+  const billingChartData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    const label = d.toLocaleString(country === 'FR' ? 'fr-FR' : 'en-US', {
+      month: 'short'
+    });
+    const invoiced = rawInvoices
+      .filter((inv) => {
+        const ed = new Date(inv.created_at);
+        return ed.getMonth() === m && ed.getFullYear() === y;
+      })
+      .reduce(
+        (acc, inv) =>
+          acc +
+          getAmountInTargetCurrency(
+            inv.total_amount_cents || 0,
+            inv.currency_snapshot || 'USD'
+          ),
+        0
+      );
+    const collected = rawInvoices
+      .filter((inv) => {
+        const ed = new Date(inv.created_at);
+        return (
+          ed.getMonth() === m &&
+          ed.getFullYear() === y &&
+          inv.payment_status === 'paid'
+        );
+      })
+      .reduce(
+        (acc, inv) =>
+          acc +
+          getAmountInTargetCurrency(
+            inv.paid_amount_cents || inv.total_amount_cents || 0,
+            inv.currency_snapshot || 'USD'
+          ),
+        0
+      );
+    return { label, invoiced, collected };
+  });
+
+  const maxBillingChartVal =
+    Math.max(
+      ...billingChartData.map((d) => Math.max(d.invoiced, d.collected)),
+      10000
+    ) * 1.15;
+
   return (
     <main className="min-h-screen bg-gray-50 p-6 sm:p-8 text-black font-sans pb-24">
       <div className="max-w-4xl mx-auto">
@@ -555,6 +707,55 @@ export default function AnalyticsPage() {
               </p>
             </div>
           </div>
+          {/* Row 3: Billing KPIs */}
+          {(totalInvoicedCents > 0 || filteredInvoices.length > 0) && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between overflow-hidden">
+              <div className="flex-1 p-5 flex justify-between items-center w-full">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  {lang.totalInvoiced}
+                </span>
+                <span className="text-2xl font-black font-mono text-blue-700 bg-blue-50 px-3 py-0.5 rounded-md">
+                  {formatMoney(totalInvoicedCents)}
+                </span>
+              </div>
+              <div
+                className="hidden sm:block bg-gray-200 shrink-0"
+                style={{ width: '3px', height: '36px' }}
+              />
+              <div className="flex-1 p-5 flex justify-between items-center w-full">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  {lang.totalCollected}
+                </span>
+                <span className="text-2xl font-black font-mono text-green-600 bg-green-50 px-3 py-0.5 rounded-md">
+                  {formatMoney(totalCollectedCents)}
+                </span>
+              </div>
+              <div
+                className="hidden sm:block bg-gray-200 shrink-0"
+                style={{ width: '3px', height: '36px' }}
+              />
+              <div className="flex-1 p-5 flex justify-between items-center w-full">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  {lang.outstandingAmount}
+                </span>
+                <span className="text-2xl font-black font-mono text-amber-600 bg-amber-50 px-3 py-0.5 rounded-md">
+                  {formatMoney(totalOutstandingCents)}
+                </span>
+              </div>
+              <div
+                className="hidden sm:block bg-gray-200 shrink-0"
+                style={{ width: '3px', height: '36px' }}
+              />
+              <div className="flex-1 p-5 flex justify-between items-center w-full">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  {lang.overdueAmount}
+                </span>
+                <span className="text-2xl font-black font-mono text-red-500 bg-red-50 px-3 py-0.5 rounded-md">
+                  {formatMoney(totalOverdueCents)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {count === 0 ? (
@@ -759,6 +960,145 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Billing & Collections Card */}
+            {filteredInvoices.length > 0 && (
+              <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6 border-b border-gray-100 pb-4">
+                  {lang.billingCollections}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+                  {/* Collection Rate */}
+                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-100 flex flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      {lang.collectionRate}
+                    </span>
+                    <span className="text-3xl font-black font-mono text-green-600">
+                      {collectionRate}%
+                    </span>
+                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden mt-2">
+                      <div
+                        className="bg-green-500 h-full transition-all duration-700"
+                        style={{ width: `${collectionRate}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Billing Rate */}
+                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-100 flex flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      {lang.billingRate}
+                    </span>
+                    <span className="text-3xl font-black font-mono text-blue-600">
+                      {billingRate}%
+                    </span>
+                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden mt-2">
+                      <div
+                        className="bg-blue-500 h-full transition-all duration-700"
+                        style={{ width: `${billingRate}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Credit Notes */}
+                  {totalCreditedCents > 0 && (
+                    <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col items-center justify-center text-center">
+                      <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2">
+                        {lang.creditNotes}
+                      </span>
+                      <span className="text-3xl font-black font-mono text-purple-600">
+                        -{formatMoney(totalCreditedCents)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {/* Invoice breakdown */}
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+                    <p className="text-2xl font-black font-mono text-green-600">
+                      {countPaidInvoices}
+                    </p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                      {lang.invoicePaid}
+                    </p>
+                  </div>
+                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                    <p className="text-2xl font-black font-mono text-amber-600">
+                      {countUnpaidInvoices}
+                    </p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                      {lang.invoiceUnpaid}
+                    </p>
+                  </div>
+                  <div className="bg-red-50 p-3 rounded-lg border border-red-100">
+                    <p className="text-2xl font-black font-mono text-red-500">
+                      {countOverdueInvoices}
+                    </p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                      {lang.invoiceOverdue}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Billing Trend Chart */}
+            {filteredInvoices.length > 0 && (
+              <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 border-b border-gray-100 pb-4">
+                  {lang.billingTrend}
+                </p>
+                <div className="flex gap-4 mb-6">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 bg-blue-500 rounded-sm" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      {lang.totalInvoiced}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 bg-green-500 rounded-sm" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      {lang.totalCollected}
+                    </span>
+                  </div>
+                </div>
+                <div className="h-48 flex items-end justify-between gap-2 sm:gap-4">
+                  {billingChartData.map((d, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 h-full flex flex-col justify-end items-center gap-3 group"
+                    >
+                      <div
+                        className="w-full flex items-end gap-0.5"
+                        style={{ height: '100%' }}
+                      >
+                        {/* Invoiced bar */}
+                        <div
+                          className="flex-1 bg-blue-100 rounded-t-sm border-t-4 border-blue-500 transition-all duration-500 hover:bg-blue-200 relative"
+                          style={{
+                            height: `${(d.invoiced / maxBillingChartVal) * 100}%`,
+                            minHeight: d.invoiced > 0 ? '4px' : '0'
+                          }}
+                        >
+                          <div className="absolute -top-8 left-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                            {formatMoney(d.invoiced)}
+                          </div>
+                        </div>
+                        {/* Collected bar */}
+                        <div
+                          className="flex-1 bg-green-100 rounded-t-sm border-t-4 border-green-500 transition-all duration-500 hover:bg-green-200"
+                          style={{
+                            height: `${(d.collected / maxBillingChartVal) * 100}%`,
+                            minHeight: d.collected > 0 ? '4px' : '0'
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-black transition-colors">
+                        {d.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Revenue Trend Graph Card */}
             <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200">
