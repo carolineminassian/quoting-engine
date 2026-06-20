@@ -64,6 +64,7 @@ export default function CreditNoteView() {
   const [creditNote, setCreditNote] = useState<any>(null);
   const [invoice, setInvoice] = useState<any>(null);
   const [materials, setMaterials] = useState<any[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [lang, setLang] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -74,10 +75,7 @@ export default function CreditNoteView() {
       const {
         data: { user }
       } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
+      // Allow guest viewing
 
       const { data: cn } = await supabase
         .from('credit_notes')
@@ -113,6 +111,7 @@ export default function CreditNoteView() {
       const country = cn.country_snapshot || prof?.country || 'US';
 
       setLang(country === 'FR' ? translations.FR : translations.US);
+      setIsOwner(!!user && user.id === cn.user_id);
       setCreditNote(cn);
       setInvoice(inv || null);
       setMaterials(matsRes.data || []);
@@ -334,37 +333,54 @@ export default function CreditNoteView() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 text-gray-900 font-sans flex flex-col">
       <main className="flex-1 p-4 sm:p-8">
         <div className="max-w-4xl mx-auto">
-          {/* ── Toolbar ── */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6 justify-between">
-            <div className="flex gap-3 items-center">
-              <LinkButton href="/invoices" variant="secondary" size="sm">
-                <Icons.ArrowLeft />
-                <span className="ml-1.5">{lang.invoices}</span>
-              </LinkButton>
-              {creditNote.invoice_id && (
-                <LinkButton
-                  href={`/invoices/${creditNote.invoice_id}`}
-                  variant="ghost"
-                  size="sm"
-                  className="!text-gray-400 hover:!text-gray-700"
-                >
-                  <span>{lang.viewInvoice}</span>
-                  <Icons.ExternalLink />
+          {/* ── Toolbar ── owner only */}
+          {isOwner && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6 justify-between">
+              <div className="flex gap-3 items-center">
+                <LinkButton href="/invoices" variant="secondary" size="sm">
+                  <Icons.ArrowLeft />
+                  <span className="ml-1.5">{lang.invoices}</span>
                 </LinkButton>
-              )}
+                {creditNote.invoice_id && (
+                  <LinkButton
+                    href={`/invoices/${creditNote.invoice_id}`}
+                    variant="ghost"
+                    size="sm"
+                    className="!text-gray-400 hover:!text-gray-700"
+                  >
+                    <span>{lang.viewInvoice}</span>
+                    <Icons.ExternalLink />
+                  </LinkButton>
+                )}
+              </div>
+              <Button
+                variant="primary"
+                size="md"
+                loading={loadingPdf}
+                onClick={handleDownloadPDF}
+                icon={<Icons.Download />}
+              >
+                {lang.downloadInvoice ||
+                  (isFR ? 'Télécharger PDF' : 'Download PDF')}
+              </Button>
             </div>
-            <Button
-              variant="primary"
-              size="md"
-              loading={loadingPdf}
-              onClick={handleDownloadPDF}
-              icon={<Icons.Download />}
-            >
-              {lang.downloadInvoice ||
-                (isFR ? 'Télécharger PDF' : 'Download PDF')}
-            </Button>
-          </div>
-
+          )}{' '}
+          {/* end isOwner toolbar */}
+          {/* Guest download bar */}
+          {!isOwner && !loading && creditNote && (
+            <div className="flex sm:justify-end mb-6">
+              <Button
+                variant="primary"
+                size="md"
+                loading={loadingPdf}
+                onClick={handleDownloadPDF}
+                icon={<Icons.Download />}
+                className="w-full sm:w-auto"
+              >
+                {lang.downloadInvoice}
+              </Button>
+            </div>
+          )}
           {/* ── Document ── */}
           <article className="bg-white shadow-xl border border-gray-200 rounded-2xl overflow-hidden">
             <div className="p-8 sm:p-12">
@@ -736,9 +752,24 @@ export default function CreditNoteView() {
                   </div>
                 </div>
 
-                {(profile?.company_reg_number || profile?.vat_number) && (
-                  <div className="mt-8 pt-6 border-t border-gray-100">
-                    <div className="flex flex-wrap gap-4 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                  <p className="text-[10px] font-bold text-gray-600">
+                    {profile.business_name}
+                  </p>
+                  {(profile?.business_address || profile?.business_city) && (
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      {[
+                        profile.business_address,
+                        profile.country === 'US'
+                          ? `${profile.business_city || ''}${profile.business_state ? `, ${profile.business_state}` : ''} ${profile.business_zip || ''}`.trim()
+                          : `${profile.business_zip || ''} ${profile.business_city || ''}`.trim()
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  )}
+                  {(profile?.company_reg_number || profile?.vat_number) && (
+                    <div className="flex flex-wrap justify-center gap-4 mt-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
                       {profile?.company_reg_number && (
                         <span>
                           {lang.companyRegNumber}: {profile.company_reg_number}
@@ -750,8 +781,8 @@ export default function CreditNoteView() {
                         </span>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </footer>
             </div>
           </article>

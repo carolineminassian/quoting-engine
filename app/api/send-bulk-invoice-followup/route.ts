@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select(
-        'business_name, country, logo_url, bank_wire_instructions, payment_link_url'
+        'business_name, country, logo_url, bank_name, bank_account_number, bank_routing_number, payment_link_url, contact_email'
       )
       .eq('id', user.id)
       .single();
@@ -109,11 +109,42 @@ export async function POST(request: Request) {
         ? `<img src="${profile.logo_url}" alt="${profile.business_name}" style="max-height: 50px; margin-bottom: 24px; display: block;" />`
         : `<h2 style="margin-bottom: 24px; color: #111827; font-size: 20px;">${profile.business_name}</h2>`;
 
-      const paymentSection = profile.bank_wire_instructions
-        ? isFr
-          ? `<p style="line-height: 1.6; margin-top: 16px;"><strong>Coordonnées bancaires :</strong><br/><span style="white-space: pre-line; color: #374151;">${profile.bank_wire_instructions}</span></p>`
-          : `<p style="line-height: 1.6; margin-top: 16px;"><strong>Bank details:</strong><br/><span style="white-space: pre-line; color: #374151;">${profile.bank_wire_instructions}</span></p>`
-        : '';
+      const hasBankDetails = profile.bank_name || profile.bank_account_number;
+      const bankLabel = isFr ? 'Banque' : 'Bank';
+      const accountLabel = isFr ? 'IBAN' : 'Account';
+      const routingLabel = isFr ? 'BIC/SWIFT' : 'Routing';
+
+      const paymentSection =
+        hasBankDetails || profile.payment_link_url
+          ? `<div style="margin-top: 20px; padding: 16px 20px; background: #f9fafb; border-radius: 10px; border: 1px solid #e5e7eb;">
+            <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #374151; margin: 0 0 12px 0;">
+              ${isFr ? 'Instructions de paiement' : 'Payment Instructions'}
+            </p>
+            ${
+              hasBankDetails
+                ? `
+              <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #6b7280; margin: 0 0 8px 0;">
+                ${isFr ? 'Virement bancaire' : 'Bank Transfer'}
+              </p>
+              <table style="border-collapse: collapse; font-size: 13px;">
+                ${profile.bank_name ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;">${bankLabel}</td><td style="color:#111827;font-weight:700;">${profile.bank_name}</td></tr>` : ''}
+                ${profile.bank_account_number ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;">${accountLabel}</td><td style="color:#111827;font-family:monospace;">${profile.bank_account_number}</td></tr>` : ''}
+                ${profile.bank_routing_number ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;">${routingLabel}</td><td style="color:#111827;font-family:monospace;">${profile.bank_routing_number}</td></tr>` : ''}
+              </table>`
+                : ''
+            }
+            ${
+              hasBankDetails && profile.payment_link_url
+                ? `<p style="text-align:center;font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:0.15em;margin:14px 0;">${isFr ? '— ou —' : '— or —'}</p>`
+                : ''
+            }
+            ${
+              profile.payment_link_url
+                ? `<div style="text-align:center;"><a href="${profile.payment_link_url}" style="display:inline-block;background:#2563eb;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:800;font-size:13px;">${isFr ? 'Payer en ligne' : 'Pay Online'}</a></div>`
+                : ''
+            }
+          </div>`
+          : '';
 
       const paymentLinkSection = profile.payment_link_url
         ? `<a href="${profile.payment_link_url}" style="display: inline-block; background: #16a34a; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 8px;">${isFr ? 'Payer en ligne' : 'Pay Online'}</a>`

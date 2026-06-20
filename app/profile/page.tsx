@@ -8,6 +8,7 @@ import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import Button from '@/components/Button';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 import LinkButton from '@/components/LinkButton';
 import {
   Listbox,
@@ -911,18 +912,29 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Business Address */}
+            {/* Business Address — autocomplete */}
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                 {lang.businessAddress}
               </label>
-              <input
-                type="text"
-                placeholder={lang.businessAddress}
-                className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
-                value={businessAddress}
-                onChange={(e) => setBusinessAddress(e.target.value)}
-              />
+              <div className="flex items-center w-full border border-gray-200 rounded-xl bg-gray-50/40 shadow-inner focus-within:border-blue-500 transition-colors">
+                <AddressAutocomplete
+                  value={businessAddress}
+                  userCountry={country}
+                  onChange={(val) => setBusinessAddress(val)}
+                  onSelect={(components) => {
+                    setBusinessAddress(components.address);
+                    setBusinessCity(components.city);
+                    setBusinessZip(components.zip);
+                    if (country === 'US') {
+                      // Mapbox returns full state name (e.g. "New York") — store as abbrev if you want,
+                      // but store as-is for now; user can correct in the state field below.
+                      setBusinessState(components.state || '');
+                    }
+                  }}
+                  placeholder={lang.businessAddress}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -962,7 +974,7 @@ export default function ProfilePage() {
                 <input
                   type="text"
                   placeholder="NY"
-                  maxLength={2}
+                  maxLength={50}
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold uppercase transition-colors bg-gray-50/40 shadow-inner"
                   value={businessState}
                   onChange={(e) =>
@@ -1044,7 +1056,7 @@ export default function ProfilePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder={lang.bankName}
+                  placeholder={lang.bankNamePlaceholder}
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
@@ -1057,7 +1069,7 @@ export default function ProfilePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder={lang.bankAccountNumberLabel}
+                  placeholder={lang.bankAccountPlaceholder}
                   maxLength={country === 'FR' ? 34 : 17}
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold tracking-widest transition-colors bg-gray-50/40 shadow-inner uppercase"
                   value={bankAccountNumber}
@@ -1076,7 +1088,7 @@ export default function ProfilePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder={lang.bankRoutingLabel}
+                  placeholder={lang.bankRoutingPlaceholder}
                   maxLength={country === 'FR' ? 11 : 9}
                   pattern={country === 'FR' ? '[A-Za-z0-9]{8,11}' : '[0-9]{9}'}
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold tracking-widest transition-colors bg-gray-50/40 shadow-inner uppercase"

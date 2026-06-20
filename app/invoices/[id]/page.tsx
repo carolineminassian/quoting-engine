@@ -343,6 +343,7 @@ export default function InvoiceView() {
   const [invoice, setInvoice] = useState<any>();
   const [estimate, setEstimate] = useState<any>();
   const [profile, setProfile] = useState<any>();
+  const [isOwner, setIsOwner] = useState(false);
   const [materials, setMaterials] = useState<any[]>([]);
   const [lang, setLang] = useState<any>();
   const [loading, setLoading] = useState(true);
@@ -393,10 +394,8 @@ export default function InvoiceView() {
           data: { user }
         } = await supabase.auth.getUser();
 
-        if (!user) {
-          router.push('/login');
-          return;
-        }
+        // Allow guest viewing — don't redirect unauthenticated users.
+        // Owner-only controls are gated on isOwner below.
 
         const { data: inv } = await supabase
           .from('invoices')
@@ -451,6 +450,15 @@ export default function InvoiceView() {
         const pageLang = country === 'FR' ? translations.FR : translations.US;
 
         setLang(pageLang);
+        const ownerCheck = !!user && user.id === inv.user_id;
+        setIsOwner(ownerCheck);
+
+        // Drafts are private — redirect guests away
+        if (!inv.is_locked && !ownerCheck) {
+          router.push('/login');
+          return;
+        }
+
         setInvoice(inv);
         setEstimate(estimateRes.data || null);
 
@@ -1249,8 +1257,11 @@ export default function InvoiceView() {
           grandTotal: (billedTotals.totalCents / 100).toFixed(2),
           currency: invoice.currency_snapshot,
           dueDate: dueFormatted,
-          bankWireInstructions: profile.bank_wire_instructions,
-          paymentLinkUrl: profile.payment_link_url
+          bankName: profile.bank_name,
+          bankAccountNumber: profile.bank_account_number,
+          bankRoutingNumber: profile.bank_routing_number,
+          paymentLinkUrl: profile.payment_link_url,
+          contactEmail: profile.contact_email
         })
       });
 
@@ -1313,8 +1324,11 @@ export default function InvoiceView() {
           grandTotal: (billedTotals.totalCents / 100).toFixed(2),
           currency: invoice.currency_snapshot,
           dueDate: dueFormatted,
-          bankWireInstructions: profile.bank_wire_instructions,
-          paymentLinkUrl: profile.payment_link_url
+          bankName: profile.bank_name,
+          bankAccountNumber: profile.bank_account_number,
+          bankRoutingNumber: profile.bank_routing_number,
+          paymentLinkUrl: profile.payment_link_url,
+          contactEmail: profile.contact_email
         })
       });
 
@@ -1652,7 +1666,7 @@ export default function InvoiceView() {
   // Amounts/structure only editable on full invoice drafts.
   // Deposit/balance are locked to the approved estimate %. Only titles/descriptions stay editable.
   const isStructurallyEditable =
-    !invoice.is_locked && invoice.invoice_type === 'full';
+    isOwner && !invoice.is_locked && invoice.invoice_type === 'full';
 
   const rawTerms = invoice.payment_terms_snapshot || '30_days';
   const isUponReceipt = rawTerms === 'upon_receipt';
@@ -1679,178 +1693,63 @@ export default function InvoiceView() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 text-gray-900 font-sans print:bg-white flex flex-col">
       <main className="flex-1 p-4 sm:p-8 print:p-0">
         <div className="max-w-4xl mx-auto print:max-w-none print:w-full">
-          {/* ACTION TOOLBAR */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
-            <div className="flex items-center gap-3">
-              <LinkButton href="/invoices" variant="secondary" size="sm">
-                <Icons.ArrowLeft />
-                <span className="ml-1.5">{lang.invoices}</span>
-              </LinkButton>
-
-              {invoice.estimate_id && (
-                <LinkButton
-                  href={`/estimates/${invoice.estimate_id}?tab=billing`}
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-gray-700"
-                >
-                  <span>{lang.relatedEstimate}</span>
-                  <Icons.ExternalLink />
+          {/* ACTION TOOLBAR — owner only; guests see document + PDF only */}
+          {isOwner && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
+              <div className="flex items-center gap-3">
+                <LinkButton href="/invoices" variant="secondary" size="sm">
+                  <Icons.ArrowLeft />
+                  <span className="ml-1.5">{lang.invoices}</span>
                 </LinkButton>
-              )}
 
-              {!invoice.is_locked && !isLineItemInvoice && (
-                <div className="flex items-center gap-2.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm ml-2">
-                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                    {lang.internalDetails}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleToggleDetails}
-                    className={`!p-0 !h-5 !w-9 !rounded-full ${
-                      showDetails ? '!bg-blue-600' : '!bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-                        showDetails ? 'translate-x-2.5' : '-translate-x-2.5'
+                {!invoice.is_locked && !isLineItemInvoice && (
+                  <div className="flex items-center gap-2.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm ml-2">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                      {lang.internalDetails}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleToggleDetails}
+                      className={`!p-0 !h-5 !w-9 !rounded-full ${
+                        showDetails ? '!bg-blue-600' : '!bg-gray-300'
                       }`}
-                    />
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap sm:flex-nowrap gap-2">
-              {!invoice.is_locked ? (
-                <>
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    onClick={handleDownloadPDF}
-                    loading={loading}
-                    icon={<Icons.Download />}
-                  >
-                    {lang.previewPdf}
-                  </Button>
-
-                  <Button
-                    variant="success"
-                    size="md"
-                    onClick={handleFinalize}
-                    disabled={isDirty || savingEdit}
-                  >
-                    {lang.finalizeInvoice}
-                  </Button>
-
-                  <Menu as="div" className="relative shrink-0">
-                    <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer">
-                      <Icons.MoreVertical />
-                    </MenuButton>
-                    <Transition
-                      as={Fragment}
-                      enter="transition ease-out duration-100"
-                      enterFrom="opacity-0 scale-95"
-                      enterTo="opacity-100 scale-100"
-                      leave="transition ease-in duration-75"
-                      leaveFrom="opacity-100 scale-100"
-                      leaveTo="opacity-0 scale-95"
                     >
-                      <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none">
-                        <MenuItem>
-                          {() => (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              fullWidth
-                              onClick={() =>
-                                setDialog({
-                                  type: 'danger',
-                                  message: lang.deleteInvoiceDraftConfirm,
-                                  onConfirm: handleDeleteDraft
-                                })
-                              }
-                              disabled={deletingDraft}
-                              className="!justify-start !text-red-600 hover:!bg-red-50 hover:!text-red-700"
-                              icon={<Icons.Trash />}
-                            >
-                              {deletingDraft ? '...' : lang.deleteInvoiceDraft}
-                            </Button>
-                          )}
-                        </MenuItem>
-                      </MenuItems>
-                    </Transition>
-                  </Menu>
-                </>
-              ) : (
-                <>
-                  {invoice.client_email &&
-                    !invoice.is_cancelled &&
-                    invoice.payment_status !== 'paid' && (
-                      <>
-                        {followUpState.mode === 'hidden' && (
-                          <Button
-                            variant="dark"
-                            size="md"
-                            loading={sending}
-                            loadingText={lang.sending}
-                            onClick={handleSendInvoice}
-                            icon={<Icons.Send />}
-                          >
-                            {lang.sendInvoice}
-                          </Button>
-                        )}
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                          showDetails ? 'translate-x-2.5' : '-translate-x-2.5'
+                        }`}
+                      />
+                    </Button>
+                  </div>
+                )}
+              </div>
 
-                        {followUpState.mode === 'send' && (
-                          <Button
-                            variant="dark"
-                            size="md"
-                            loading={sending}
-                            loadingText={lang.followUpSending}
-                            onClick={handleSendFollowUp}
-                            icon={<Icons.Send />}
-                          >
-                            {lang.followUpBtn}
-                          </Button>
-                        )}
+              <div className="flex gap-2 w-full sm:w-auto">
+                {!invoice.is_locked ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={handleDownloadPDF}
+                      loading={loading}
+                      icon={<Icons.Download />}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {lang.previewPdf}
+                    </Button>
 
-                        {followUpState.mode === 'cooldown' && (
-                          <Button
-                            variant="secondary"
-                            size="md"
-                            disabled
-                            title={t(lang.followUpCooldown, {
-                              date: followUpState.cooldownUntil!.toLocaleDateString(
-                                profile.country === 'FR' ? 'fr-FR' : 'en-US',
-                                {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric'
-                                }
-                              )
-                            })}
-                            className="opacity-60"
-                          >
-                            {lang.followUpBtn}
-                          </Button>
-                        )}
-                      </>
-                    )}
+                    <Button
+                      variant="success"
+                      size="md"
+                      onClick={handleFinalize}
+                      disabled={isDirty || savingEdit}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {lang.finalizeInvoice}
+                    </Button>
 
-                  <Button
-                    variant="primary"
-                    size="md"
-                    loading={loading}
-                    onClick={handleDownloadPDF}
-                    icon={<Icons.Download />}
-                  >
-                    {lang.downloadInvoice}
-                  </Button>
-
-                  {!invoice.is_cancelled && (
                     <Menu as="div" className="relative shrink-0">
                       <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer">
                         <Icons.MoreVertical />
@@ -1864,28 +1763,32 @@ export default function InvoiceView() {
                         leaveFrom="opacity-100 scale-100"
                         leaveTo="opacity-0 scale-95"
                       >
-                        <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none divide-y divide-gray-100">
-                          {invoice.payment_status !== 'paid' && (
-                            <div className="py-1">
-                              <MenuItem>
-                                {() => (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    fullWidth
-                                    onClick={() => setMarkPaidModalOpen(true)}
-                                    className="!justify-start !text-green-600 hover:!bg-green-50 hover:!text-green-700"
-                                    icon={<Icons.Check />}
-                                  >
-                                    {lang.markAsPaid}
-                                  </Button>
-                                )}
-                              </MenuItem>
-                            </div>
-                          )}
-
-                          <div className="py-1">
+                        <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none">
+                          <MenuItem>
+                            {() => (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                fullWidth
+                                onClick={() =>
+                                  setDialog({
+                                    type: 'danger',
+                                    message: lang.deleteInvoiceDraftConfirm,
+                                    onConfirm: handleDeleteDraft
+                                  })
+                                }
+                                disabled={deletingDraft}
+                                className="!justify-start !text-red-600 hover:!bg-red-50 hover:!text-red-700"
+                                icon={<Icons.Trash />}
+                              >
+                                {deletingDraft
+                                  ? '...'
+                                  : lang.deleteInvoiceDraft}
+                              </Button>
+                            )}
+                          </MenuItem>
+                          {invoice.estimate_id && (
                             <MenuItem>
                               {() => (
                                 <Button
@@ -1894,25 +1797,192 @@ export default function InvoiceView() {
                                   size="sm"
                                   fullWidth
                                   onClick={() =>
-                                    router.push(`/invoices/${id}/credit-note`)
+                                    router.push(
+                                      `/estimates/${invoice.estimate_id}?tab=billing`
+                                    )
                                   }
                                   className="!justify-start"
-                                  icon={<Icons.CreditNote />}
+                                  icon={<Icons.ExternalLink />}
                                 >
-                                  {lang.createCreditNote}
+                                  {lang.relatedEstimate}
                                 </Button>
                               )}
                             </MenuItem>
-                          </div>
+                          )}
                         </MenuItems>
                       </Transition>
                     </Menu>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+                  </>
+                ) : (
+                  <>
+                    {invoice.client_email &&
+                      !invoice.is_cancelled &&
+                      invoice.payment_status !== 'paid' && (
+                        <>
+                          {followUpState.mode === 'hidden' && (
+                            <Button
+                              variant="dark"
+                              size="md"
+                              loading={sending}
+                              loadingText={lang.sending}
+                              onClick={handleSendInvoice}
+                              icon={<Icons.Send />}
+                              className="flex-1 sm:flex-none"
+                            >
+                              {lang.sendInvoice}
+                            </Button>
+                          )}
 
+                          {followUpState.mode === 'send' && (
+                            <Button
+                              variant="dark"
+                              size="md"
+                              loading={sending}
+                              loadingText={lang.followUpSending}
+                              onClick={handleSendFollowUp}
+                              icon={<Icons.Send />}
+                              className="flex-1 sm:flex-none"
+                            >
+                              {lang.followUpBtn}
+                            </Button>
+                          )}
+
+                          {followUpState.mode === 'cooldown' && (
+                            <Button
+                              variant="secondary"
+                              size="md"
+                              disabled
+                              className="flex-1 sm:flex-none opacity-60"
+                              title={t(lang.followUpCooldown, {
+                                date: followUpState.cooldownUntil!.toLocaleDateString(
+                                  profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                                  {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  }
+                                )
+                              })}
+                            >
+                              {lang.followUpBtn}
+                            </Button>
+                          )}
+                        </>
+                      )}
+
+                    <Button
+                      variant="primary"
+                      size="md"
+                      loading={loading}
+                      onClick={handleDownloadPDF}
+                      icon={<Icons.Download />}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {lang.downloadInvoice}
+                    </Button>
+
+                    {!invoice.is_cancelled && (
+                      <Menu as="div" className="relative shrink-0">
+                        <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer">
+                          <Icons.MoreVertical />
+                        </MenuButton>
+                        <Transition
+                          as={Fragment}
+                          enter="transition ease-out duration-100"
+                          enterFrom="opacity-0 scale-95"
+                          enterTo="opacity-100 scale-100"
+                          leave="transition ease-in duration-75"
+                          leaveFrom="opacity-100 scale-100"
+                          leaveTo="opacity-0 scale-95"
+                        >
+                          <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none divide-y divide-gray-100">
+                            {invoice.payment_status !== 'paid' && (
+                              <div className="py-1">
+                                <MenuItem>
+                                  {() => (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      fullWidth
+                                      onClick={() => setMarkPaidModalOpen(true)}
+                                      className="!justify-start !text-green-600 hover:!bg-green-50 hover:!text-green-700"
+                                      icon={<Icons.Check />}
+                                    >
+                                      {lang.markAsPaid}
+                                    </Button>
+                                  )}
+                                </MenuItem>
+                              </div>
+                            )}
+
+                            <div className="py-1">
+                              <MenuItem>
+                                {() => (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    fullWidth
+                                    onClick={() =>
+                                      router.push(`/invoices/${id}/credit-note`)
+                                    }
+                                    className="!justify-start"
+                                    icon={<Icons.CreditNote />}
+                                  >
+                                    {lang.createCreditNote}
+                                  </Button>
+                                )}
+                              </MenuItem>
+                            </div>
+                            {invoice.estimate_id && (
+                              <div className="py-1">
+                                <MenuItem>
+                                  {() => (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      fullWidth
+                                      onClick={() =>
+                                        router.push(
+                                          `/estimates/${invoice.estimate_id}?tab=billing`
+                                        )
+                                      }
+                                      className="!justify-start"
+                                      icon={<Icons.ExternalLink />}
+                                    >
+                                      {lang.relatedEstimate}
+                                    </Button>
+                                  )}
+                                </MenuItem>
+                              </div>
+                            )}
+                          </MenuItems>
+                        </Transition>
+                      </Menu>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}{' '}
+          {/* end isOwner toolbar */}
+          {/* Guest download bar — shown to clients viewing via shared link */}
+          {!isOwner && !loading && invoice && (
+            <div className="flex sm:justify-end mb-6 print:hidden">
+              <Button
+                variant="primary"
+                size="md"
+                loading={loading}
+                onClick={handleDownloadPDF}
+                icon={<Icons.Download />}
+                className="w-full sm:w-auto"
+              >
+                {lang.downloadInvoice}
+              </Button>
+            </div>
+          )}
           {/* STATUS BANNER */}
           <div
             className={`mb-6 px-5 py-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden ${
@@ -2049,7 +2119,6 @@ export default function InvoiceView() {
                 </span>
               )}
           </div>
-
           {/* RELATED CREDIT NOTES */}
           {creditNotes.length > 0 && (
             <div className="mb-6 bg-purple-50/50 border border-purple-200 rounded-xl p-5 print:hidden">
@@ -2094,7 +2163,6 @@ export default function InvoiceView() {
               </div>
             </div>
           )}
-
           {/* MAIN INVOICE DOCUMENT */}
           <article
             className={`bg-white shadow-xl border border-gray-200 rounded-2xl overflow-hidden print:shadow-none print:border-none print:rounded-none relative ${
@@ -2938,65 +3006,78 @@ export default function InvoiceView() {
               </section>
 
               {/* PAYMENT INSTRUCTIONS */}
-              {(profile.bank_wire_instructions || profile.payment_link_url) && (
-                <section className="mb-10 pt-8 border-t border-gray-100">
+              {(profile.bank_name ||
+                profile.bank_account_number ||
+                profile.payment_link_url) && (
+                <section className="mb-6 pt-8 border-t border-gray-100">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300 mb-4">
                     {lang.paymentInstructions}
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {(profile.bank_name || profile.bank_account_number) && (
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widests text-gray-400 mb-2">
-                          {lang.bankWireInstructions}
-                        </p>
-                        <div className="text-sm text-gray-600 space-y-0.5">
-                          {profile.bank_name && (
-                            <p>
-                              <span className="font-semibold text-gray-500">
-                                {lang.bankLabel}:
-                              </span>{' '}
-                              {profile.bank_name}
-                            </p>
-                          )}
-                          {profile.bank_account_number && (
-                            <p>
-                              <span className="font-semibold text-gray-500">
-                                {lang.bankAccountNumberLabel}:
-                              </span>{' '}
-                              <span className="font-mono tracking-wider">
-                                {profile.bank_account_number}
-                              </span>
-                            </p>
-                          )}
-                          {profile.bank_routing_number && (
-                            <p>
-                              <span className="font-semibold text-gray-500">
-                                {lang.bicSwiftLabel}:
-                              </span>{' '}
-                              <span className="font-mono tracking-wider">
-                                {profile.bank_routing_number}
-                              </span>
-                            </p>
-                          )}
-                        </div>
+
+                  {(profile.bank_name || profile.bank_account_number) && (
+                    <div className="mb-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                        {lang.bankWireInstructions}
+                      </p>
+                      <div className="text-sm text-gray-600 space-y-0.5">
+                        {profile.bank_name && (
+                          <p>
+                            <span className="font-semibold text-gray-500">
+                              {lang.bankLabel}:
+                            </span>{' '}
+                            {profile.bank_name}
+                          </p>
+                        )}
+                        {profile.bank_account_number && (
+                          <p>
+                            <span className="font-semibold text-gray-500">
+                              {lang.bankAccountNumberLabel}:
+                            </span>{' '}
+                            <span className="font-mono tracking-wider">
+                              {profile.bank_account_number}
+                            </span>
+                          </p>
+                        )}
+                        {profile.bank_routing_number && (
+                          <p>
+                            <span className="font-semibold text-gray-500">
+                              {lang.bicSwiftLabel}:
+                            </span>{' '}
+                            <span className="font-mono tracking-wider">
+                              {profile.bank_routing_number}
+                            </span>
+                          </p>
+                        )}
                       </div>
-                    )}
-                    {profile.payment_link_url && (
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-                          {lang.paymentLinkLabel}
-                        </p>
-                        <a
-                          href={profile.payment_link_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block bg-blue-600 text-white px-4 py-2.5 rounded-lg font-bold uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-colors shadow-sm"
-                        >
-                          {lang.payInvoiceOnline}
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* Pay online — only renders if link is set */}
+                  {profile.payment_link_url && (
+                    <a
+                      href={profile.payment_link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block bg-blue-600 text-white px-4 py-2.5 rounded-lg font-bold uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      {lang.payInvoiceOnline}
+                    </a>
+                  )}
+                </section>
+              )}
+
+              {/* Contact email — directly after payment section */}
+              {profile?.contact_email && (
+                <section className="mb-10">
+                  <p className="text-[10px] text-gray-400">
+                    {lang.invoiceContactNote}{' '}
+                    <a
+                      href={`mailto:${profile.contact_email}`}
+                      className="text-blue-500 hover:underline font-semibold"
+                    >
+                      {profile.contact_email}
+                    </a>
+                  </p>
                 </section>
               )}
 
@@ -3027,23 +3108,24 @@ export default function InvoiceView() {
                   </div>
                 </div>
 
-                {profile?.contact_email && (
-                  <div className="mt-6 text-center">
-                    <p className="text-[10px] text-gray-400">
-                      {lang.invoiceContactNote}{' '}
-                      <a
-                        href={`mailto:${profile.contact_email}`}
-                        className="text-blue-500 hover:underline font-semibold"
-                      >
-                        {profile.contact_email}
-                      </a>
+                <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                  <p className="text-[10px] font-bold text-gray-600">
+                    {profile.business_name}
+                  </p>
+                  {(profile?.business_address || profile?.business_city) && (
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      {[
+                        profile.business_address,
+                        profile.country === 'US'
+                          ? `${profile.business_city || ''}${profile.business_state ? `, ${profile.business_state}` : ''} ${profile.business_zip || ''}`.trim()
+                          : `${profile.business_zip || ''} ${profile.business_city || ''}`.trim()
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
-                  </div>
-                )}
-
-                {(profile?.company_reg_number || profile?.vat_number) && (
-                  <div className="mt-8 pt-6 border-t border-gray-100">
-                    <div className="flex flex-wrap gap-4 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                  )}
+                  {(profile?.company_reg_number || profile?.vat_number) && (
+                    <div className="flex flex-wrap justify-center gap-4 mt-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
                       {profile?.company_reg_number && (
                         <span>
                           {lang.companyRegNumber}: {profile.company_reg_number}
@@ -3055,8 +3137,8 @@ export default function InvoiceView() {
                         </span>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </footer>
             </div>
           </article>

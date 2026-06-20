@@ -6,6 +6,7 @@ interface AddressComponents {
   address: string;
   city: string;
   zip: string;
+  state: string;
   country: string;
 }
 
@@ -85,6 +86,7 @@ export default function AddressAutocomplete({
       address: '',
       city: '',
       zip: '',
+      state: '',
       country: ''
     };
 
@@ -105,6 +107,7 @@ export default function AddressAutocomplete({
         feature.context.forEach((ctx: any) => {
           if (ctx.id.startsWith('postcode')) parsed.zip = ctx.text;
           if (ctx.id.startsWith('place')) parsed.city = ctx.text;
+          if (ctx.id.startsWith('region')) parsed.state = ctx.text; // e.g. "New York"
           if (ctx.id.startsWith('country')) parsed.country = ctx.text;
         });
       }

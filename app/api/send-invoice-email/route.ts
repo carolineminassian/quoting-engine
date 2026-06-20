@@ -25,8 +25,12 @@ export async function POST(request: Request) {
       grandTotal,
       currency,
       dueDate,
-      bankWireInstructions,
-      paymentLinkUrl
+      // Structured bank fields (replaces bankWireInstructions blob)
+      bankName,
+      bankAccountNumber,
+      bankRoutingNumber,
+      paymentLinkUrl,
+      contactEmail
     } = body;
 
     if (!invoiceId || !clientEmail) {
@@ -41,100 +45,145 @@ export async function POST(request: Request) {
 
     const logoHtml = logoUrl
       ? `<img src="${logoUrl}" alt="${businessName}" style="max-height: 50px; margin-bottom: 24px; display: block;" />`
-      : `<h2 style="margin-bottom: 24px; color: #111827; font-size: 20px;">${businessName}</h2>`;
+      : `<h2 style="margin-bottom: 24px; color: #111827; font-size: 20px; font-weight: 800;">${businessName}</h2>`;
 
-    // Payment instructions block
+    const hasBankDetails = bankName || bankAccountNumber;
+    const hasPayLink = !!paymentLinkUrl;
+
+    // ── Payment block ──────────────────────────────────────────
     let paymentHtml = '';
-    if (bankWireInstructions || paymentLinkUrl) {
-      paymentHtml = `
-      <div style="margin-top: 24px; padding: 16px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
-        <p style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #374151; margin-bottom: 12px;">
-          ${isFr ? 'Instructions de paiement' : 'Payment Instructions'}
-        </p>
-        ${
-          bankWireInstructions
-            ? `
-          <p style="font-size: 12px; color: #6b7280; font-weight: bold; margin-bottom: 4px;">
-            ${isFr ? 'Virement bancaire' : 'Bank Transfer'}
+    if (hasBankDetails || hasPayLink) {
+      const bankLabel = isFr ? 'Banque' : 'Bank';
+      const accountLabel = isFr ? 'IBAN' : 'Account';
+      const routingLabel = isFr ? 'BIC/SWIFT' : 'Routing';
+      const transferTitle = isFr ? 'Virement bancaire' : 'Bank Transfer';
+      const orText = isFr ? '— ou —' : '— or —';
+      const payOnlineText = isFr ? 'Payer en ligne' : 'Pay Online';
+      const paymentTitle = isFr
+        ? 'Instructions de paiement'
+        : 'Payment Instructions';
+
+      const bankRowsHtml = hasBankDetails
+        ? `
+          <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 10px 0;">
+            ${transferTitle}
           </p>
-          <p style="font-size: 12px; color: #374151; white-space: pre-wrap; margin-bottom: 12px;">${bankWireInstructions}</p>
-        `
-            : ''
-        }
-        ${
-          paymentLinkUrl
-            ? `
-          <a href="${paymentLinkUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px;">
-            ${isFr ? 'Payer en ligne' : 'Pay Online'}
-          </a>
-        `
-            : ''
-        }
-      </div>
-    `;
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            ${
+              bankName
+                ? `
+            <tr>
+              <td style="color: #9ca3af; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top;">${bankLabel}</td>
+              <td style="color: #111827; font-weight: 700;">${bankName}</td>
+            </tr>`
+                : ''
+            }
+            ${
+              bankAccountNumber
+                ? `
+            <tr>
+              <td style="color: #9ca3af; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top;">${accountLabel}</td>
+              <td style="color: #111827; font-family: monospace; font-weight: 600; letter-spacing: 0.05em;">${bankAccountNumber}</td>
+            </tr>`
+                : ''
+            }
+            ${
+              bankRoutingNumber
+                ? `
+            <tr>
+              <td style="color: #9ca3af; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top;">${routingLabel}</td>
+              <td style="color: #111827; font-family: monospace; font-weight: 600; letter-spacing: 0.05em;">${bankRoutingNumber}</td>
+            </tr>`
+                : ''
+            }
+          </table>`
+        : '';
+
+      const orSeparatorHtml =
+        hasBankDetails && hasPayLink
+          ? `<p style="text-align: center; font-size: 11px; font-weight: 800; color: #9ca3af; letter-spacing: 0.15em; margin: 16px 0;">${orText}</p>`
+          : '';
+
+      const payLinkHtml = hasPayLink
+        ? `<div style="text-align: center;">
+            <a href="${paymentLinkUrl}"
+               style="display: inline-block; background: #2563eb; color: white; padding: 11px 28px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 13px; letter-spacing: 0.05em;">
+              ${payOnlineText}
+            </a>
+          </div>`
+        : '';
+
+      paymentHtml = `
+        <div style="margin-top: 24px; padding: 20px; background: #f9fafb; border-radius: 10px; border: 1px solid #e5e7eb;">
+          <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #374151; margin: 0 0 16px 0;">
+            ${paymentTitle}
+          </p>
+          ${bankRowsHtml}
+          ${orSeparatorHtml}
+          ${payLinkHtml}
+        </div>`;
     }
+
+    // ── Contact line ───────────────────────────────────────────
+    const replyAddress = contactEmail || ownerEmail;
+    const contactLine = isFr
+      ? `Des questions ? Répondez à cet e-mail ou contactez-nous à <a href="mailto:${replyAddress}" style="color: #2563eb;">${replyAddress}</a>.`
+      : `Questions? Reply to this email or reach us at <a href="mailto:${replyAddress}" style="color: #2563eb;">${replyAddress}</a>.`;
+
+    // ── Amount + due date block ────────────────────────────────
+    const amountBlock = `
+      <div style="margin: 24px 0; padding: 16px 20px; background: #eff6ff; border-radius: 10px; border: 1px solid #bfdbfe;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="vertical-align: middle;">
+              <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 4px 0;">
+                ${isFr ? 'Montant Total' : 'Amount Due'}
+              </p>
+              <p style="font-size: 26px; font-weight: 900; color: #1e40af; margin: 0; font-family: monospace;">
+                ${currencySymbol}${grandTotal}
+              </p>
+            </td>
+            ${
+              dueDate
+                ? `
+            <td style="vertical-align: middle; text-align: right;">
+              <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 4px 0;">
+                ${isFr ? 'Échéance' : 'Due Date'}
+              </p>
+              <p style="font-size: 14px; font-weight: 700; color: #374151; margin: 0;">${dueDate}</p>
+            </td>`
+                : ''
+            }
+          </tr>
+        </table>
+      </div>`;
 
     const subject = isFr
       ? `Facture ${invoiceNumber} — ${businessName}`
       : `Invoice ${invoiceNumber} from ${businessName}`;
 
-    const htmlContent = isFr
-      ? `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 40px; color: #111827;">
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; padding: 40px; color: #111827;">
         ${logoHtml}
-        <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 8px;">Bonjour ${clientName},</h2>
-        <p style="line-height: 1.6; color: #4b5563;">Veuillez trouver ci-joint votre facture <strong>${invoiceNumber}</strong> de <strong>${businessName}</strong>.</p>
-        <div style="margin: 24px 0; padding: 16px; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <p style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 4px 0;">Montant Total</p>
-              <p style="font-size: 24px; font-weight: 900; color: #1e40af; margin: 0;">${currencySymbol}${grandTotal}</p>
-            </div>
-            ${
-              dueDate
-                ? `<div style="text-align: right;">
-              <p style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 4px 0;">Échéance</p>
-              <p style="font-size: 14px; font-weight: bold; color: #374151; margin: 0;">${dueDate}</p>
-            </div>`
-                : ''
-            }
-          </div>
-        </div>
-        <a href="${invoiceUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-bottom: 8px;">
-          Consulter la Facture
-        </a>
-        ${paymentHtml}
-        <hr style="border: 0; border-top: 1px solid #f3f4f6; margin: 24px 0;" />
-        <p style="font-size: 12px; color: #6b7280; line-height: 1.4;">
-          Des questions ? Répondez directement à cet e-mail pour contacter ${businessName} à ${ownerEmail}.
+        <h2 style="font-size: 22px; font-weight: 800; margin: 0 0 8px 0;">
+          ${isFr ? `Bonjour ${clientName},` : `Hello ${clientName},`}
+        </h2>
+        <p style="line-height: 1.6; color: #4b5563; margin: 0 0 4px 0;">
+          ${
+            isFr
+              ? `Veuillez trouver ci-joint votre facture <strong>${invoiceNumber}</strong> de <strong>${businessName}</strong>.`
+              : `Please find your invoice <strong>${invoiceNumber}</strong> from <strong>${businessName}</strong> below.`
+          }
         </p>
-      </div>`
-      : `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 40px; color: #111827;">
-        ${logoHtml}
-        <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 8px;">Hello ${clientName},</h2>
-        <p style="line-height: 1.6; color: #4b5563;">Please find your invoice <strong>${invoiceNumber}</strong> from <strong>${businessName}</strong> attached below.</p>
-        <div style="margin: 24px 0; padding: 16px; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <p style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 4px 0;">Amount Due</p>
-              <p style="font-size: 24px; font-weight: 900; color: #1e40af; margin: 0;">${currencySymbol}${grandTotal}</p>
-            </div>
-            ${
-              dueDate
-                ? `<div style="text-align: right;">
-              <p style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 4px 0;">Due Date</p>
-              <p style="font-size: 14px; font-weight: bold; color: #374151; margin: 0;">${dueDate}</p>
-            </div>`
-                : ''
-            }
-          </div>
-        </div>
-        <a href="${invoiceUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-bottom: 8px;">
-          View Invoice
+        ${amountBlock}
+        <a href="${invoiceUrl}"
+           style="display: inline-block; background: #111827; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 14px; margin-bottom: 4px;">
+          ${isFr ? 'Consulter la Facture' : 'View Invoice'}
         </a>
         ${paymentHtml}
-        <hr style="border: 0; border-top: 1px solid #f3f4f6; margin: 24px 0;" />
-        <p style="font-size: 12px; color: #6b7280; line-height: 1.4;">
-          Any questions? Reply to this email to reach ${businessName} at ${ownerEmail}.
+        <hr style="border: 0; border-top: 1px solid #f3f4f6; margin: 28px 0 16px 0;" />
+        <p style="font-size: 12px; color: #9ca3af; line-height: 1.6; margin: 0;">
+          ${contactLine}
         </p>
       </div>`;
 
@@ -151,7 +200,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error }, { status: 500 });
     }
 
-    // Track last_email_sent_at
     await supabaseAdmin
       .from('invoices')
       .update({ last_email_sent_at: new Date().toISOString() })

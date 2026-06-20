@@ -519,7 +519,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   footerBlock: {
-    width: '47%'
+    width: '32%'
+  },
+  footerBlockCenter: {
+    flex: 1,
+    alignItems: 'center'
   },
   footerTitle: {
     fontSize: 7.5,
@@ -1051,18 +1055,7 @@ export default function InvoicePDF({
             <Text style={styles.footerTitle}>
               {lang?.complianceLegal || (isFr ? 'Mentions Légales' : 'Legal')}
             </Text>
-            {profile.company_reg_number && (
-              <Text style={styles.footerText}>
-                {lang?.companyRegNumber || (isFr ? 'SIRET' : 'Reg. No')}:{' '}
-                {profile.company_reg_number}
-              </Text>
-            )}
-            {profile.vat_number && (
-              <Text style={styles.footerText}>
-                {lang?.vatNumber || (isFr ? 'N° TVA' : 'VAT No')}:{' '}
-                {profile.vat_number}
-              </Text>
-            )}
+
             <Text style={[styles.footerText, { marginTop: 4, fontSize: 7.5 }]}>
               {lang?.complianceText ||
                 (isFr
@@ -1070,7 +1063,41 @@ export default function InvoicePDF({
                   : 'Certified digital invoice record.')}
             </Text>
           </View>
-
+          {/* Center — business identity */}
+          <View style={styles.footerBlockCenter}>
+            <Text style={[styles.footerTitle, { textAlign: 'center' }]}>
+              {profile.business_name}
+            </Text>
+            {profile.business_address && (
+              <Text style={[styles.footerText, { textAlign: 'center' }]}>
+                {profile.business_address}
+              </Text>
+            )}
+            {(profile.business_zip || profile.business_city) && (
+              <Text style={[styles.footerText, { textAlign: 'center' }]}>
+                {isFr
+                  ? `${profile.business_zip || ''} ${profile.business_city || ''}`.trim()
+                  : `${profile.business_city || ''}${profile.business_state ? `, ${profile.business_state}` : ''} ${profile.business_zip || ''}`.trim()}
+              </Text>
+            )}
+            {profile.company_reg_number && (
+              <Text
+                style={[
+                  styles.footerText,
+                  { textAlign: 'center', marginTop: 3 }
+                ]}
+              >
+                {lang?.companyRegNumber || (isFr ? 'SIRET' : 'Reg')}:{' '}
+                {profile.company_reg_number}
+              </Text>
+            )}
+            {profile.vat_number && (
+              <Text style={[styles.footerText, { textAlign: 'center' }]}>
+                {lang?.vatNumber || (isFr ? 'N° TVA' : 'VAT')}:{' '}
+                {profile.vat_number}
+              </Text>
+            )}
+          </View>
           <View
             style={[
               styles.footerBlock,
