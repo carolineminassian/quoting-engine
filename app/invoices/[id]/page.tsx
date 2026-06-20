@@ -1662,12 +1662,14 @@ export default function InvoiceView() {
     invoice?.due_date &&
     new Date(invoice.due_date) < new Date();
 
-  const isDepositInvoice = invoice?.invoice_type === 'deposit';
-  const isBalanceInvoice = invoice?.invoice_type === 'balance';
   // Amounts/structure only editable on full invoice drafts.
   // Deposit/balance are locked to the approved estimate %. Only titles/descriptions stay editable.
+
+  const isDepositInvoice = invoice?.invoice_type === 'deposit';
+  const isBalanceInvoice = invoice?.invoice_type === 'balance';
+  const isPro = profile?.subscription_tier === 'pro';
   const isStructurallyEditable =
-    isOwner && !invoice.is_locked && invoice.invoice_type === 'full';
+    isOwner && !invoice.is_locked && invoice.invoice_type === 'full' && isPro;
 
   const rawTerms = invoice.payment_terms_snapshot || '30_days';
   const isUponReceipt = rawTerms === 'upon_receipt';
@@ -1741,15 +1743,26 @@ export default function InvoiceView() {
                       {lang.previewPdf}
                     </Button>
 
-                    <Button
-                      variant="success"
-                      size="md"
-                      onClick={handleFinalize}
-                      disabled={isDirty || savingEdit}
-                      className="flex-1 sm:flex-none"
-                    >
-                      {lang.finalizeInvoice}
-                    </Button>
+                    {isPro ? (
+                      <Button
+                        variant="success"
+                        size="md"
+                        onClick={handleFinalize}
+                        disabled={isDirty || savingEdit}
+                        className="flex-1 sm:flex-none"
+                      >
+                        {lang.finalizeInvoice}
+                      </Button>
+                    ) : (
+                      <LinkButton
+                        href="/upgrade"
+                        variant="primary"
+                        size="md"
+                        className="flex-1 sm:flex-none"
+                      >
+                        {lang.upgradeToPro || 'Upgrade to Pro'}
+                      </LinkButton>
+                    )}
 
                     <Menu as="div" className="relative shrink-0">
                       <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer">
@@ -2120,6 +2133,25 @@ export default function InvoiceView() {
                 </span>
               )}
           </div>
+          {/* Upgrade prompt — shown to owner of a draft invoice who is no longer Pro */}
+          {isOwner && !invoice.is_locked && !isPro && (
+            <div className="mb-6 px-5 py-4 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden">
+              <p className="text-sm text-blue-700 font-semibold">
+                {lang.proRequiredToFinalize ||
+                  (profile?.country === 'FR'
+                    ? 'Passez à Pro pour modifier et finaliser cette facture.'
+                    : 'Upgrade to Pro to edit and finalize this invoice.')}
+              </p>
+              <LinkButton
+                href="/upgrade"
+                variant="primary"
+                size="sm"
+                className="shrink-0"
+              >
+                {lang.upgradeToPro || 'Upgrade to Pro'}
+              </LinkButton>
+            </div>
+          )}
           {/* RELATED CREDIT NOTES */}
           {creditNotes.length > 0 && (
             <div className="mb-6 bg-purple-50/50 border border-purple-200 rounded-xl p-5 print:hidden">

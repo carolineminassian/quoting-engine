@@ -1515,18 +1515,30 @@ export default function EstimateView() {
               )}
 
               {/* ─── BILLING TAB ACTIONS ─── */}
-              {activeTab === 'billing' && canCreateInvoice && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  loading={creatingInvoice}
-                  loadingText={lang?.creating || 'Creating...'}
-                  onClick={handleCreateInvoice}
-                  icon={<Icons.Plus />}
-                >
-                  {lang?.createInvoice || 'Create Invoice'}
-                </Button>
-              )}
+              {activeTab === 'billing' &&
+                canCreateInvoice &&
+                (profile?.subscription_tier === 'pro' ? (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    loading={creatingInvoice}
+                    loadingText={lang?.creating || 'Creating...'}
+                    onClick={handleCreateInvoice}
+                    icon={<Icons.Plus />}
+                    className="w-full sm:w-auto"
+                  >
+                    {lang?.createInvoice || 'Create Invoice'}
+                  </Button>
+                ) : (
+                  <LinkButton
+                    href="/upgrade"
+                    variant="primary"
+                    size="md"
+                    className="w-full sm:w-auto"
+                  >
+                    {lang?.upgradeToPro || 'Upgrade to Pro'}
+                  </LinkButton>
+                ))}
 
               {/* ─── DISCUSSION TAB ACTIONS ─── */}
               {/* Currently no actions needed, but you could add "Mark all read" etc here */}

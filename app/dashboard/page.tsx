@@ -984,7 +984,7 @@ export default function DashboardPage() {
         {estimates.length > 0 && (
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center mb-4">
             {/* Live Text Filter input — also acts as a dropdown of past clients */}
-            <div className="relative flex-1 max-w-md">
+            <div className="relative w-full sm:flex-1 sm:max-w-md">
               {/* Input group: input + buttons in a single row that looks like one input */}
               <div className="flex items-start min-h-[52px] border border-gray-200 rounded-xl bg-white shadow-sm focus-within:border-blue-500 transition-colors px-2 py-1.5 cursor-text gap-1">
                 {/* Chips + input — flex-wrap so they flow freely */}

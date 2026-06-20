@@ -317,6 +317,7 @@ export const translations = {
       '{sent} follow-up(s) sent · {skipped} skipped · {failed} failed.',
     invoiceFollowUpAllNothingToSend:
       'No eligible invoices to follow up on. Invoices must have been sent at least once and not contacted in the last 7 days.',
+    proRequiredToFinalize: 'Upgrade to Pro to edit and finalize this invoice.',
     statusLabel: 'Status',
     selectAll: 'Select All',
     deselectAll: 'Deselect All',
@@ -1004,7 +1005,8 @@ export const translations = {
       '{sent} relance(s) envoyée(s) · {skipped} ignorée(s) · {failed} échouée(s).',
     invoiceFollowUpAllNothingToSend:
       'Aucune facture éligible à relancer. Les factures doivent avoir été envoyées au moins une fois et ne pas avoir été contactées dans les 7 derniers jours.',
-
+    proRequiredToFinalize:
+      'Passez à Pro pour modifier et finaliser cette facture.',
     vatNumber: 'Numéro de TVA',
     companyRegNumber: 'SIRET',
     originalInvoiceRef: "Facture d'origine N° : {ref} du {date}",
