@@ -20,8 +20,10 @@ function UpgradeContent() {
   const [lang, setLang] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>(
-    'annual' // Default to annual since it's the better value
+    'annual'
   );
+  const [lifetimeSpotsUsed, setLifetimeSpotsUsed] = useState(0);
+  const MAX_LIFETIME_SPOTS = 100;
   const [dialog, setDialog] = useState<{
     type: 'alert';
     title?: string;
@@ -51,6 +53,14 @@ function UpgradeContent() {
         setProfile(prof);
         setLang(prof.country === 'FR' ? translations.FR : translations.US);
       }
+
+      // Count lifetime users to show spots remaining
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('lifetime_access', true);
+      setLifetimeSpotsUsed(count || 0);
+
       return prof;
     }
 
@@ -104,7 +114,9 @@ function UpgradeContent() {
     };
   }, [router, success]);
 
-  const handleCheckout = async (type: 'pro' | 'pro_annual' | 'credits') => {
+  const handleCheckout = async (
+    type: 'pro' | 'pro_annual' | 'credits' | 'lifetime'
+  ) => {
     setProcessing(true);
 
     try {
@@ -243,7 +255,7 @@ function UpgradeContent() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-3 gap-6">
           {/* Pro Subscription Tier — with Monthly/Annual toggle */}
           <div className="bg-white p-10 rounded-2xl shadow-xl border-2 border-blue-600 relative">
             <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-bl-lg rounded-tr-xl">
@@ -375,6 +387,98 @@ function UpgradeContent() {
               {lang.buyCredits}
             </Button>
           </div>
+          {/* Lifetime Deal — Limited */}
+          {(() => {
+            const spotsLeft = Math.max(
+              0,
+              MAX_LIFETIME_SPOTS - lifetimeSpotsUsed
+            );
+            const soldOut = spotsLeft === 0;
+            const isCurrentPlan = profile.lifetime_access === true;
+
+            return (
+              <div className="bg-gray-900 p-10 rounded-2xl shadow-xl border-2 border-gray-800 relative flex flex-col">
+                {/* Badge */}
+                <div className="absolute top-0 right-0 bg-amber-400 text-gray-900 text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-bl-lg rounded-tr-xl">
+                  {soldOut ? lang.lifetimeSoldOut : lang.lifetimeLimitedBadge}
+                </div>
+
+                <h2 className="text-3xl font-black uppercase mb-2 text-white">
+                  {lang.lifetimePlanName}
+                </h2>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-6">
+                  {lang.lifetimeTagline}
+                </p>
+
+                {/* Price */}
+                <div className="mb-6">
+                  <p className="text-4xl font-mono font-black text-white">
+                    {profile.currency === 'EUR' ? '249€' : '$299'}
+                    <span className="text-sm text-gray-400 ml-1">
+                      {lang.lifetimeOneTime}
+                    </span>
+                  </p>
+                  {!soldOut && (
+                    <p className="text-[11px] font-bold text-amber-400 mt-1.5 uppercase tracking-widest">
+                      {spotsLeft} / {MAX_LIFETIME_SPOTS}{' '}
+                      {lang.lifetimeSpotsLeft}
+                    </p>
+                  )}
+                  {soldOut && (
+                    <p className="text-[11px] font-bold text-gray-500 mt-1.5 uppercase tracking-widest">
+                      {lang.lifetimeNoMoreSpots}
+                    </p>
+                  )}
+                </div>
+
+                {/* Progress bar */}
+                {!soldOut && (
+                  <div className="mb-6">
+                    <div className="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-amber-400 h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${(lifetimeSpotsUsed / MAX_LIFETIME_SPOTS) * 100}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <ul className="space-y-3 mb-8 text-sm font-bold text-gray-300 flex-1">
+                  {lang.lifetimeFeatures.map((f: string, i: number) => (
+                    <li
+                      key={i}
+                      className={f.startsWith('✗') ? 'text-gray-600' : ''}
+                    >
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  loading={processing}
+                  loadingText="..."
+                  disabled={soldOut || isCurrentPlan || processing}
+                  onClick={() => handleCheckout('lifetime')}
+                  className={
+                    soldOut || isCurrentPlan
+                      ? 'opacity-40 cursor-not-allowed'
+                      : '!bg-amber-400 !text-gray-900 hover:!bg-amber-300'
+                  }
+                >
+                  {isCurrentPlan
+                    ? lang.currentPlan
+                    : soldOut
+                      ? lang.lifetimeSoldOut
+                      : lang.getLifetime}
+                </Button>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="text-center mt-12">

@@ -24,6 +24,8 @@ export async function POST(req: Request) {
       priceId = process.env.STRIPE_PRO_ANNUAL_PRICE_ID;
     } else if (type === 'credits') {
       priceId = process.env.STRIPE_CREDITS_PRICE_ID;
+    } else if (type === 'lifetime') {
+      priceId = process.env.STRIPE_LIFETIME_PRICE_ID;
     } else {
       return NextResponse.json(
         { error: 'Invalid checkout type' },

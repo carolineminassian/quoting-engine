@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, Suspense, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { translations } from '@/lib/translations';
+import { translations, t } from '@/lib/translations';
 import {
   getTaxSummary,
   type EstimateFinancialContext,
@@ -493,7 +493,7 @@ function NewEstimateContent() {
     supabase
       .from('estimate_templates')
       .select(
-        'id, name, sections, additional_charges, margin_mode, global_margin, deposit_enabled, deposit_percentage, payment_terms'
+        'id, name, sections, additional_charges, margin_mode, global_margin, deposit_enabled, deposit_percentage, payment_terms, created_at'
       )
       .eq('user_id', profile.id)
       .order('created_at', { ascending: false })
@@ -1233,7 +1233,7 @@ function NewEstimateContent() {
                             key={tmpl.id}
                             value={tmpl.id}
                             className={({ active }) =>
-                              `cursor-pointer select-none relative pr-10 pl-3 py-3 border-b border-gray-50 last:border-b-0 ${
+                              `cursor-pointer select-none relative px-3 py-3 border-b border-gray-50 last:border-b-0 ${
                                 active
                                   ? 'bg-blue-50 text-blue-900'
                                   : 'text-gray-900'
@@ -1248,10 +1248,7 @@ function NewEstimateContent() {
                                   </p>
                                   <p className="text-[10px] text-gray-400 mt-0.5">
                                     {(tmpl.sections || []).length}{' '}
-                                    {profile?.country === 'FR'
-                                      ? 'catégorie(s)'
-                                      : 'categorie(s)'}{' '}
-                                    ·{' '}
+                                    {lang.templateCategories} ·{' '}
                                     {new Date(
                                       tmpl.created_at
                                     ).toLocaleDateString(
@@ -1270,28 +1267,27 @@ function NewEstimateContent() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (
-                                      window.confirm(
-                                        profile?.country === 'FR'
-                                          ? `Supprimer "${tmpl.name}" ?`
-                                          : `Delete "${tmpl.name}"?`
-                                      )
-                                    ) {
-                                      supabase
-                                        .from('estimate_templates')
-                                        .delete()
-                                        .eq('id', tmpl.id)
-                                        .then(() => {
-                                          setTemplates((prev) =>
-                                            prev.filter((t) => t.id !== tmpl.id)
-                                          );
-                                          if (selectedTemplateId === tmpl.id) {
-                                            setSelectedTemplateId(null);
-                                          }
-                                        });
-                                    }
+                                    setDialog({
+                                      type: 'confirm',
+                                      message: t(lang.deleteTemplateConfirm, {
+                                        name: tmpl.name
+                                      }),
+                                      onConfirm: async () => {
+                                        setDialog(null);
+                                        await supabase
+                                          .from('estimate_templates')
+                                          .delete()
+                                          .eq('id', tmpl.id);
+                                        setTemplates((prev) =>
+                                          prev.filter((t) => t.id !== tmpl.id)
+                                        );
+                                        if (selectedTemplateId === tmpl.id) {
+                                          setSelectedTemplateId(null);
+                                        }
+                                      }
+                                    });
                                   }}
-                                  className="shrink-0 w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors rounded"
+                                  className="shrink-0 w-6 h-6 flex items-center justify-center text-gray-300 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
                                 >
                                   ×
                                 </button>
@@ -1300,16 +1296,14 @@ function NewEstimateContent() {
                           </ListboxOption>
                         ))}
 
-                        {/* Manage link — opens /templates for rename etc. */}
+                        {/* Manage link */}
                         <div className="border-t border-gray-100 px-3 py-2">
                           <a
                             href="/templates"
                             onClick={(e) => e.stopPropagation()}
                             className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 transition-colors"
                           >
-                            {profile?.country === 'FR'
-                              ? 'Gérer les modèles →'
-                              : 'Manage templates →'}
+                            {lang.manageTemplates}
                           </a>
                         </div>
                       </ListboxOptions>

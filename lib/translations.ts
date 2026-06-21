@@ -69,17 +69,30 @@ export const translations = {
     upgradeTitle: 'Upgrade PactEstim',
     upgradeSubtitle: 'Unlock unlimited potential',
     bestValue: 'Best Value',
+    lifetimePlanName: 'Lifetime',
+    lifetimeTagline: 'Pay once, use forever',
+    lifetimeLimitedBadge: 'Limited',
+    lifetimeOneTime: 'one-time',
+    lifetimeSpotsLeft: 'spots remaining',
+    lifetimeNoMoreSpots: 'All spots claimed',
+    lifetimeSoldOut: 'Sold Out',
+    getLifetime: 'Get Lifetime Access',
+    lifetimeFeatures: [
+      '✓ Everything in Pro',
+      '✓ All future core features',
+      '✗ Does not include future paid add-ons'
+    ],
     proPlanName: 'Pro',
     payAsYouGoName: 'Pay-As-You-Go',
     perMonth: '/mo',
     proFeatures: [
-      '✓ Unlimited Estimates',
-      '✓ Integrated Invoicing',
-      '✓ Custom Company Logo',
-      '✓ Excel Data Export',
-      '✓ Bulk PDF Download (ZIP)',
-      '✓ Full Analytics Dashboard',
-      '✓ Priority Support'
+      '✓ Unlimited estimates',
+      '✓ Integrated invoicing & credit notes',
+      '✓ Reusable estimate templates',
+      '✓ Full analytics dashboard',
+      '✓ Custom company logo',
+      '✓ Excel export & bulk PDF download',
+      '✓ Priority support'
     ],
     payGoFeatures: [
       '✓ 10 Estimate Credits',
@@ -155,7 +168,16 @@ export const translations = {
     templateName: 'Template name',
     templateNamePlaceholder: 'e.g. Bathroom Renovation',
     templateSaved:
-      'Template saved. You can now use it when creating new estimates.',
+      'Template saved successfully. You can now use it when creating new estimates.',
+    templateCategories: 'categorie(s)',
+    manageTemplates: 'Manage templates →',
+    startFromTemplate: 'Start from template',
+
+    clearTemplate: 'Clear',
+    templates: 'Templates',
+
+    deleteTemplateConfirm: 'Delete template "{name}"? This cannot be undone.',
+    rename: 'Rename',
     customerContactDetails: 'Customer Contact Details',
     yourBusinessName: 'Your Business Name',
     guestMode: 'Guest Mode',
@@ -405,7 +427,7 @@ export const translations = {
     fullProjectTotal: 'Approved project total',
     invoiceSubtotal: 'Invoice subtotal',
     depositSubtotal: 'Deposit subtotal',
-    balanceSubtotal: 'Balance subtotal',
+
     approvedEstimateExceededTitle: 'Approved estimate exceeded',
     approvedEstimateExceededMessage:
       'This invoice exceeds the remaining billable amount on the approved estimate by {amount}. Do you still want to finalize it?',
@@ -769,17 +791,30 @@ export const translations = {
     upgradeTitle: 'Mise à Niveau PactEstim',
     upgradeSubtitle: 'Débloquez un potentiel illimité',
     bestValue: 'Meilleur Choix',
+    lifetimePlanName: 'À Vie',
+    lifetimeTagline: 'Payez une fois, utilisez pour toujours',
+    lifetimeLimitedBadge: 'Limité',
+    lifetimeOneTime: 'paiement unique',
+    lifetimeSpotsLeft: 'places restantes',
+    lifetimeNoMoreSpots: 'Toutes les places sont prises',
+    lifetimeSoldOut: 'Complet',
+    getLifetime: "Obtenir l'accès à vie",
+    lifetimeFeatures: [
+      '✓ Tout ce qui est inclus dans Pro',
+      '✓ Toutes les futures fonctionnalités',
+      "✗ N'inclut pas les futurs modules payants"
+    ],
     proPlanName: 'Pro',
     payAsYouGoName: 'À la carte',
     perMonth: '/mois',
     proFeatures: [
-      '✓ Devis Illimités',
-      '✓ Facturation Intégrée',
-      "✓ Logo d'Entreprise Personnalisé",
-      '✓ Exportation de Données Excel',
-      '✓ Téléchargement PDF Groupé (ZIP)',
-      '✓ Tableau de bord Analytique complet',
-      '✓ Support Prioritaire'
+      '✓ Devis illimités',
+      '✓ Facturation & avoirs intégrés',
+      '✓ Modèles de devis réutilisables',
+      '✓ Tableau de bord analytique complet',
+      "✓ Logo d'entreprise personnalisé",
+      '✓ Export Excel & téléchargement PDF en lot',
+      '✓ Support prioritaire'
     ],
     payGoFeatures: [
       '✓ 10 Crédits de Devis',
@@ -860,7 +895,17 @@ export const translations = {
     templateName: 'Nom du modèle',
     templateNamePlaceholder: 'ex. Rénovation salle de bain',
     templateSaved:
-      "Modèle enregistré. Vous pouvez maintenant l'utiliser lors de la création de nouveaux devis.",
+      "Modèle enregistré avec succès. Vous pouvez maintenant l'utiliser lors de la création de nouveaux devis.",
+    templateCategories: 'catégorie(s)',
+    manageTemplates: 'Gérer les modèles →',
+    startFromTemplate: 'Démarrer depuis un modèle',
+
+    clearTemplate: 'Effacer',
+    templates: 'Modèles',
+
+    deleteTemplateConfirm:
+      'Supprimer le modèle "{name}" ? Cette action est irréversible.',
+    rename: 'Renommer',
     customerContactDetails: 'Coordonnées du Client',
     yourBusinessName: 'Nom de votre entreprise',
     guestMode: 'Mode Invité',
@@ -1026,7 +1071,7 @@ export const translations = {
     poNumber: 'N° de commande (PO)',
     poPlaceholder: 'Ex: PO-12345',
     lessDepositPaid: 'Moins : acompte versé',
-    balanceSubtotal: 'Sous-total solde',
+
     bankDetails: 'Coordonnées Bancaires',
     invoicingLegal: 'Facturation & Légal',
     invoiceContactNote: 'Des questions sur cette facture ?',

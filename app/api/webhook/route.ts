@@ -95,6 +95,24 @@ export async function POST(req: Request) {
           `[webhook] Pro upgrade applied for user ${userId} (interval: ${updates.subscription_interval})`
         );
       }
+    } else if (userId && type === 'lifetime') {
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          subscription_tier: 'pro',
+          lifetime_access: true,
+          stripe_customer_id:
+            (typeof session.customer === 'string'
+              ? session.customer
+              : (session.customer as any)?.id) || null
+        })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('[webhook] Lifetime access grant error:', updateError);
+      } else {
+        console.log(`[webhook] Lifetime access granted for user ${userId}`);
+      }
     } else if (userId && type === 'credits') {
       // Atomic increment to prevent race conditions
       const { error: rpcError } = await supabaseAdmin.rpc('increment_credits', {
@@ -116,6 +134,7 @@ export async function POST(req: Request) {
     const subscription = event.data.object as Stripe.Subscription;
     const customerId = subscription.customer as string;
 
+    // Never downgrade lifetime users — they have no subscription to cancel
     await supabaseAdmin
       .from('profiles')
       .update({
@@ -125,7 +144,8 @@ export async function POST(req: Request) {
         subscription_cancel_at: null,
         pending_plan_switch: null
       })
-      .eq('stripe_customer_id', customerId);
+      .eq('stripe_customer_id', customerId)
+      .eq('lifetime_access', false);
     processedSuccessfully = true;
   }
 
