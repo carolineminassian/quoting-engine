@@ -474,19 +474,25 @@ export default function LandingPage() {
             </h2>
           </div>
           <div className="space-y-4">
-            {t.faqs.map((faq, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl p-7 border border-gray-200"
-              >
-                <h3 className="font-black text-gray-900 mb-2 text-sm uppercase tracking-tight">
-                  {faq.q}
-                </h3>
-                <p className="text-sm text-gray-500 font-medium leading-relaxed">
-                  {faq.a}
-                </p>
-              </div>
-            ))}
+            {t.faqs
+              .filter((_, i) =>
+                lifetimeSpotsUsed < MAX_LIFETIME_SPOTS
+                  ? true
+                  : i !== t.faqs.length - 1
+              )
+              .map((faq, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl p-7 border border-gray-200"
+                >
+                  <h3 className="font-black text-gray-900 mb-2 text-sm uppercase tracking-tight">
+                    {faq.q}
+                  </h3>
+                  <p className="text-sm text-gray-500 font-medium leading-relaxed">
+                    {faq.a}
+                  </p>
+                </div>
+              ))}
           </div>
         </div>
       </section>
