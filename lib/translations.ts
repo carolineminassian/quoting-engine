@@ -147,6 +147,15 @@ export const translations = {
 
     // === NEW: NEW ESTIMATE ===
     editProjectTitle: 'Edit Project',
+    saveAsTemplate: 'Save as Template',
+    selectTemplate: 'Optional — start from a template',
+    saveAsTemplateDesc:
+      'Saves all service categories, items, additional charges, margins, deposit and payment settings. Client details are not included.',
+
+    templateName: 'Template name',
+    templateNamePlaceholder: 'e.g. Bathroom Renovation',
+    templateSaved:
+      'Template saved. You can now use it when creating new estimates.',
     customerContactDetails: 'Customer Contact Details',
     yourBusinessName: 'Your Business Name',
     guestMode: 'Guest Mode',
@@ -310,6 +319,9 @@ export const translations = {
     invoices: 'Billing',
     poNumber: 'PO Number',
     poPlaceholder: 'e.g. PO-12345',
+    lessDepositPaid: 'Less: deposit paid',
+    balanceSubtotal: 'Balance subtotal',
+
     bankDetails: 'Bank Details',
     invoicingLegal: 'Invoicing & Legal',
     invoiceContactNote: 'Questions about this invoice?',
@@ -841,6 +853,14 @@ export const translations = {
 
     // === NEW: NEW ESTIMATE ===
     editProjectTitle: 'Modifier le Projet',
+    saveAsTemplate: 'Enregistrer comme modèle',
+    selectTemplate: 'Optionnel — démarrer depuis un modèle',
+    saveAsTemplateDesc:
+      'Enregistre toutes les catégories de services, éléments, frais supplémentaires, marges, acompte et conditions de paiement. Les informations client ne sont pas incluses.',
+    templateName: 'Nom du modèle',
+    templateNamePlaceholder: 'ex. Rénovation salle de bain',
+    templateSaved:
+      "Modèle enregistré. Vous pouvez maintenant l'utiliser lors de la création de nouveaux devis.",
     customerContactDetails: 'Coordonnées du Client',
     yourBusinessName: 'Nom de votre entreprise',
     guestMode: 'Mode Invité',
@@ -1005,6 +1025,8 @@ export const translations = {
     invoices: 'Facturation',
     poNumber: 'N° de commande (PO)',
     poPlaceholder: 'Ex: PO-12345',
+    lessDepositPaid: 'Moins : acompte versé',
+    balanceSubtotal: 'Sous-total solde',
     bankDetails: 'Coordonnées Bancaires',
     invoicingLegal: 'Facturation & Légal',
     invoiceContactNote: 'Des questions sur cette facture ?',

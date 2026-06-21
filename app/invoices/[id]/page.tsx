@@ -352,6 +352,7 @@ export default function InvoiceView() {
   const [creditNotes, setCreditNotes] = useState<any[]>([]);
   const [finalizedNetOtherInvoicesCents, setFinalizedNetOtherInvoicesCents] =
     useState(0);
+  const [depositInvoice, setDepositInvoice] = useState<any>(null);
 
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm' | 'danger';
@@ -440,7 +441,7 @@ export default function InvoiceView() {
               ? supabase
                   .from('invoices')
                   .select(
-                    'id, total_amount_cents, credited_amount_cents, is_locked, is_cancelled'
+                    'id, invoice_number, invoice_date, invoice_type, total_amount_cents, subtotal_cents, subtotal_amount_cents, credited_amount_cents, is_locked, is_cancelled'
                   )
                   .eq('estimate_id', inv.estimate_id)
                   .eq('user_id', inv.user_id)
@@ -494,6 +495,17 @@ export default function InvoiceView() {
         );
 
         setFinalizedNetOtherInvoicesCents(Math.max(0, otherNetBilledCents));
+
+        // For balance invoices, find the finalized deposit invoice for the deduction line
+        if (inv.invoice_type === 'balance') {
+          const dep = (estimateInvoicesRes.data || []).find(
+            (other: any) =>
+              other.invoice_type === 'deposit' &&
+              other.is_locked &&
+              !other.is_cancelled
+          );
+          setDepositInvoice(dep || null);
+        }
 
         setDraftData({
           invoiceDate: inv.invoice_date
@@ -2364,517 +2376,560 @@ export default function InvoiceView() {
                 </div>
               </section>
 
-              {/* SECTION-BASED INVOICE */}
-              {!isLineItemInvoice && sections.length > 0 && (
+              {/* DEPOSIT INVOICE — single description line, no section breakdown */}
+              {isDepositInvoice && (
                 <section className="mb-10">
                   <div className="flex items-baseline justify-between pb-3 mb-4 border-b-2 border-gray-900">
                     <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-700">
-                      {lang.serviceCategoryHeader}
+                      {lang.description}
                     </p>
                     <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-700">
                       {lang.amountHeader}
                     </p>
                   </div>
-
-                  <div className="divide-y divide-gray-100">
-                    {sections.map((sec: any, secIdx: number) => {
-                      let sectionSubtotalCents = 0;
-
-                      if ((sec.laborHours || 0) > 0) {
-                        sectionSubtotalCents += Math.round(
-                          (sec.laborHours || 0) * getInvoiceLaborRateCents(sec)
-                        );
-                      }
-
-                      (sec.items || []).forEach((item: any) => {
-                        sectionSubtotalCents += Math.round(
-                          (item.qty || 0) *
-                            getInvoiceItemUnitCostCents(sec, item)
-                        );
-                      });
-
-                      return (
-                        <div key={secIdx} className="py-8 first:pt-2">
-                          <div className="flex justify-between items-start gap-4 mb-4">
-                            <div className="flex-1">
-                              {!invoice.is_locked ? (
-                                <input
-                                  type="text"
-                                  value={sec.title || ''}
-                                  onChange={(e) =>
-                                    handleUpdateSectionTitle(
-                                      secIdx,
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full p-2 border border-gray-200 rounded-lg text-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-                                  placeholder={lang.professionalServices}
-                                />
-                              ) : (
-                                <h3 className="text-lg font-bold text-gray-900 break-words">
-                                  {sec.title || lang.professionalServices}
-                                </h3>
-                              )}
-                            </div>
-                            <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap tabular-nums mt-1.5">
-                              {fmt(sectionSubtotalCents)}
-                            </span>
-                          </div>
-
-                          <div className="pl-0 sm:pl-4 mb-6">
-                            {!invoice.is_locked ? (
-                              <textarea
-                                value={getSectionDisplayDescription(sec)}
-                                onChange={(e) =>
-                                  handleUpdateSectionDesc(
-                                    secIdx,
-                                    e.target.value
-                                  )
-                                }
-                                maxLength={5000}
-                                rows={2}
-                                className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y whitespace-pre-wrap text-gray-900 shadow-sm"
-                                placeholder={lang.sectionDescPlaceholder}
-                              />
-                            ) : (
-                              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
-                                {getSectionDisplayDescription(sec)}
-                              </p>
-                            )}
-                          </div>
-
-                          {isShowingDetails ? (
-                            <div className="pl-0 sm:pl-4 border-l-2 border-gray-100 space-y-4">
-                              {(sec.laborHours > 0 ||
-                                isStructurallyEditable) && (
-                                <div className="bg-gray-50 p-4 sm:p-5 rounded-xl border border-gray-100 flex flex-wrap gap-4 items-end shadow-sm">
-                                  <div className="flex-1 min-w-[120px]">
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-                                      {lang.laborLabel}
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="0.5"
-                                      value={
-                                        (sec.laborHours || 0) === 0
-                                          ? ''
-                                          : sec.laborHours
-                                      }
-                                      placeholder="0"
-                                      onChange={(e) =>
-                                        handleUpdateSectionLabor(
-                                          secIdx,
-                                          'laborHours',
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm disabled:bg-gray-100"
-                                      disabled={!isStructurallyEditable}
-                                    />
-                                  </div>
-
-                                  <div className="flex-1 min-w-[120px]">
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-                                      {lang.hourlyRate}
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={
-                                        (sec.hourlyRate || 0) === 0
-                                          ? ''
-                                          : sec.hourlyRate
-                                      }
-                                      placeholder="0.00"
-                                      onChange={(e) =>
-                                        handleUpdateSectionLabor(
-                                          secIdx,
-                                          'hourlyRate',
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm disabled:bg-gray-100"
-                                      disabled={!isStructurallyEditable}
-                                    />
-                                  </div>
-
-                                  <div className="w-24">
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-                                      {lang.tax} %
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="100"
-                                      step="0.1"
-                                      value={
-                                        (sec.laborTaxRate ??
-                                          profile?.tax_rate ??
-                                          0) === 0
-                                          ? ''
-                                          : (sec.laborTaxRate ??
-                                            profile?.tax_rate ??
-                                            0)
-                                      }
-                                      placeholder="0"
-                                      onChange={(e) =>
-                                        handleUpdateSectionLabor(
-                                          secIdx,
-                                          'laborTaxRate',
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm disabled:bg-gray-100"
-                                      disabled={!isStructurallyEditable}
-                                    />
-                                  </div>
-
-                                  {(sec.laborHours || 0) > 0 && (
-                                    <div className="flex flex-col items-end justify-center px-3 bg-gray-50 border border-gray-200 rounded-xl h-[46px] min-w-[80px]">
-                                      <span className="text-sm font-mono font-bold text-gray-700 tabular-nums">
-                                        {fmt(
-                                          Math.round(
-                                            (sec.laborHours || 0) *
-                                              getInvoiceLaborRateCents(sec)
-                                          )
-                                        )}
-                                      </span>
-                                      {invoiceContext.margin_mode_snapshot &&
-                                        invoiceContext.margin_mode_snapshot !==
-                                          'none' &&
-                                        (sec.hourlyRate || 0) > 0 &&
-                                        getInvoiceLaborRateCents(sec) !==
-                                          Math.round(
-                                            (sec.hourlyRate || 0) * 100
-                                          ) && (
-                                          <span className="text-[9px] text-blue-400 font-bold whitespace-nowrap">
-                                            +
-                                            {Math.round(
-                                              (getInvoiceLaborRateCents(sec) /
-                                                ((sec.hourlyRate || 1) * 100) -
-                                                1) *
-                                                100
-                                            )}
-                                            % mgn
-                                          </span>
-                                        )}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              {sec.items && sec.items.length > 0 && (
-                                <div className="space-y-3">
-                                  {sec.items.map(
-                                    (item: any, itemIdx: number) => {
-                                      const m = materialsById.get(
-                                        item.materialId
-                                      );
-                                      const unitCostCents =
-                                        getInvoiceItemUnitCostCents(sec, item);
-
-                                      if (isStructurallyEditable) {
-                                        return (
-                                          <div
-                                            key={itemIdx}
-                                            className="flex flex-col lg:flex-row gap-3 items-stretch bg-gray-50/50 p-3 rounded-lg border border-gray-100/50"
-                                          >
-                                            {/* Material selector */}
-                                            <div className="flex-1 min-w-[200px]">
-                                              {item.materialId ? (
-                                                <div className="flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm h-[42px]">
-                                                  <span className="font-bold text-gray-900 truncate pr-4 text-xs">
-                                                    {item.name || m?.name}
-                                                  </span>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                      handleUpdateSectionItem(
-                                                        secIdx,
-                                                        itemIdx,
-                                                        'materialId',
-                                                        ''
-                                                      )
-                                                    }
-                                                    className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors shrink-0"
-                                                  >
-                                                    {lang.edit}
-                                                  </button>
-                                                </div>
-                                              ) : (
-                                                <MaterialCombobox
-                                                  materials={materials}
-                                                  selectedId={item.materialId}
-                                                  onChange={(val: any) => {
-                                                    if (!val) return;
-                                                    handleUpdateSectionItemMaterial(
-                                                      secIdx,
-                                                      itemIdx,
-                                                      val
-                                                    );
-                                                  }}
-                                                  onCreateNew={(name: string) =>
-                                                    handleCreateMaterialOnTheFly(
-                                                      secIdx,
-                                                      itemIdx,
-                                                      name
-                                                    )
-                                                  }
-                                                  placeholder={
-                                                    lang.selectMaterial ||
-                                                    'Select or create...'
-                                                  }
-                                                  createLabel={lang.create}
-                                                  emptyStateLabel={
-                                                    lang.noMaterialsFound
-                                                  }
-                                                  currencySymbol={
-                                                    profile?.currency === 'EUR'
-                                                      ? '€'
-                                                      : '$'
-                                                  }
-                                                  unitLabels={lang?.units || {}}
-                                                />
-                                              )}
-                                            </div>
-
-                                            {/* Numeric fields */}
-                                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-                                              {/* QTY */}
-                                              <div className="relative group w-20">
-                                                <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
-                                                  {lang.qtyShort || 'QTY'}
-                                                </span>
-                                                <input
-                                                  type="number"
-                                                  min="0"
-                                                  placeholder="1"
-                                                  className="w-full py-2 pl-9 pr-2 border border-gray-200 rounded-lg text-right text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                                  value={
-                                                    item.qty === 0
-                                                      ? ''
-                                                      : item.qty
-                                                  }
-                                                  onChange={(e) =>
-                                                    handleUpdateSectionItem(
-                                                      secIdx,
-                                                      itemIdx,
-                                                      'quantity',
-                                                      parseFloat(
-                                                        e.target.value
-                                                      ) || 0
-                                                    )
-                                                  }
-                                                />
-                                              </div>
-
-                                              {/* COST */}
-                                              <div className="relative group w-28">
-                                                <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
-                                                  {lang.costShort || 'COST'}
-                                                </span>
-                                                <input
-                                                  type="number"
-                                                  min="0"
-                                                  step="0.01"
-                                                  placeholder="0.00"
-                                                  className="w-full py-2 pl-10 pr-2 border border-gray-200 rounded-lg text-right text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                                  value={
-                                                    (item.cost_per_unit_cents ||
-                                                      0) === 0
-                                                      ? ''
-                                                      : item.cost_per_unit_cents /
-                                                        100
-                                                  }
-                                                  onChange={(e) =>
-                                                    handleUpdateSectionItem(
-                                                      secIdx,
-                                                      itemIdx,
-                                                      'unit_price_cents',
-                                                      Math.round(
-                                                        (parseFloat(
-                                                          e.target.value
-                                                        ) || 0) * 100
-                                                      )
-                                                    )
-                                                  }
-                                                />
-                                              </div>
-
-                                              {/* TAX */}
-                                              <div className="relative group w-24">
-                                                <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
-                                                  {lang.taxShort || 'TAX'}
-                                                </span>
-                                                <input
-                                                  type="number"
-                                                  min="0"
-                                                  max="100"
-                                                  placeholder="0"
-                                                  className="w-full py-2 pl-10 pr-6 border border-gray-200 rounded-lg text-right text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                                  value={
-                                                    (item.taxRate ?? 0) === 0
-                                                      ? ''
-                                                      : (item.taxRate ?? 0)
-                                                  }
-                                                  onChange={(e) =>
-                                                    handleUpdateSectionItem(
-                                                      secIdx,
-                                                      itemIdx,
-                                                      'tax_rate',
-                                                      parseFloat(
-                                                        e.target.value
-                                                      ) || 0
-                                                    )
-                                                  }
-                                                />
-                                                <span className="absolute right-2 top-2.5 text-[10px] font-black text-gray-400 pointer-events-none">
-                                                  %
-                                                </span>
-                                              </div>
-
-                                              {/* AMOUNT (read-only computed, post-margin) */}
-                                              <div className="flex flex-col items-end justify-center w-24 h-[42px] px-3 bg-gray-50 border border-gray-100 rounded-lg">
-                                                <span className="text-sm font-mono font-bold text-gray-700 tabular-nums">
-                                                  {fmt(
-                                                    Math.round(
-                                                      (item.qty || 0) *
-                                                        unitCostCents
-                                                    )
-                                                  )}
-                                                </span>
-                                                {invoiceContext.margin_mode_snapshot &&
-                                                  invoiceContext.margin_mode_snapshot !==
-                                                    'none' &&
-                                                  item.cost_per_unit_cents >
-                                                    0 &&
-                                                  unitCostCents !==
-                                                    item.cost_per_unit_cents && (
-                                                    <span className="text-[9px] text-blue-400 font-bold whitespace-nowrap">
-                                                      +
-                                                      {Math.round(
-                                                        (unitCostCents /
-                                                          item.cost_per_unit_cents -
-                                                          1) *
-                                                          100
-                                                      )}
-                                                      % mgn
-                                                    </span>
-                                                  )}
-                                              </div>
-
-                                              {/* DELETE */}
-                                              <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="md"
-                                                onClick={() =>
-                                                  handleRemoveSectionItem(
-                                                    secIdx,
-                                                    itemIdx
-                                                  )
-                                                }
-                                                className="!h-[42px] !w-[42px] !p-0 !text-gray-300 hover:!text-red-600 hover:!bg-red-50"
-                                              >
-                                                <Icons.Trash />
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        );
-                                      }
-
-                                      // Read-only path (deposit/balance drafts + locked)
-                                      return (
-                                        <div
-                                          key={itemIdx}
-                                          className="py-2 flex justify-between items-center gap-4 border-b border-gray-100 last:border-b-0"
-                                        >
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-900">
-                                              {item.name ||
-                                                m?.name ||
-                                                lang.itemLabel}
-                                            </p>
-                                            <p className="text-xs text-gray-500 mt-0.5">
-                                              {item.qty} × {fmt(unitCostCents)}
-                                              {(item.taxRate ?? 0) > 0 && (
-                                                <span className="text-gray-400 ml-2">
-                                                  ({lang.tax} {item.taxRate}%)
-                                                </span>
-                                              )}
-                                            </p>
-                                          </div>
-                                          <span className="font-mono font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap">
-                                            {fmt(
-                                              Math.round(
-                                                (item.qty || 0) * unitCostCents
-                                              )
-                                            )}
-                                          </span>
-                                        </div>
-                                      );
-                                    }
-                                  )}
-                                </div>
-                              )}
-
-                              {isStructurallyEditable && (
-                                <div className="mt-4">
-                                  <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => handleAddSectionItem(secIdx)}
-                                    icon={<Icons.Plus />}
-                                  >
-                                    {lang.addItem}
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            sec.items &&
-                            sec.items.length > 0 && (
-                              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 pl-0 sm:pl-4">
-                                {sec.items.map((item: any, i: number) => {
-                                  const m = materialsById.get(item.materialId);
-                                  const displayName =
-                                    item.name || m?.name || lang.itemLabel;
-                                  const rawUnit = item.unit || m?.unit || '';
-                                  const displayUnit =
-                                    lang?.units?.[rawUnit] || rawUnit;
-
-                                  return (
-                                    <span
-                                      key={i}
-                                      className="text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100"
-                                    >
-                                      <span className="text-gray-700 font-medium">
-                                        {displayName}
-                                      </span>
-                                      {(item.qty > 0 || displayUnit) && (
-                                        <span className="text-gray-400">
-                                          {' '}
-                                          · {item.qty}
-                                          {displayUnit ? ` ${displayUnit}` : ''}
-                                        </span>
-                                      )}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div className="py-4 flex justify-between items-start gap-4">
+                    <p className="text-base font-bold text-gray-900 flex-1">
+                      {invoice.invoice_description ||
+                        `${lang.depositInvoiceTitle} ${invoice.deposit_percentage}%`}
+                    </p>
+                    <span className="font-mono font-bold text-lg text-gray-900 tabular-nums whitespace-nowrap">
+                      {fmt(billedTotals.subtotalCents)}
+                    </span>
                   </div>
                 </section>
               )}
 
+              {/* SECTION-BASED INVOICE */}
+              {!isDepositInvoice &&
+                !isLineItemInvoice &&
+                sections.length > 0 && (
+                  <section className="mb-10">
+                    <div className="flex items-baseline justify-between pb-3 mb-4 border-b-2 border-gray-900">
+                      <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-700">
+                        {lang.serviceCategoryHeader}
+                      </p>
+                      <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-700">
+                        {lang.amountHeader}
+                      </p>
+                    </div>
+
+                    <div className="divide-y divide-gray-100">
+                      {sections.map((sec: any, secIdx: number) => {
+                        let sectionSubtotalCents = 0;
+
+                        if ((sec.laborHours || 0) > 0) {
+                          sectionSubtotalCents += Math.round(
+                            (sec.laborHours || 0) *
+                              getInvoiceLaborRateCents(sec)
+                          );
+                        }
+
+                        (sec.items || []).forEach((item: any) => {
+                          sectionSubtotalCents += Math.round(
+                            (item.qty || 0) *
+                              getInvoiceItemUnitCostCents(sec, item)
+                          );
+                        });
+
+                        return (
+                          <div key={secIdx} className="py-8 first:pt-2">
+                            <div className="flex justify-between items-start gap-4 mb-4">
+                              <div className="flex-1">
+                                {!invoice.is_locked ? (
+                                  <input
+                                    type="text"
+                                    value={sec.title || ''}
+                                    onChange={(e) =>
+                                      handleUpdateSectionTitle(
+                                        secIdx,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full p-2 border border-gray-200 rounded-lg text-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                    placeholder={lang.professionalServices}
+                                  />
+                                ) : (
+                                  <h3 className="text-lg font-bold text-gray-900 break-words">
+                                    {sec.title || lang.professionalServices}
+                                  </h3>
+                                )}
+                              </div>
+                              <span className="font-mono font-bold text-lg text-gray-900 whitespace-nowrap tabular-nums mt-1.5">
+                                {fmt(sectionSubtotalCents)}
+                              </span>
+                            </div>
+
+                            <div className="pl-0 sm:pl-4 mb-6">
+                              {!invoice.is_locked ? (
+                                <textarea
+                                  value={getSectionDisplayDescription(sec)}
+                                  onChange={(e) =>
+                                    handleUpdateSectionDesc(
+                                      secIdx,
+                                      e.target.value
+                                    )
+                                  }
+                                  maxLength={5000}
+                                  rows={2}
+                                  className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y whitespace-pre-wrap text-gray-900 shadow-sm"
+                                  placeholder={lang.sectionDescPlaceholder}
+                                />
+                              ) : (
+                                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+                                  {getSectionDisplayDescription(sec)}
+                                </p>
+                              )}
+                            </div>
+
+                            {isShowingDetails ? (
+                              <div className="pl-0 sm:pl-4 border-l-2 border-gray-100 space-y-4">
+                                {(sec.laborHours > 0 ||
+                                  isStructurallyEditable) && (
+                                  <div className="bg-gray-50 p-4 sm:p-5 rounded-xl border border-gray-100 flex flex-wrap gap-4 items-end shadow-sm">
+                                    <div className="flex-1 min-w-[120px]">
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                                        {lang.laborLabel}
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        value={
+                                          (sec.laborHours || 0) === 0
+                                            ? ''
+                                            : sec.laborHours
+                                        }
+                                        placeholder="0"
+                                        onChange={(e) =>
+                                          handleUpdateSectionLabor(
+                                            secIdx,
+                                            'laborHours',
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm disabled:bg-gray-100"
+                                        disabled={!isStructurallyEditable}
+                                      />
+                                    </div>
+
+                                    <div className="flex-1 min-w-[120px]">
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                                        {lang.hourlyRate}
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={
+                                          (sec.hourlyRate || 0) === 0
+                                            ? ''
+                                            : sec.hourlyRate
+                                        }
+                                        placeholder="0.00"
+                                        onChange={(e) =>
+                                          handleUpdateSectionLabor(
+                                            secIdx,
+                                            'hourlyRate',
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm disabled:bg-gray-100"
+                                        disabled={!isStructurallyEditable}
+                                      />
+                                    </div>
+
+                                    <div className="w-24">
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                                        {lang.tax} %
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        value={
+                                          (sec.laborTaxRate ??
+                                            profile?.tax_rate ??
+                                            0) === 0
+                                            ? ''
+                                            : (sec.laborTaxRate ??
+                                              profile?.tax_rate ??
+                                              0)
+                                        }
+                                        placeholder="0"
+                                        onChange={(e) =>
+                                          handleUpdateSectionLabor(
+                                            secIdx,
+                                            'laborTaxRate',
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white shadow-sm disabled:bg-gray-100"
+                                        disabled={!isStructurallyEditable}
+                                      />
+                                    </div>
+
+                                    {(sec.laborHours || 0) > 0 && (
+                                      <div className="flex flex-col items-end justify-center px-3 bg-gray-50 border border-gray-200 rounded-xl h-[46px] min-w-[80px]">
+                                        <span className="text-sm font-mono font-bold text-gray-700 tabular-nums">
+                                          {fmt(
+                                            Math.round(
+                                              (sec.laborHours || 0) *
+                                                getInvoiceLaborRateCents(sec)
+                                            )
+                                          )}
+                                        </span>
+                                        {invoiceContext.margin_mode_snapshot &&
+                                          invoiceContext.margin_mode_snapshot !==
+                                            'none' &&
+                                          (sec.hourlyRate || 0) > 0 &&
+                                          getInvoiceLaborRateCents(sec) !==
+                                            Math.round(
+                                              (sec.hourlyRate || 0) * 100
+                                            ) && (
+                                            <span className="text-[9px] text-blue-400 font-bold whitespace-nowrap">
+                                              +
+                                              {Math.round(
+                                                (getInvoiceLaborRateCents(sec) /
+                                                  ((sec.hourlyRate || 1) *
+                                                    100) -
+                                                  1) *
+                                                  100
+                                              )}
+                                              % mgn
+                                            </span>
+                                          )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {sec.items && sec.items.length > 0 && (
+                                  <div className="space-y-3">
+                                    {sec.items.map(
+                                      (item: any, itemIdx: number) => {
+                                        const m = materialsById.get(
+                                          item.materialId
+                                        );
+                                        const unitCostCents =
+                                          getInvoiceItemUnitCostCents(
+                                            sec,
+                                            item
+                                          );
+
+                                        if (isStructurallyEditable) {
+                                          return (
+                                            <div
+                                              key={itemIdx}
+                                              className="flex flex-col lg:flex-row gap-3 items-stretch bg-gray-50/50 p-3 rounded-lg border border-gray-100/50"
+                                            >
+                                              {/* Material selector */}
+                                              <div className="flex-1 min-w-[200px]">
+                                                {item.materialId ? (
+                                                  <div className="flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm h-[42px]">
+                                                    <span className="font-bold text-gray-900 truncate pr-4 text-xs">
+                                                      {item.name || m?.name}
+                                                    </span>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        handleUpdateSectionItem(
+                                                          secIdx,
+                                                          itemIdx,
+                                                          'materialId',
+                                                          ''
+                                                        )
+                                                      }
+                                                      className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors shrink-0"
+                                                    >
+                                                      {lang.edit}
+                                                    </button>
+                                                  </div>
+                                                ) : (
+                                                  <MaterialCombobox
+                                                    materials={materials}
+                                                    selectedId={item.materialId}
+                                                    onChange={(val: any) => {
+                                                      if (!val) return;
+                                                      handleUpdateSectionItemMaterial(
+                                                        secIdx,
+                                                        itemIdx,
+                                                        val
+                                                      );
+                                                    }}
+                                                    onCreateNew={(
+                                                      name: string
+                                                    ) =>
+                                                      handleCreateMaterialOnTheFly(
+                                                        secIdx,
+                                                        itemIdx,
+                                                        name
+                                                      )
+                                                    }
+                                                    placeholder={
+                                                      lang.selectMaterial ||
+                                                      'Select or create...'
+                                                    }
+                                                    createLabel={lang.create}
+                                                    emptyStateLabel={
+                                                      lang.noMaterialsFound
+                                                    }
+                                                    currencySymbol={
+                                                      profile?.currency ===
+                                                      'EUR'
+                                                        ? '€'
+                                                        : '$'
+                                                    }
+                                                    unitLabels={
+                                                      lang?.units || {}
+                                                    }
+                                                  />
+                                                )}
+                                              </div>
+
+                                              {/* Numeric fields */}
+                                              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                                                {/* QTY */}
+                                                <div className="relative group w-20">
+                                                  <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
+                                                    {lang.qtyShort || 'QTY'}
+                                                  </span>
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    placeholder="1"
+                                                    className="w-full py-2 pl-9 pr-2 border border-gray-200 rounded-lg text-right text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    value={
+                                                      item.qty === 0
+                                                        ? ''
+                                                        : item.qty
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleUpdateSectionItem(
+                                                        secIdx,
+                                                        itemIdx,
+                                                        'quantity',
+                                                        parseFloat(
+                                                          e.target.value
+                                                        ) || 0
+                                                      )
+                                                    }
+                                                  />
+                                                </div>
+
+                                                {/* COST */}
+                                                <div className="relative group w-28">
+                                                  <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
+                                                    {lang.costShort || 'COST'}
+                                                  </span>
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    placeholder="0.00"
+                                                    className="w-full py-2 pl-10 pr-2 border border-gray-200 rounded-lg text-right text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    value={
+                                                      (item.cost_per_unit_cents ||
+                                                        0) === 0
+                                                        ? ''
+                                                        : item.cost_per_unit_cents /
+                                                          100
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleUpdateSectionItem(
+                                                        secIdx,
+                                                        itemIdx,
+                                                        'unit_price_cents',
+                                                        Math.round(
+                                                          (parseFloat(
+                                                            e.target.value
+                                                          ) || 0) * 100
+                                                        )
+                                                      )
+                                                    }
+                                                  />
+                                                </div>
+
+                                                {/* TAX */}
+                                                <div className="relative group w-24">
+                                                  <span className="absolute left-2 top-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest pointer-events-none">
+                                                    {lang.taxShort || 'TAX'}
+                                                  </span>
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    placeholder="0"
+                                                    className="w-full py-2 pl-10 pr-6 border border-gray-200 rounded-lg text-right text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    value={
+                                                      (item.taxRate ?? 0) === 0
+                                                        ? ''
+                                                        : (item.taxRate ?? 0)
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleUpdateSectionItem(
+                                                        secIdx,
+                                                        itemIdx,
+                                                        'tax_rate',
+                                                        parseFloat(
+                                                          e.target.value
+                                                        ) || 0
+                                                      )
+                                                    }
+                                                  />
+                                                  <span className="absolute right-2 top-2.5 text-[10px] font-black text-gray-400 pointer-events-none">
+                                                    %
+                                                  </span>
+                                                </div>
+
+                                                {/* AMOUNT (read-only computed, post-margin) */}
+                                                <div className="flex flex-col items-end justify-center w-24 h-[42px] px-3 bg-gray-50 border border-gray-100 rounded-lg">
+                                                  <span className="text-sm font-mono font-bold text-gray-700 tabular-nums">
+                                                    {fmt(
+                                                      Math.round(
+                                                        (item.qty || 0) *
+                                                          unitCostCents
+                                                      )
+                                                    )}
+                                                  </span>
+                                                  {invoiceContext.margin_mode_snapshot &&
+                                                    invoiceContext.margin_mode_snapshot !==
+                                                      'none' &&
+                                                    item.cost_per_unit_cents >
+                                                      0 &&
+                                                    unitCostCents !==
+                                                      item.cost_per_unit_cents && (
+                                                      <span className="text-[9px] text-blue-400 font-bold whitespace-nowrap">
+                                                        +
+                                                        {Math.round(
+                                                          (unitCostCents /
+                                                            item.cost_per_unit_cents -
+                                                            1) *
+                                                            100
+                                                        )}
+                                                        % mgn
+                                                      </span>
+                                                    )}
+                                                </div>
+
+                                                {/* DELETE */}
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="md"
+                                                  onClick={() =>
+                                                    handleRemoveSectionItem(
+                                                      secIdx,
+                                                      itemIdx
+                                                    )
+                                                  }
+                                                  className="!h-[42px] !w-[42px] !p-0 !text-gray-300 hover:!text-red-600 hover:!bg-red-50"
+                                                >
+                                                  <Icons.Trash />
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+
+                                        // Read-only path (deposit/balance drafts + locked)
+                                        return (
+                                          <div
+                                            key={itemIdx}
+                                            className="py-2 flex justify-between items-center gap-4 border-b border-gray-100 last:border-b-0"
+                                          >
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-sm font-medium text-gray-900">
+                                                {item.name ||
+                                                  m?.name ||
+                                                  lang.itemLabel}
+                                              </p>
+                                              <p className="text-xs text-gray-500 mt-0.5">
+                                                {item.qty} ×{' '}
+                                                {fmt(unitCostCents)}
+                                                {(item.taxRate ?? 0) > 0 && (
+                                                  <span className="text-gray-400 ml-2">
+                                                    ({lang.tax} {item.taxRate}%)
+                                                  </span>
+                                                )}
+                                              </p>
+                                            </div>
+                                            <span className="font-mono font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap">
+                                              {fmt(
+                                                Math.round(
+                                                  (item.qty || 0) *
+                                                    unitCostCents
+                                                )
+                                              )}
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+                                    )}
+                                  </div>
+                                )}
+
+                                {isStructurallyEditable && (
+                                  <div className="mt-4">
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleAddSectionItem(secIdx)
+                                      }
+                                      icon={<Icons.Plus />}
+                                    >
+                                      {lang.addItem}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              sec.items &&
+                              sec.items.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 pl-0 sm:pl-4">
+                                  {sec.items.map((item: any, i: number) => {
+                                    const m = materialsById.get(
+                                      item.materialId
+                                    );
+                                    const displayName =
+                                      item.name || m?.name || lang.itemLabel;
+                                    const rawUnit = item.unit || m?.unit || '';
+                                    const displayUnit =
+                                      lang?.units?.[rawUnit] || rawUnit;
+
+                                    return (
+                                      <span
+                                        key={i}
+                                        className="text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100"
+                                      >
+                                        <span className="text-gray-700 font-medium">
+                                          {displayName}
+                                        </span>
+                                        {(item.qty > 0 || displayUnit) && (
+                                          <span className="text-gray-400">
+                                            {' '}
+                                            · {item.qty}
+                                            {displayUnit
+                                              ? ` ${displayUnit}`
+                                              : ''}
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
               {/* FLAT LINE ITEMS ONLY */}
-              {isLineItemInvoice && (
+              {!isDepositInvoice && isLineItemInvoice && (
                 <section className="mb-10">
                   <div className="flex items-baseline justify-between pb-3 mb-4 border-b-2 border-gray-900">
                     <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-700">
@@ -2996,37 +3051,157 @@ export default function InvoiceView() {
               {/* TOTALS */}
               <section className="flex justify-end pt-8 mb-10 border-t-2 border-gray-200">
                 <div className="w-full sm:w-80 space-y-3">
-                  <div className="flex justify-between items-baseline text-sm">
-                    <span className="text-gray-700 font-bold">
-                      {isDepositInvoice
-                        ? `${lang.depositSubtotal} (${invoice.deposit_percentage}%)`
-                        : isBalanceInvoice
-                          ? `${lang.balanceSubtotal} (${
-                              100 - invoice.deposit_percentage
-                            }%)`
-                          : lang.invoiceSubtotal}
-                    </span>
-                    <span className="font-mono font-bold text-gray-900 tabular-nums">
-                      {fmt(billedTotals.subtotalCents)}
-                    </span>
-                  </div>
-
-                  {Object.entries(billedTotals.taxGroups)
-                    .sort((a, b) => Number(b[0]) - Number(a[0]))
-                    .map(([rate, amt]) => (
-                      <div
-                        key={rate}
-                        className="flex justify-between items-baseline text-sm"
-                      >
-                        <span className="text-gray-500">
-                          {lang.tax} ({rate}%)
+                  {/* ── DEPOSIT INVOICE totals ── */}
+                  {isDepositInvoice && (
+                    <>
+                      <div className="flex justify-between items-baseline text-sm">
+                        <span className="text-gray-700 font-bold">
+                          {lang.invoiceSubtotal}
                         </span>
-                        <span className="font-mono font-semibold text-gray-900 tabular-nums">
-                          {fmt(amt as number)}
+                        <span className="font-mono font-bold text-gray-900 tabular-nums">
+                          {fmt(billedTotals.subtotalCents)}
                         </span>
                       </div>
-                    ))}
+                      {Object.entries(billedTotals.taxGroups)
+                        .sort((a, b) => Number(b[0]) - Number(a[0]))
+                        .map(([rate, amt]) => (
+                          <div
+                            key={rate}
+                            className="flex justify-between items-baseline text-sm"
+                          >
+                            <span className="text-gray-500">
+                              {lang.tax} ({rate}%)
+                            </span>
+                            <span className="font-mono font-semibold text-gray-900 tabular-nums">
+                              {fmt(amt as number)}
+                            </span>
+                          </div>
+                        ))}
+                    </>
+                  )}
 
+                  {/* ── BALANCE INVOICE totals — full subtotal → deposit deduction → balance subtotal → tax → total ── */}
+                  {isBalanceInvoice && (
+                    <>
+                      {/* Full project subtotal */}
+                      <div className="flex justify-between items-baseline text-sm">
+                        <span className="text-gray-500">
+                          {lang.approvedProjectSubtotal}
+                        </span>
+                        <span className="font-mono text-gray-700 tabular-nums">
+                          {fmt(baseTotals.subtotalCents)}
+                        </span>
+                      </div>
+
+                      {/* Deposit deduction */}
+                      {(() => {
+                        const depositSubtotalCents = Math.max(
+                          0,
+                          baseTotals.subtotalCents - billedTotals.subtotalCents
+                        );
+                        const depRef = depositInvoice?.invoice_number
+                          ? `${depositInvoice.invoice_number}${
+                              depositInvoice.invoice_date
+                                ? ` · ${new Date(
+                                    depositInvoice.invoice_date
+                                  ).toLocaleDateString(
+                                    profile?.country === 'FR'
+                                      ? 'fr-FR'
+                                      : 'en-US',
+                                    {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    }
+                                  )}`
+                                : ''
+                            }`
+                          : null;
+
+                        return (
+                          <div className="flex justify-between items-start text-sm pb-3 border-b border-dashed border-gray-200">
+                            <div>
+                              <span className="text-gray-500">
+                                {lang.lessDepositPaid ||
+                                  (profile?.country === 'FR'
+                                    ? 'Moins : acompte versé'
+                                    : 'Less: deposit paid')}
+                              </span>
+                              {depRef && (
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  {depRef}
+                                </p>
+                              )}
+                            </div>
+                            <span className="font-mono text-gray-700 tabular-nums whitespace-nowrap">
+                              -{fmt(depositSubtotalCents)}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Balance subtotal */}
+                      <div className="flex justify-between items-baseline text-sm">
+                        <span className="text-gray-700 font-bold">
+                          {lang.balanceSubtotal ||
+                            (profile?.country === 'FR'
+                              ? 'Sous-total solde'
+                              : 'Balance subtotal')}
+                        </span>
+                        <span className="font-mono font-bold text-gray-900 tabular-nums">
+                          {fmt(billedTotals.subtotalCents)}
+                        </span>
+                      </div>
+
+                      {/* Tax on balance */}
+                      {Object.entries(billedTotals.taxGroups)
+                        .sort((a, b) => Number(b[0]) - Number(a[0]))
+                        .map(([rate, amt]) => (
+                          <div
+                            key={rate}
+                            className="flex justify-between items-baseline text-sm"
+                          >
+                            <span className="text-gray-500">
+                              {lang.tax} ({rate}%)
+                            </span>
+                            <span className="font-mono font-semibold text-gray-900 tabular-nums">
+                              {fmt(amt as number)}
+                            </span>
+                          </div>
+                        ))}
+                    </>
+                  )}
+
+                  {/* ── FULL INVOICE totals ── */}
+                  {!isDepositInvoice && !isBalanceInvoice && (
+                    <>
+                      <div className="flex justify-between items-baseline text-sm">
+                        <span className="text-gray-700 font-bold">
+                          {lang.invoiceSubtotal}
+                        </span>
+                        <span className="font-mono font-bold text-gray-900 tabular-nums">
+                          {fmt(billedTotals.subtotalCents)}
+                        </span>
+                      </div>
+                      {Object.entries(billedTotals.taxGroups)
+                        .sort((a, b) => Number(b[0]) - Number(a[0]))
+                        .map(([rate, amt]) => (
+                          <div
+                            key={rate}
+                            className="flex justify-between items-baseline text-sm"
+                          >
+                            <span className="text-gray-500">
+                              {lang.tax} ({rate}%)
+                            </span>
+                            <span className="font-mono font-semibold text-gray-900 tabular-nums">
+                              {fmt(amt as number)}
+                            </span>
+                          </div>
+                        ))}
+                    </>
+                  )}
+
+                  {/* Grand total — all invoice types */}
                   <div className="flex justify-between items-baseline pt-5 border-t-2 border-gray-900">
                     <span className="text-base font-bold text-gray-900 uppercase tracking-wide">
                       {lang.grandTotalLabel}

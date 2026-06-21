@@ -68,7 +68,7 @@ export async function POST(request: Request) {
           <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 10px 0;">
             ${transferTitle}
           </p>
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed;">
             ${
               bankName
                 ? `
@@ -82,8 +82,8 @@ export async function POST(request: Request) {
               bankAccountNumber
                 ? `
             <tr>
-              <td style="color: #9ca3af; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top;">${accountLabel}</td>
-              <td style="color: #111827; font-family: monospace; font-weight: 600; letter-spacing: 0.05em;">${bankAccountNumber}</td>
+              <td style="color: #9ca3af; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top; width: 80px;">${accountLabel}</td>
+              <td style="color: #111827; font-family: monospace; font-weight: 600; word-break: break-all; overflow-wrap: break-word;">${bankAccountNumber}</td>
             </tr>`
                 : ''
             }
@@ -91,8 +91,8 @@ export async function POST(request: Request) {
               bankRoutingNumber
                 ? `
             <tr>
-              <td style="color: #9ca3af; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top;">${routingLabel}</td>
-              <td style="color: #111827; font-family: monospace; font-weight: 600; letter-spacing: 0.05em;">${bankRoutingNumber}</td>
+              <td style="color: #9ca3af; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top; width: 80px;">${routingLabel}</td>
+              <td style="color: #111827; font-family: monospace; font-weight: 600; word-break: break-all; overflow-wrap: break-word;">${bankRoutingNumber}</td>
             </tr>`
                 : ''
             }

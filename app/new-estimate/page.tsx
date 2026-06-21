@@ -75,6 +75,10 @@ function NewEstimateContent() {
 
   const [isGuest, setIsGuest] = useState(false);
   const [businessName, setBusinessName] = useState('');
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null
+  );
 
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm';
@@ -483,7 +487,92 @@ function NewEstimateContent() {
     }
     fetchData();
   }, [editId, router, targetClientId]);
+  // Fetch templates when profile loads (Pro only)
+  useEffect(() => {
+    if (!profile?.id || profile?.subscription_tier !== 'pro') return;
+    supabase
+      .from('estimate_templates')
+      .select(
+        'id, name, sections, additional_charges, margin_mode, global_margin, deposit_enabled, deposit_percentage, payment_terms'
+      )
+      .eq('user_id', profile.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setTemplates(data);
+      });
+  }, [profile?.id, profile?.subscription_tier]);
 
+  const applyTemplate = (templateId: string) => {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+
+    setSections(
+      (template.sections || []).length > 0
+        ? template.sections.map((sec: any) => ({
+            title: sec.title || '',
+            description: sec.description || '',
+            laborHours: sec.laborHours || 0,
+            hourlyRate: sec.hourlyRate || profile?.default_hourly_rate || 50,
+            laborTaxRate: sec.laborTaxRate ?? profile?.default_tax_rate ?? 0,
+            laborType: sec.laborType || 'hourly',
+            laborMarginRate: sec.laborMarginRate || 0,
+            marginRate: sec.marginRate || 0,
+            items: (sec.items || []).map((item: any) => ({ ...item }))
+          }))
+        : [
+            {
+              title: '',
+              description: '',
+              laborHours: 0,
+              hourlyRate: profile?.default_hourly_rate || 50,
+              laborTaxRate: profile?.default_tax_rate || 0,
+              laborType: 'hourly' as const,
+              items: []
+            }
+          ]
+    );
+
+    setAdditionalCharges(
+      (template.additional_charges || []).map((c: any, idx: number) => ({
+        ...c,
+        id: `tmpl_${idx}`
+      }))
+    );
+
+    setMarginMode(template.margin_mode || 'none');
+    setGlobalMargin(template.global_margin || 0);
+    setDepositEnabled(template.deposit_enabled ?? false);
+    setDepositPercentage(template.deposit_percentage ?? 20);
+
+    const terms = template.payment_terms || '30_days';
+    if (terms === 'upon_receipt') {
+      setPaymentTermsType('upon_receipt');
+      setPaymentDays(0);
+    } else {
+      setPaymentTermsType('net_days');
+      setPaymentDays(parseInt(terms.replace('_days', '')) || 30);
+    }
+  };
+
+  const clearTemplate = () => {
+    setSelectedTemplateId(null);
+    setSections([
+      {
+        title: '',
+        description: '',
+        laborHours: 0,
+        hourlyRate: profile?.default_hourly_rate || 50,
+        laborTaxRate: profile?.default_tax_rate || 0,
+        laborType: 'hourly' as const,
+        items: []
+      }
+    ]);
+    setAdditionalCharges([]);
+    setMarginMode('none');
+    setGlobalMargin(0);
+    setDepositEnabled(profile?.default_deposit_enabled ?? false);
+    setDepositPercentage(profile?.default_deposit_percentage ?? 20);
+  };
   const updateSection = (
     sIdx: number,
     field: keyof EstimateSection,
@@ -1089,6 +1178,157 @@ function NewEstimateContent() {
               {lang.cancelExit}
             </LinkButton>
           </div>
+          {/* Template Picker — Pro users, new estimates only */}
+          {!isGuest &&
+            !editId &&
+            profile?.subscription_tier === 'pro' &&
+            templates.length > 0 && (
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl px-4 py-3 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
+                  <svg
+                    className="w-4 h-4 text-blue-500"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M3 9h18M9 21V9" />
+                  </svg>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 whitespace-nowrap">
+                    {lang.startFromTemplate}
+                  </span>
+                </div>
+
+                <Listbox
+                  value={selectedTemplateId || ''}
+                  onChange={(id: string) => {
+                    setSelectedTemplateId(id || null);
+                    if (id) applyTemplate(id);
+                  }}
+                >
+                  <div className="relative flex-1 w-full sm:max-w-xs">
+                    <ListboxButton className="w-full p-2.5 border border-blue-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {selectedTemplateId
+                          ? templates.find((t) => t.id === selectedTemplateId)
+                              ?.name || lang.selectTemplate
+                          : lang.selectTemplate}
+                      </span>
+                      <span className="pointer-events-none text-gray-400 text-[8px]">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                        {templates.map((tmpl) => (
+                          <ListboxOption
+                            key={tmpl.id}
+                            value={tmpl.id}
+                            className={({ active }) =>
+                              `cursor-pointer select-none relative pr-10 pl-3 py-3 border-b border-gray-50 last:border-b-0 ${
+                                active
+                                  ? 'bg-blue-50 text-blue-900'
+                                  : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ active }) => (
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-[11px] uppercase tracking-widest truncate">
+                                    {tmpl.name}
+                                  </p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {(tmpl.sections || []).length}{' '}
+                                    {profile?.country === 'FR'
+                                      ? 'catégorie(s)'
+                                      : 'categorie(s)'}{' '}
+                                    ·{' '}
+                                    {new Date(
+                                      tmpl.created_at
+                                    ).toLocaleDateString(
+                                      profile?.country === 'FR'
+                                        ? 'fr-FR'
+                                        : 'en-US',
+                                      {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                      }
+                                    )}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (
+                                      window.confirm(
+                                        profile?.country === 'FR'
+                                          ? `Supprimer "${tmpl.name}" ?`
+                                          : `Delete "${tmpl.name}"?`
+                                      )
+                                    ) {
+                                      supabase
+                                        .from('estimate_templates')
+                                        .delete()
+                                        .eq('id', tmpl.id)
+                                        .then(() => {
+                                          setTemplates((prev) =>
+                                            prev.filter((t) => t.id !== tmpl.id)
+                                          );
+                                          if (selectedTemplateId === tmpl.id) {
+                                            setSelectedTemplateId(null);
+                                          }
+                                        });
+                                    }
+                                  }}
+                                  className="shrink-0 w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors rounded"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
+                          </ListboxOption>
+                        ))}
+
+                        {/* Manage link — opens /templates for rename etc. */}
+                        <div className="border-t border-gray-100 px-3 py-2">
+                          <a
+                            href="/templates"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700 transition-colors"
+                          >
+                            {profile?.country === 'FR'
+                              ? 'Gérer les modèles →'
+                              : 'Manage templates →'}
+                          </a>
+                        </div>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+
+                {selectedTemplateId && (
+                  <button
+                    type="button"
+                    onClick={clearTemplate}
+                    className="text-[10px] font-black text-blue-400 hover:text-blue-700 uppercase tracking-widest whitespace-nowrap transition-colors"
+                  >
+                    {lang.clearTemplate}
+                  </button>
+                )}
+              </div>
+            )}
+
           {/* Guest Lock Context Overlay */}
           {isGuest && (
             <div className="bg-blue-50 p-6 sm:p-8 rounded-xl border border-blue-100 mb-8 flex flex-col gap-4">
