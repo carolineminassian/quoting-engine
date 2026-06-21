@@ -1589,6 +1589,37 @@ export default function InvoiceView() {
         })
       );
 
+      // Deposit invoice: single description line — no sections in PDF
+      const pdfSections =
+        invoice.invoice_type === 'deposit' ? [] : preparedSections;
+
+      const pdfLineItems =
+        invoice.invoice_type === 'deposit'
+          ? [
+              {
+                description:
+                  invoice.invoice_description ||
+                  `${lang.depositInvoiceTitle} ${invoice.deposit_percentage}%`,
+                quantity: 1,
+                unit_price_cents: billedTotals.subtotalCents,
+                amount_cents: billedTotals.subtotalCents,
+                tax_rate: invoice.tax_rate_snapshot ?? profile.tax_rate ?? 0
+              }
+            ]
+          : isLineItemInvoice
+            ? lineItems
+            : undefined;
+
+      // Balance invoice: pass deduction row data
+      const fullProjectSubtotalForPDF =
+        invoice.invoice_type === 'balance' ? baseTotals.subtotalCents / 100 : 0;
+
+      const depositSubtotalForPDF =
+        invoice.invoice_type === 'balance'
+          ? Math.max(0, baseTotals.subtotalCents - billedTotals.subtotalCents) /
+            100
+          : 0;
+
       const blob = await pdf(
         <InvoicePDF
           invoice={invoice}
@@ -1597,10 +1628,23 @@ export default function InvoiceView() {
           subtotal={billedTotals.subtotalCents / 100}
           taxGroups={Object.entries(billedTotals.taxGroups) as any}
           grandTotal={billedTotals.totalCents / 100}
-          sections={preparedSections}
-          lineItems={isLineItemInvoice ? lineItems : undefined}
-          additionalCharges={preparedAdditionalCharges}
+          sections={pdfSections}
+          lineItems={pdfLineItems}
+          additionalCharges={
+            invoice.invoice_type === 'deposit' ? [] : preparedAdditionalCharges
+          }
           isDraft={!invoice.is_locked}
+          fullProjectSubtotal={fullProjectSubtotalForPDF}
+          depositSubtotal={depositSubtotalForPDF}
+          depositRef={depositInvoice?.invoice_number}
+          depositDate={
+            depositInvoice?.invoice_date
+              ? new Date(depositInvoice.invoice_date).toLocaleDateString(
+                  profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                  { year: 'numeric', month: 'short', day: 'numeric' }
+                )
+              : undefined
+          }
         />
       ).toBlob();
 
@@ -2970,58 +3014,61 @@ export default function InvoiceView() {
               )}
 
               {/* ADDITIONAL CHARGES */}
-              {!isLineItemInvoice && additionalCharges.length > 0 && (
-                <section className="mb-10">
-                  <div className="flex items-baseline justify-between pb-3 mb-4 border-b border-gray-200">
-                    <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-500">
-                      {lang.additionalCharges}
-                    </p>
-                    <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-500">
-                      {lang.amountHeader}
-                    </p>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {additionalCharges.map(
-                      (charge: AdditionalCharge, idx: number) => {
-                        const amountCents = getAdditionalChargeAmountCents(
-                          invoiceContext,
-                          charge,
-                          sections || [],
-                          materialsById
-                        );
+              {!isDepositInvoice &&
+                !isLineItemInvoice &&
+                additionalCharges.length > 0 && (
+                  <section className="mb-10">
+                    <div className="flex items-baseline justify-between pb-3 mb-4 border-b border-gray-200">
+                      <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-500">
+                        {lang.additionalCharges}
+                      </p>
+                      <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-500">
+                        {lang.amountHeader}
+                      </p>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {additionalCharges.map(
+                        (charge: AdditionalCharge, idx: number) => {
+                          const amountCents = getAdditionalChargeAmountCents(
+                            invoiceContext,
+                            charge,
+                            sections || [],
+                            materialsById
+                          );
 
-                        const editableItem = {
-                          description: charge.name || lang.additionalCharges,
-                          quantity: charge.qty || 1,
-                          unit_price_cents: charge.costPerUnitCents || 0,
-                          amount_cents: amountCents,
-                          tax_rate: charge.taxRate ?? profile?.tax_rate ?? 0
-                        };
+                          const editableItem = {
+                            description: charge.name || lang.additionalCharges,
+                            quantity: charge.qty || 1,
+                            unit_price_cents: charge.costPerUnitCents || 0,
+                            amount_cents: amountCents,
+                            tax_rate: charge.taxRate ?? profile?.tax_rate ?? 0
+                          };
 
-                        return (
-                          <div key={idx} className="relative">
-                            <EditableLineItem
-                              item={editableItem}
-                              index={idx}
-                              isLocked={
-                                !isStructurallyEditable || !!charge.isPercentage
-                              }
-                              currency={profile?.currency}
-                              country={profile?.country}
-                              lang={lang}
-                              onUpdate={(i, field, val) =>
-                                handleUpdateCharge(i, field, val)
-                              }
-                              onRemove={(i) => handleRemoveCharge(i)}
-                              canRemove={!invoice.is_locked}
-                            />
-                          </div>
-                        );
-                      }
-                    )}
-                  </div>
-                </section>
-              )}
+                          return (
+                            <div key={idx} className="relative">
+                              <EditableLineItem
+                                item={editableItem}
+                                index={idx}
+                                isLocked={
+                                  !isStructurallyEditable ||
+                                  !!charge.isPercentage
+                                }
+                                currency={profile?.currency}
+                                country={profile?.country}
+                                lang={lang}
+                                onUpdate={(i, field, val) =>
+                                  handleUpdateCharge(i, field, val)
+                                }
+                                onRemove={(i) => handleRemoveCharge(i)}
+                                canRemove={!invoice.is_locked}
+                              />
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
+                  </section>
+                )}
 
               {/* NOTES */}
               {(!invoice.is_locked || invoice.notes) && (

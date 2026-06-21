@@ -555,7 +555,7 @@ export default function InvoicesPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
             {/* Bulk follow-up — only when there are eligible unpaid invoices */}
             {filteredItems.some(
               (item) =>
@@ -603,7 +603,7 @@ export default function InvoicesPage() {
                   ? handleExportCSV()
                   : setProLockModal('csv')
               }
-              className="inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 cursor-pointer select-none whitespace-nowrap px-3 py-2 text-[9px] rounded-lg gap-1.5 bg-green-50/60 text-green-700 border border-green-200 hover:bg-green-100/70 hover:text-green-800 hover:border-green-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+              className="inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 cursor-pointer select-none whitespace-nowrap px-3 py-2 text-[9px] rounded-lg gap-1.5 bg-green-50/60 text-green-700 border border-green-200 hover:bg-green-100/70 hover:text-green-800 hover:border-green-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex-1 sm:flex-none"
             >
               Excel (CSV)
             </button>
@@ -642,6 +642,7 @@ export default function InvoicesPage() {
                   />
                 </svg>
               }
+              className="flex-1 sm:flex-none disabled:cursor-not-allowed"
             >
               {t(lang.downloadPdfsZip, {
                 count: filteredItems.filter(
