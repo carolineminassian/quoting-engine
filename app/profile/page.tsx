@@ -1434,16 +1434,14 @@ export default function ProfilePage() {
                             {profile?.currency === 'EUR' ? '249€' : '$299'}
                           </p>
                         </div>
-                        <Button
+                        <LinkButton
+                          href="/upgrade"
                           variant="ghost"
                           size="sm"
-                          loading={processing}
-                          loadingText="..."
-                          onClick={() => handleCheckout('lifetime')}
                           className="!bg-amber-400 !text-gray-900 hover:!bg-amber-300 !border-0 shrink-0"
                         >
                           {lang.getLifetime}
-                        </Button>
+                        </LinkButton>
                       </div>
                     )}
 
