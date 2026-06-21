@@ -25,6 +25,7 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [processingDelete, setProcessingDelete] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   const [dialog, setDialog] = useState<{
     type: 'alert' | 'confirm' | 'danger';
@@ -311,6 +312,22 @@ export default function ProfilePage() {
         type: 'alert',
         message: lang.securityUpdated
       });
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setProcessing(true);
+    try {
+      const res = await fetch('/api/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: profile.id })
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else setProcessing(false);
+    } catch {
+      setProcessing(false);
     }
   };
 

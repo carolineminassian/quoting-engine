@@ -385,7 +385,7 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {/* Free */}
-            <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200 flex flex-col">
+            <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">
                 {t.planFree}
               </p>
@@ -395,7 +395,7 @@ export default function LandingPage() {
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-6">
                 &nbsp;
               </p>
-              <ul className="space-y-2 mb-8 flex-1">
+              <ul className="space-y-2 mb-8">
                 {t.planFreeFeatures.map((f, i) => (
                   <li
                     key={i}
@@ -405,15 +405,9 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/new-estimate"
-                className="w-full text-center bg-gray-900 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-700 transition-colors"
-              >
-                {t.planFreeCta}
-              </Link>
             </div>
             {/* Pro */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-blue-600 flex flex-col relative shadow-xl">
+            <div className="bg-white rounded-2xl p-8 border-2 border-blue-600 relative shadow-xl">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
                 Popular
               </div>
@@ -429,7 +423,7 @@ export default function LandingPage() {
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-6">
                 {t.planProAlt}
               </p>
-              <ul className="space-y-2 mb-8 flex-1">
+              <ul className="space-y-2 mb-8">
                 {t.planProFeatures.map((f, i) => (
                   <li
                     key={i}
@@ -439,16 +433,10 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/login?redirect=/upgrade"
-                className="w-full text-center bg-blue-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-colors"
-              >
-                {t.planProCta}
-              </Link>
             </div>
             {/* Lifetime — hidden when sold out */}
             {lifetimeSpotsUsed < MAX_LIFETIME_SPOTS && (
-              <div className="bg-gray-900 rounded-2xl p-8 border-2 border-gray-700 flex flex-col relative">
+              <div className="bg-gray-900 rounded-2xl p-8 border-2 border-gray-700 relative">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-gray-900 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full whitespace-nowrap">
                   {t.planLifetimeBadge}
                 </div>
@@ -461,7 +449,7 @@ export default function LandingPage() {
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-6">
                   {t.planLifetimeAlt}
                 </p>
-                <ul className="space-y-2 mb-8 flex-1">
+                <ul className="space-y-2 mb-8">
                   {t.planLifetimeFeatures.map((f, i) => (
                     <li
                       key={i}
@@ -471,23 +459,9 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/login?redirect=/upgrade"
-                  className="w-full text-center bg-amber-400 text-gray-900 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-amber-300 transition-colors"
-                >
-                  {t.planLifetimeCta}
-                </Link>
               </div>
             )}
           </div>
-          <p className="text-center mt-6">
-            <a
-              href="#pricing"
-              className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800"
-            >
-              {t.viewAllPlans}
-            </a>
-          </p>
         </div>
       </section>
 
