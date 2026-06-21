@@ -221,7 +221,7 @@ export const landingTranslations = {
     planProPrice: '7€',
     planProPer: '/mois',
     planProAlt: 'ou 70€/an',
-    planLifetimePrice: '149€',
+    planLifetimePrice: '139€',
     planLifetimeAlt: 'paiement unique',
     planLifetimeBadge: 'Limité · 100 premiers',
     planFreeFeatures: [

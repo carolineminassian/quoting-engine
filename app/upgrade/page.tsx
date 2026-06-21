@@ -300,9 +300,7 @@ function UpgradeContent() {
               {billingInterval === 'annual' ? (
                 <>
                   <p className="text-4xl font-mono font-black">
-                    {(profile?.currency ?? guestCurrency) === 'EUR'
-                      ? '70€'
-                      : '$90'}
+                    {profile?.currency === 'EUR' ? '70€' : '$90'}
                     <span className="text-sm text-gray-400">
                       {lang.perYearShort}
                     </span>
@@ -311,7 +309,7 @@ function UpgradeContent() {
                     ✓ {lang.save2Months}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                    {(profile?.currency ?? guestCurrency) === 'EUR'
+                    {profile?.currency === 'EUR'
                       ? '5,83€/mois équivalent'
                       : '$7.50/mo equivalent'}{' '}
                     · {lang.billedAnnually}
@@ -320,9 +318,7 @@ function UpgradeContent() {
               ) : (
                 <>
                   <p className="text-4xl font-mono font-black">
-                    {(profile?.currency ?? guestCurrency) === 'EUR'
-                      ? '7€'
-                      : '$9'}
+                    {profile?.currency === 'EUR' ? '7€' : '$9'}
                     <span className="text-sm text-gray-400">
                       {lang.perMonthShort}
                     </span>
@@ -367,7 +363,7 @@ function UpgradeContent() {
               {lang.payAsYouGoName}
             </h2>
             <p className="text-4xl font-mono font-black mb-8">
-              {(profile?.currency ?? guestCurrency) === 'EUR' ? '4€' : '$5'}
+              {profile?.currency === 'EUR' ? '4€' : '$5'}
             </p>
             <ul className="space-y-4 mb-10 text-sm font-bold text-gray-600">
               {lang.payGoFeatures.map((f: string, i: number) => (
@@ -416,9 +412,7 @@ function UpgradeContent() {
                 {/* Price */}
                 <div className="mb-6">
                   <p className="text-4xl font-mono font-black text-white">
-                    {(profile?.currency ?? guestCurrency) === 'EUR'
-                      ? '149€'
-                      : '$179'}
+                    {profile?.currency === 'EUR' ? '139€' : '$179'}
                     <span className="text-sm text-gray-400 ml-1">
                       {lang.lifetimeOneTime}
                     </span>
