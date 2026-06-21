@@ -1346,153 +1346,196 @@ export default function ProfilePage() {
 
         {/* SUBSCRIPTION PLAN SECTION */}
         <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200/60 mb-8">
-          <p className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest border-b border-gray-50 pb-3">
+          <p className="text-[10px] font-black uppercase text-gray-300 mb-6 tracking-[0.2em] border-b border-gray-50 pb-3">
             {lang.currentPlan || 'Current Plan'}
           </p>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <p className="font-black text-xl text-gray-900 tracking-tight uppercase">
-                {profile?.subscription_tier === 'pro'
-                  ? lang.proPlan || 'Pro Plan'
-                  : lang.freePlan || 'Free Plan'}
-              </p>
 
-              {/* Show interval (monthly/annual) for Pro users */}
-              {!isFreePlan && profile?.subscription_interval && (
-                <p className="text-[10px] font-black uppercase font-mono text-gray-400 tracking-widest mt-1">
-                  {profile.subscription_interval === 'annual'
-                    ? lang.youAreOnAnnual
-                    : lang.youAreOnMonthly}
-                </p>
-              )}
+          {/* ── Plan status ── */}
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${
+                  isFreePlan
+                    ? 'bg-gray-300'
+                    : profile?.lifetime_access
+                      ? 'bg-amber-400'
+                      : 'bg-blue-600'
+                }`}
+              />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-black text-lg text-gray-900 uppercase tracking-tight">
+                    {profile?.lifetime_access
+                      ? lang.lifetimePlanName || 'Lifetime'
+                      : isFreePlan
+                        ? lang.freePlan
+                        : lang.proPlan}
+                  </p>
+                  {!isFreePlan &&
+                    !profile?.lifetime_access &&
+                    profile?.subscription_interval && (
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {profile.subscription_interval === 'annual'
+                          ? lang.youAreOnAnnual
+                          : lang.youAreOnMonthly}
+                      </span>
+                    )}
+                  {profile?.lifetime_access && (
+                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      {lang.lifetimeOneTime || 'One-time'}
+                    </span>
+                  )}
+                </div>
 
-              {isFreePlan && profile?.estimate_credits > 0 && (
-                <p className="text-xs font-black uppercase font-mono text-blue-600 tracking-wider mt-1.5">
-                  {t(lang.creditsRemaining, {
-                    count: profile.estimate_credits
-                  })}
-                </p>
-              )}
-
-              {!isFreePlan && profile?.subscription_cancel_at && (
-                <p className="text-xs font-black uppercase font-mono text-orange-500 tracking-wider mt-1.5">
-                  {t(lang.cancellationScheduledFor, {
-                    date: new Date(
-                      profile.subscription_cancel_at
-                    ).toLocaleDateString(country === 'FR' ? 'fr-FR' : 'en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })
-                  })}
-                </p>
-              )}
-
-              {/* Pending plan switch status */}
-              {!isFreePlan &&
-                profile?.pending_plan_switch === 'annual' &&
-                !profile?.subscription_cancel_at && (
-                  <p className="text-xs font-black uppercase font-mono text-blue-500 tracking-wider mt-1.5">
-                    ↗ {lang.upgradeToAnnual}
+                {isFreePlan && profile?.estimate_credits > 0 && (
+                  <p className="text-xs font-black text-blue-600 mt-1 uppercase tracking-wider">
+                    {t(lang.creditsRemaining, {
+                      count: profile.estimate_credits
+                    })}
                   </p>
                 )}
+                {!isFreePlan &&
+                  !profile?.lifetime_access &&
+                  profile?.subscription_cancel_at && (
+                    <p className="text-xs font-bold text-orange-500 mt-1">
+                      {t(lang.cancellationScheduledFor, {
+                        date: new Date(
+                          profile.subscription_cancel_at
+                        ).toLocaleDateString(
+                          country === 'FR' ? 'fr-FR' : 'en-US',
+                          { year: 'numeric', month: 'long', day: 'numeric' }
+                        )
+                      })}
+                    </p>
+                  )}
+                {!isFreePlan &&
+                  !profile?.lifetime_access &&
+                  profile?.pending_plan_switch === 'annual' &&
+                  !profile?.subscription_cancel_at && (
+                    <p className="text-xs font-bold text-blue-500 mt-1">
+                      ↗ {lang.upgradeToAnnual}
+                    </p>
+                  )}
+                {profile?.lifetime_access && (
+                  <p className="text-xs text-gray-400 font-medium mt-0.5">
+                    {lang.lifetimeTagline}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="w-full sm:w-auto flex flex-col sm:items-end gap-2">
-              {isFreePlan ? (
-                <LinkButton
-                  href="/upgrade"
-                  variant="primary"
-                  size="md"
-                  className="w-full sm:w-auto px-6"
-                >
-                  {lang.upgradeToPro || 'Upgrade to Pro'}
-                </LinkButton>
-              ) : profile?.subscription_cancel_at ? (
+            {isFreePlan && (
+              <LinkButton
+                href="/upgrade"
+                variant="primary"
+                size="sm"
+                className="shrink-0"
+              >
+                {lang.upgradeToPro}
+              </LinkButton>
+            )}
+          </div>
+
+          {/* ── Actions (Pro users only) ── */}
+          {!isFreePlan && !profile?.lifetime_access && (
+            <div className="border-t border-gray-100 mt-5 pt-4 space-y-1">
+              {profile?.subscription_cancel_at ? (
                 <Button
                   variant="ghost"
                   size="sm"
+                  fullWidth
                   onClick={handleResumeSubClick}
-                  className="!text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
+                  className="!justify-start !text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
                 >
                   {lang.resumeSubscription}
                 </Button>
               ) : (
                 <>
-                  {/* Lifetime upgrade nudge — shown while spots remain */}
-                  {!profile?.lifetime_access &&
-                    lifetimeSpotsUsed < MAX_LIFETIME_SPOTS && (
-                      <div className="w-full sm:w-auto bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">
-                            {lang.lifetimeLimitedBadge} ·{' '}
-                            {MAX_LIFETIME_SPOTS - lifetimeSpotsUsed}{' '}
-                            {lang.lifetimeSpotsLeft}
-                          </p>
-                          <p className="text-xs font-bold text-amber-900 mt-0.5">
-                            {lang.lifetimeTagline} —{' '}
-                            {profile?.currency === 'EUR' ? '249€' : '$299'}
-                          </p>
-                        </div>
-                        <LinkButton
-                          href="/upgrade"
-                          variant="ghost"
-                          size="sm"
-                          className="!bg-amber-400 !text-gray-900 hover:!bg-amber-300 !border-0 shrink-0"
-                        >
-                          {lang.getLifetime}
-                        </LinkButton>
+                  {/* Lifetime nudge */}
+                  {lifetimeSpotsUsed < MAX_LIFETIME_SPOTS && (
+                    <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-amber-900 uppercase tracking-tight">
+                          {lang.lifetimePlanName} ·{' '}
+                          {MAX_LIFETIME_SPOTS - lifetimeSpotsUsed}{' '}
+                          {lang.lifetimeSpotsLeft}
+                        </p>
+                        <p className="text-[10px] text-amber-700 font-medium mt-0.5">
+                          {profile?.currency === 'EUR' ? '249€' : '$299'} ·{' '}
+                          {lang.lifetimeTagline}
+                        </p>
                       </div>
-                    )}
+                      <LinkButton
+                        href="/upgrade"
+                        variant="ghost"
+                        size="sm"
+                        className="!bg-amber-400 !text-gray-900 hover:!bg-amber-300 !border-0 shrink-0 ml-3"
+                      >
+                        {lang.getLifetime}
+                      </LinkButton>
+                    </div>
+                  )}
 
-                  {/* Switch to Annual (only for monthly users without scheduled cancellation) */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    fullWidth
+                    onClick={handleManageBilling}
+                    disabled={processing}
+                    className="!justify-start !text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
+                  >
+                    {lang.manageBilling}
+                  </Button>
+
                   {profile?.subscription_interval === 'monthly' &&
                     !profile?.pending_plan_switch && (
                       <Button
                         variant="ghost"
                         size="sm"
+                        fullWidth
                         onClick={handleSwitchToAnnualClick}
-                        className="!text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
+                        className="!justify-start !text-blue-600 hover:!text-blue-800 hover:!bg-blue-50"
                       >
                         ↗ {lang.upgradeToAnnual}
                       </Button>
                     )}
 
-                  {/* Cancel pending annual switch */}
                   {profile?.pending_plan_switch === 'annual' && (
                     <Button
                       variant="ghost"
                       size="sm"
+                      fullWidth
                       onClick={handleCancelAnnualSwitchClick}
-                      className="!text-gray-400 hover:!text-red-500 hover:!bg-red-50"
+                      className="!justify-start !text-gray-400 hover:!text-red-500 hover:!bg-red-50"
                     >
                       {lang.cancelAnnualSwitch}
                     </Button>
                   )}
 
-                  {/* Switch to Pay-as-you-go (cancels Pro at period end + redirects to credits) */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSwitchToPayAsYouGoClick}
-                    className="!text-gray-500 hover:!text-blue-600 hover:!bg-blue-50"
-                  >
-                    ⇄ {lang.switchToPayAsYouGo}
-                  </Button>
-
-                  {/* Cancel subscription (always available) */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCancelSubClick}
-                    className="!text-gray-400 hover:!text-red-500 hover:!bg-red-50"
-                  >
-                    {lang.cancelSub || 'Cancel Subscription'}
-                  </Button>
+                  <div className="border-t border-gray-50 mt-2 pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      fullWidth
+                      onClick={handleSwitchToPayAsYouGoClick}
+                      className="!justify-start !text-gray-500 hover:!text-blue-600 hover:!bg-blue-50"
+                    >
+                      ⇄ {lang.switchToPayAsYouGo}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      fullWidth
+                      onClick={handleCancelSubClick}
+                      className="!justify-start !text-gray-400 hover:!text-red-500 hover:!bg-red-50"
+                    >
+                      {lang.cancelSub || 'Cancel Subscription'}
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
-          </div>
+          )}
         </div>
 
         {/* COMPLIANCE DANGER ZONE - ACCOUNT ERASURE BLOCK */}

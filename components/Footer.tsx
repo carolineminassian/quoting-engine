@@ -64,19 +64,25 @@ export default function Footer() {
   if (!lang) return null;
 
   return (
-    <footer className="w-full py-6 flex justify-center gap-8 border-t border-gray-200 bg-white z-10 mt-auto">
-      <Link
-        href="/privacy"
-        className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-colors"
-      >
-        {lang.privacyPolicy}
-      </Link>
-      <Link
-        href="/terms"
-        className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-colors"
-      >
-        {lang.termsOfService}
-      </Link>
+    <footer className="w-full py-6 px-6 flex flex-col sm:flex-row items-center justify-center gap-4 border-t border-gray-200 bg-white z-10 mt-auto">
+      <div className="flex items-center gap-6">
+        <Link
+          href="/privacy"
+          className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-colors"
+        >
+          {lang.privacyPolicy}
+        </Link>
+        <Link
+          href="/terms"
+          className="text-[10px] font-black uppercase tracking-widests text-gray-400 hover:text-gray-800 transition-colors"
+        >
+          {lang.termsOfService}
+        </Link>
+      </div>
+      <span className="hidden sm:block text-gray-300 text-xs">·</span>
+      <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+        © {new Date().getFullYear()} PactEstim
+      </p>
     </footer>
   );
 }

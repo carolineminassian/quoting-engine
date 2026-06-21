@@ -186,7 +186,6 @@ function UpgradeContent() {
             {lang.paymentCanceled}
           </div>
         )}
-
         <div className="text-center mb-12">
           <h1 className="text-5xl tracking-tighter mb-4">
             {/* Match navbar branding: "Pact" in black, "Estim" in light blue.
@@ -217,8 +216,8 @@ function UpgradeContent() {
             {lang.upgradeSubtitle}
           </p>
         </div>
+        {/* Status box — authenticated users only */}
 
-        {/* Improved Status Box */}
         <div className="mb-12 bg-white p-6 sm:p-8 rounded-2xl border border-gray-100 shadow-sm">
           <div className="grid grid-cols-2 sm:grid-cols-3 items-center gap-6">
             <div>
@@ -301,7 +300,9 @@ function UpgradeContent() {
               {billingInterval === 'annual' ? (
                 <>
                   <p className="text-4xl font-mono font-black">
-                    {profile.currency === 'EUR' ? '70€' : '$90'}
+                    {(profile?.currency ?? guestCurrency) === 'EUR'
+                      ? '70€'
+                      : '$90'}
                     <span className="text-sm text-gray-400">
                       {lang.perYearShort}
                     </span>
@@ -310,7 +311,7 @@ function UpgradeContent() {
                     ✓ {lang.save2Months}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                    {profile.currency === 'EUR'
+                    {(profile?.currency ?? guestCurrency) === 'EUR'
                       ? '5,83€/mois équivalent'
                       : '$7.50/mo equivalent'}{' '}
                     · {lang.billedAnnually}
@@ -319,7 +320,9 @@ function UpgradeContent() {
               ) : (
                 <>
                   <p className="text-4xl font-mono font-black">
-                    {profile.currency === 'EUR' ? '7€' : '$9'}
+                    {(profile?.currency ?? guestCurrency) === 'EUR'
+                      ? '7€'
+                      : '$9'}
                     <span className="text-sm text-gray-400">
                       {lang.perMonthShort}
                     </span>
@@ -364,7 +367,7 @@ function UpgradeContent() {
               {lang.payAsYouGoName}
             </h2>
             <p className="text-4xl font-mono font-black mb-8">
-              {profile.currency === 'EUR' ? '4€' : '$5'}
+              {(profile?.currency ?? guestCurrency) === 'EUR' ? '4€' : '$5'}
             </p>
             <ul className="space-y-4 mb-10 text-sm font-bold text-gray-600">
               {lang.payGoFeatures.map((f: string, i: number) => (
@@ -394,7 +397,7 @@ function UpgradeContent() {
               MAX_LIFETIME_SPOTS - lifetimeSpotsUsed
             );
             const soldOut = spotsLeft === 0;
-            const isCurrentPlan = profile.lifetime_access === true;
+            const isCurrentPlan = profile?.lifetime_access === true;
 
             return (
               <div className="bg-gray-900 p-10 rounded-2xl shadow-xl border-2 border-gray-800 relative flex flex-col">
@@ -413,7 +416,9 @@ function UpgradeContent() {
                 {/* Price */}
                 <div className="mb-6">
                   <p className="text-4xl font-mono font-black text-white">
-                    {profile.currency === 'EUR' ? '149€' : '$179'}
+                    {(profile?.currency ?? guestCurrency) === 'EUR'
+                      ? '149€'
+                      : '$179'}
                     <span className="text-sm text-gray-400 ml-1">
                       {lang.lifetimeOneTime}
                     </span>
@@ -480,7 +485,6 @@ function UpgradeContent() {
             );
           })()}
         </div>
-
         <div className="text-center mt-12">
           <LinkButton href="/dashboard" variant="ghost" size="sm">
             ← {lang.cancel}
