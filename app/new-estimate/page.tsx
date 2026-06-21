@@ -2057,7 +2057,16 @@ function NewEstimateContent() {
 
                     <Listbox
                       value={sec.laborType || 'hourly'}
-                      onChange={(val) => updateSection(sIdx, 'laborType', val)}
+                      onChange={(val) => {
+                        updateSection(sIdx, 'laborType', val);
+                        updateSection(
+                          sIdx,
+                          'hourlyRate',
+                          val === 'daily'
+                            ? profile?.default_daily_rate || 400
+                            : profile?.default_hourly_rate || 50
+                        );
+                      }}
                     >
                       <div className="relative w-36 sm:w-40">
                         <ListboxButton className="w-full p-2 border border-slate-200 rounded-lg text-left outline-none focus:border-blue-500 font-bold bg-white transition-colors shadow-sm text-[9px] uppercase tracking-widest text-slate-500 flex justify-between items-center cursor-pointer">

@@ -126,11 +126,11 @@ export async function POST(request: Request) {
               <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #6b7280; margin: 0 0 8px 0;">
                 ${isFr ? 'Virement bancaire' : 'Bank Transfer'}
               </p>
-              <table style="border-collapse: collapse; font-size: 13px;">
-                ${profile.bank_name ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;">${bankLabel}</td><td style="color:#111827;font-weight:700;">${profile.bank_name}</td></tr>` : ''}
-                ${profile.bank_account_number ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;">${accountLabel}</td><td style="color:#111827;font-family:monospace;">${profile.bank_account_number}</td></tr>` : ''}
-                ${profile.bank_routing_number ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;">${routingLabel}</td><td style="color:#111827;font-family:monospace;">${profile.bank_routing_number}</td></tr>` : ''}
-              </table>`
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed;">
+          ${profile.bank_name ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;width:80px;white-space:nowrap;">${bankLabel}</td><td style="color:#111827;font-weight:700;word-break:break-all;overflow-wrap:break-word;">${profile.bank_name}</td></tr>` : ''}
+          ${profile.bank_account_number ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;width:80px;white-space:nowrap;">${accountLabel}</td><td style="color:#111827;font-family:monospace;word-break:break-all;overflow-wrap:break-word;">${profile.bank_account_number}</td></tr>` : ''}
+          ${profile.bank_routing_number ? `<tr><td style="color:#9ca3af;padding:2px 12px 2px 0;font-weight:600;width:80px;white-space:nowrap;">${routingLabel}</td><td style="color:#111827;font-family:monospace;word-break:break-all;overflow-wrap:break-word;">${profile.bank_routing_number}</td></tr>` : ''}
+        </table>`
                 : ''
             }
             ${

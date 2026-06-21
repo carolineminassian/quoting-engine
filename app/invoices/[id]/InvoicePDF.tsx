@@ -64,6 +64,11 @@ interface InvoicePDFProps {
   additionalCharges?: PreparedCharge[];
   lineItems?: LineItem[]; // For deposit/balance invoices
   isDraft?: boolean; // Show draft watermark
+  // Balance invoice deduction row
+  fullProjectSubtotal?: number;
+  depositSubtotal?: number;
+  depositRef?: string;
+  depositDate?: string;
 }
 
 // ============================================================
@@ -73,7 +78,7 @@ interface InvoicePDFProps {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 40,
-    paddingBottom: 110, // Increased slightly from 90 to accommodate bank details footer
+    paddingBottom: 130, // Increased slightly from 90 to accommodate bank details footer
     paddingHorizontal: 45,
     fontSize: 10,
     fontFamily: 'Helvetica',
@@ -519,7 +524,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   footerBlock: {
-    width: '32%'
+    width: '47%'
   },
   footerBlockCenter: {
     flex: 1,
@@ -560,7 +565,11 @@ export default function InvoicePDF({
   sections = [],
   additionalCharges = [],
   lineItems = [],
-  isDraft = false
+  isDraft = false,
+  fullProjectSubtotal = 0,
+  depositSubtotal = 0,
+  depositRef,
+  depositDate
 }: InvoicePDFProps) {
   const isFr = profile.country === 'FR';
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
@@ -957,6 +966,115 @@ export default function InvoicePDF({
         )}
 
         {/* ═══════════════════════════════════════════════
+        PAYMENT DETAILS (after totals, invoices only)
+        ═══════════════════════════════════════════════ */}
+        {!isCredit &&
+          (profile.bank_name ||
+            profile.bank_account_number ||
+            profile.payment_link_url) && (
+            <View style={{ marginTop: 18 }} wrap={false}>
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { marginBottom: 8, color: '#9ca3af' }
+                ]}
+              >
+                {lang?.paymentInstructions ||
+                  (isFr ? 'Instructions de paiement' : 'Payment Instructions')}
+              </Text>
+              {profile.bank_name && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    marginBottom: 3,
+                    alignItems: 'flex-start'
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.footerText,
+                      { width: 72, color: '#9ca3af', fontWeight: 'bold' }
+                    ]}
+                  >
+                    {lang?.bankLabel || (isFr ? 'Banque' : 'Bank')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.footerText,
+                      { flex: 1, color: '#374151', fontWeight: 'bold' }
+                    ]}
+                  >
+                    {profile.bank_name}
+                  </Text>
+                </View>
+              )}
+              {profile.bank_account_number && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    marginBottom: 3,
+                    alignItems: 'flex-start'
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.footerText,
+                      { width: 72, color: '#9ca3af', fontWeight: 'bold' }
+                    ]}
+                  >
+                    {lang?.bankAccountNumberLabel ||
+                      (isFr ? 'IBAN' : 'Account')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.footerText,
+                      { flex: 1, color: '#374151', fontFamily: 'Courier' }
+                    ]}
+                  >
+                    {profile.bank_account_number}
+                  </Text>
+                </View>
+              )}
+              {profile.bank_routing_number && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    marginBottom: 3,
+                    alignItems: 'flex-start'
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.footerText,
+                      { width: 72, color: '#9ca3af', fontWeight: 'bold' }
+                    ]}
+                  >
+                    {lang?.bicSwiftLabel || (isFr ? 'BIC/SWIFT' : 'Routing')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.footerText,
+                      { flex: 1, color: '#374151', fontFamily: 'Courier' }
+                    ]}
+                  >
+                    {profile.bank_routing_number}
+                  </Text>
+                </View>
+              )}
+              {profile.payment_link_url && (
+                <View style={{ marginTop: 6 }}>
+                  <Text style={[styles.footerText, { color: '#2563eb' }]}>
+                    {lang?.paymentLinkLabel ||
+                      (isFr ? 'Paiement en ligne' : 'Pay Online')}
+                    {': '}
+                    {profile.payment_link_url}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+        {/* ═══════════════════════════════════════════════
         REASON (Credit Notes) OR NOTES (Invoices)
         ═══════════════════════════════════════════════ */}
         {isCredit && docData.reason && (
@@ -981,12 +1099,69 @@ export default function InvoicePDF({
         ═══════════════════════════════════════════════ */}
         <View style={styles.totalsContainer} wrap={false}>
           <View style={styles.totalsBox}>
-            {/* Show Subtotal & Tax for invoices and full credit notes */}
+            {/* Balance invoice: full project subtotal → deposit deduction → balance subtotal */}
+            {!isCredit &&
+              docData?.invoice_type === 'balance' &&
+              fullProjectSubtotal > 0 && (
+                <>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>
+                      {lang?.approvedProjectSubtotal ||
+                        (isFr
+                          ? 'Sous-total projet approuvé'
+                          : 'Approved project subtotal')}
+                    </Text>
+                    <Text style={styles.totalValue}>
+                      {formatPrice(fullProjectSubtotal)}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.totalRow,
+                      {
+                        paddingBottom: 6,
+                        marginBottom: 4,
+                        borderBottomWidth: 0.5,
+                        borderBottomColor: '#e5e7eb',
+                        borderBottomStyle: 'dashed'
+                      }
+                    ]}
+                  >
+                    <View>
+                      <Text style={styles.totalLabel}>
+                        {isFr ? 'Moins : acompte versé' : 'Less: deposit paid'}
+                      </Text>
+                      {(depositRef || depositDate) && (
+                        <Text
+                          style={[
+                            styles.totalLabel,
+                            { fontSize: 7.5, marginTop: 1 }
+                          ]}
+                        >
+                          {[depositRef, depositDate]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.totalValue}>
+                      -{formatPrice(depositSubtotal)}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+            {/* Subtotal + tax — all invoices except credit notes (unless full credit) */}
             {(!isCredit || docData?.is_full_credit) && subtotal > 0 && (
               <>
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>
-                    {lang?.subtotalHT || (isFr ? 'Sous-total HT' : 'Subtotal')}
+                    {!isCredit && docData?.invoice_type === 'balance'
+                      ? lang?.balanceSubtotal ||
+                        (isFr ? 'Sous-total solde' : 'Balance subtotal')
+                      : lang?.subtotalHT ||
+                        (isFr ? 'Sous-total HT' : 'Subtotal')}
                   </Text>
                   <Text style={styles.totalValue}>{formatPrice(subtotal)}</Text>
                 </View>
@@ -1012,7 +1187,7 @@ export default function InvoicePDF({
               </Text>
             </View>
 
-            {/* Deposit breakdown (Full Invoices only) */}
+            {/* Deposit breakdown pill (full invoices with deposit enabled) */}
             {!isCredit &&
               docData.deposit_enabled &&
               docData.invoice_type !== 'deposit' &&
@@ -1048,24 +1223,89 @@ export default function InvoicePDF({
         </View>
 
         {/* ═══════════════════════════════════════════════
-        FOOTER (Bank Details + Legal + Terms)
+        FOOTER — Row 1: Compliance + Terms | Row 2: Business info centered
         ═══════════════════════════════════════════════ */}
         <View style={styles.footer} fixed>
-          <View style={styles.footerBlock}>
-            <Text style={styles.footerTitle}>
-              {lang?.complianceLegal || (isFr ? 'Mentions Légales' : 'Legal')}
-            </Text>
+          {/* Row 1: Compliance (left) + Payment terms (right) */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginBottom: 8
+            }}
+          >
+            <View style={styles.footerBlock}>
+              <Text style={styles.footerTitle}>
+                {lang?.complianceLegal || (isFr ? 'Mentions Légales' : 'Legal')}
+              </Text>
+              <Text
+                style={[styles.footerText, { marginTop: 4, fontSize: 7.5 }]}
+              >
+                {lang?.complianceText ||
+                  (isFr
+                    ? "Document généré conformément à l'article 286 du code général des impôts."
+                    : 'Certified digital invoice record.')}
+              </Text>
+            </View>
 
-            <Text style={[styles.footerText, { marginTop: 4, fontSize: 7.5 }]}>
-              {lang?.complianceText ||
-                (isFr
-                  ? "Document généré conformément à l'article 286 du code général des impôts."
-                  : 'Certified digital invoice record.')}
-            </Text>
+            <View style={[styles.footerBlock, { alignItems: 'flex-end' }]}>
+              {!isCredit && (
+                <>
+                  <Text
+                    style={[
+                      styles.footerTitle,
+                      { width: '100%', textAlign: 'right' }
+                    ]}
+                  >
+                    {lang?.termsHeader ||
+                      (isFr ? 'Conditions de Paiement' : 'Terms')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.footerText,
+                      styles.footerTextRight,
+                      { width: '100%' }
+                    ]}
+                  >
+                    {(() => {
+                      if (docData.invoice_type === 'deposit') {
+                        return isFr
+                          ? 'Acompte payable dès réception.'
+                          : 'Deposit due upon receipt.';
+                      }
+                      const rawTerms =
+                        docData.payment_terms_snapshot ||
+                        profile.payment_terms ||
+                        '30_days';
+                      const isUponReceipt = rawTerms === 'upon_receipt';
+                      const days = isUponReceipt
+                        ? 30
+                        : parseInt(rawTerms.replace('_days', '')) || 30;
+                      return isFr
+                        ? `Règlement ${isUponReceipt ? 'dès réception.' : `sous ${days} jours.`}`
+                        : `Payment due ${isUponReceipt ? 'upon receipt.' : `within ${days} days.`}`;
+                    })()}
+                  </Text>
+                </>
+              )}
+            </View>
           </View>
-          {/* Center — business identity */}
-          <View style={styles.footerBlockCenter}>
-            <Text style={[styles.footerTitle, { textAlign: 'center' }]}>
+
+          {/* Row 2: Business name + address + VAT — centered */}
+          <View
+            style={{
+              borderTopWidth: 0.5,
+              borderTopColor: '#f3f4f6',
+              paddingTop: 6,
+              alignItems: 'center'
+            }}
+          >
+            <Text
+              style={[
+                styles.footerTitle,
+                { textAlign: 'center', color: '#6b7280' }
+              ]}
+            >
               {profile.business_name}
             </Text>
             {profile.business_address && (
@@ -1080,123 +1320,32 @@ export default function InvoicePDF({
                   : `${profile.business_city || ''}${profile.business_state ? `, ${profile.business_state}` : ''} ${profile.business_zip || ''}`.trim()}
               </Text>
             )}
-            {profile.company_reg_number && (
-              <Text
-                style={[
-                  styles.footerText,
-                  { textAlign: 'center', marginTop: 3 }
-                ]}
+            {(profile.company_reg_number || profile.vat_number) && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  marginTop: 3
+                }}
               >
-                {lang?.companyRegNumber || (isFr ? 'SIRET' : 'Reg')}:{' '}
-                {profile.company_reg_number}
-              </Text>
-            )}
-            {profile.vat_number && (
-              <Text style={[styles.footerText, { textAlign: 'center' }]}>
-                {lang?.vatNumber || (isFr ? 'N° TVA' : 'VAT')}:{' '}
-                {profile.vat_number}
-              </Text>
-            )}
-          </View>
-          <View
-            style={[
-              styles.footerBlock,
-              { alignItems: 'flex-end', textAlign: 'right' }
-            ]}
-          >
-            {!isCredit && (
-              <>
-                {profile.bank_name || profile.bank_account_number ? (
-                  <>
-                    <Text
-                      style={[
-                        styles.footerTitle,
-                        { width: '100%', textAlign: 'right' }
-                      ]}
-                    >
-                      {lang?.bankDetails ||
-                        (isFr ? 'Coordonnées Bancaires' : 'Bank Details')}
-                    </Text>
-                    {profile.bank_name && (
-                      <Text
-                        style={[
-                          styles.footerText,
-                          styles.footerTextRight,
-                          { width: '100%' }
-                        ]}
-                      >
-                        {lang?.bankLabel || 'Bank'}: {profile.bank_name}
-                      </Text>
-                    )}
-                    {profile.bank_account_number && (
-                      <Text
-                        style={[
-                          styles.footerText,
-                          styles.footerTextRight,
-                          { width: '100%' }
-                        ]}
-                      >
-                        {lang?.bankAccountNumberLabel || 'Account'}:{' '}
-                        {profile.bank_account_number}
-                      </Text>
-                    )}
-                    {profile.bank_routing_number && (
-                      <Text
-                        style={[
-                          styles.footerText,
-                          styles.footerTextRight,
-                          { width: '100%' }
-                        ]}
-                      >
-                        {lang?.bicSwiftLabel || 'Routing'}:{' '}
-                        {profile.bank_routing_number}
-                      </Text>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Text
-                      style={[
-                        styles.footerTitle,
-                        { width: '100%', textAlign: 'right' }
-                      ]}
-                    >
-                      {lang?.termsHeader ||
-                        (isFr ? 'Conditions de Paiement' : 'Terms')}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.footerText,
-                        styles.footerTextRight,
-                        { width: '100%' }
-                      ]}
-                    >
-                      {(() => {
-                        if (docData.invoice_type === 'deposit') {
-                          return isFr
-                            ? 'Acompte payable dès réception.'
-                            : 'Deposit due upon receipt.';
-                        }
-
-                        const rawTerms =
-                          docData.payment_terms_snapshot ||
-                          profile.payment_terms ||
-                          '30_days';
-                        const isUponReceipt = rawTerms === 'upon_receipt';
-                        const displayPaymentDays = isUponReceipt
-                          ? 30
-                          : parseInt(rawTerms.replace('_days', '')) || 30;
-
-                        if (isFr) {
-                          return `Règlement ${isUponReceipt ? 'dès réception.' : `sous ${displayPaymentDays} jours.`}`;
-                        } else {
-                          return `Payment due ${isUponReceipt ? 'upon receipt.' : `within ${displayPaymentDays} days.`}`;
-                        }
-                      })()}
-                    </Text>
-                  </>
+                {profile.company_reg_number && (
+                  <Text
+                    style={[
+                      styles.footerText,
+                      { textAlign: 'center', marginRight: 12 }
+                    ]}
+                  >
+                    {lang?.companyRegNumber || (isFr ? 'SIRET' : 'Reg')}:{' '}
+                    {profile.company_reg_number}
+                  </Text>
                 )}
-              </>
+                {profile.vat_number && (
+                  <Text style={[styles.footerText, { textAlign: 'center' }]}>
+                    {lang?.vatNumber || (isFr ? 'N° TVA' : 'VAT')}:{' '}
+                    {profile.vat_number}
+                  </Text>
+                )}
+              </View>
             )}
           </View>
         </View>

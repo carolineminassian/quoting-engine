@@ -355,6 +355,7 @@ export const translations = {
       'No eligible invoices to follow up on. Invoices must have been sent at least once and not contacted in the last 7 days.',
     proRequiredToFinalize: 'Upgrade to Pro to edit and finalize this invoice.',
     statusLabel: 'Status',
+    allBilling: 'All Billing',
     selectAll: 'Select All',
     deselectAll: 'Deselect All',
     vatNumber: 'VAT Number',
@@ -1078,6 +1079,7 @@ export const translations = {
     statusLabel: 'Statut',
     selectAll: 'Tout sélectionner',
     deselectAll: 'Tout désélectionner',
+    allBilling: 'Toute facturation',
     invoiceFollowUpAllConfirm:
       'Envoyer une relance à {count} facture(s) impayée(s) avec un email client ? Les factures relancées dans les 7 derniers jours seront ignorées.',
     invoiceFollowUpAllResult:

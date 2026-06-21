@@ -107,7 +107,12 @@ export default function AddressAutocomplete({
         feature.context.forEach((ctx: any) => {
           if (ctx.id.startsWith('postcode')) parsed.zip = ctx.text;
           if (ctx.id.startsWith('place')) parsed.city = ctx.text;
-          if (ctx.id.startsWith('region')) parsed.state = ctx.text; // e.g. "New York"
+          if (ctx.id.startsWith('region')) {
+            // short_code is "US-NY" — strip country prefix to get "NY"
+            parsed.state = ctx.short_code
+              ? ctx.short_code.replace(/^[A-Z]{2}-/, '')
+              : ctx.text;
+          } // e.g. "New York"
           if (ctx.id.startsWith('country')) parsed.country = ctx.text;
         });
       }

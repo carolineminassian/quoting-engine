@@ -530,7 +530,7 @@ export default function InvoicesPage() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   const filterOptions: { value: typeof filterStatus; label: string }[] = [
-    { value: 'all', label: lang.allProjects },
+    { value: 'all', label: lang.allBilling },
     { value: 'unpaid', label: lang.invoiceUnpaid },
     { value: 'overdue', label: lang.invoiceOverdue },
     { value: 'paid', label: lang.invoicePaid },
@@ -555,7 +555,7 @@ export default function InvoicesPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {/* Bulk follow-up — only when there are eligible unpaid invoices */}
             {filteredItems.some(
               (item) =>
