@@ -64,6 +64,8 @@ export default function ProfilePage() {
   const [companyRegNumber, setCompanyRegNumber] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [savingInvoicing, setSavingInvoicing] = useState(false);
+  const [lifetimeSpotsUsed, setLifetimeSpotsUsed] = useState(0);
+  const MAX_LIFETIME_SPOTS = 100;
 
   // Security Profile State
   const [authEmail, setAuthEmail] = useState('');
@@ -98,6 +100,13 @@ export default function ProfilePage() {
         setNotifyOnComment(prof.notify_on_comment ?? true);
         setNotifyOnApproved(prof.notify_on_approved ?? true);
         setNotifyOnRejected(prof.notify_on_rejected ?? true);
+
+        // Fetch lifetime spots for the upgrade nudge
+        const { count } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('lifetime_access', true);
+        setLifetimeSpotsUsed(count || 0);
         setBankName(prof.bank_name || '');
         setBankAccountNumber(prof.bank_account_number || '');
         setBankRoutingNumber(prof.bank_routing_number || '');
@@ -1410,6 +1419,34 @@ export default function ProfilePage() {
                 </Button>
               ) : (
                 <>
+                  {/* Lifetime upgrade nudge — shown while spots remain */}
+                  {!profile?.lifetime_access &&
+                    lifetimeSpotsUsed < MAX_LIFETIME_SPOTS && (
+                      <div className="w-full sm:w-auto bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                            {lang.lifetimeLimitedBadge} ·{' '}
+                            {MAX_LIFETIME_SPOTS - lifetimeSpotsUsed}{' '}
+                            {lang.lifetimeSpotsLeft}
+                          </p>
+                          <p className="text-xs font-bold text-amber-900 mt-0.5">
+                            {lang.lifetimeTagline} —{' '}
+                            {profile?.currency === 'EUR' ? '249€' : '$299'}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          loading={processing}
+                          loadingText="..."
+                          onClick={() => handleCheckout('lifetime')}
+                          className="!bg-amber-400 !text-gray-900 hover:!bg-amber-300 !border-0 shrink-0"
+                        >
+                          {lang.getLifetime}
+                        </Button>
+                      </div>
+                    )}
+
                   {/* Switch to Annual (only for monthly users without scheduled cancellation) */}
                   {profile?.subscription_interval === 'monthly' &&
                     !profile?.pending_plan_switch && (
