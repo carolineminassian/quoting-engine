@@ -52,7 +52,12 @@ export default function InvoicesPage() {
 
   const [filterStatus, setFilterStatus] = useState<
     'all' | 'draft' | 'paid' | 'unpaid' | 'overdue' | 'credit_note'
-  >('all');
+  >(() => {
+    if (typeof window === 'undefined') return 'all';
+    const f = new URLSearchParams(window.location.search).get('filter');
+    const valid = ['all', 'draft', 'paid', 'unpaid', 'overdue', 'credit_note'];
+    return (f && valid.includes(f) ? f : 'all') as any;
+  });
 
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc'>('date_desc');
   const [clientSearchText, setClientSearchText] = useState('');
@@ -61,15 +66,7 @@ export default function InvoicesPage() {
   const [filterDate, setFilterDate] = useState<
     'all' | 'this-month' | 'last-30' | 'this-year' | 'last-year'
   >('all');
-  // Initialize filter from URL param (used by analytics links)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const f = params.get('filter');
-    const valid = ['all', 'draft', 'paid', 'unpaid', 'overdue', 'credit_note'];
-    if (f && valid.includes(f)) {
-      setFilterStatus(f as typeof filterStatus);
-    }
-  }, []);
+
   useEffect(() => {
     async function fetchData() {
       const {
