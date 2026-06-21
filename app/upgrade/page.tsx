@@ -413,7 +413,7 @@ function UpgradeContent() {
                 {/* Price */}
                 <div className="mb-6">
                   <p className="text-4xl font-mono font-black text-white">
-                    {profile.currency === 'EUR' ? '249€' : '$299'}
+                    {profile.currency === 'EUR' ? '149€' : '$179'}
                     <span className="text-sm text-gray-400 ml-1">
                       {lang.lifetimeOneTime}
                     </span>

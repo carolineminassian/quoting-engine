@@ -714,9 +714,12 @@ export default function AnalyticsPage() {
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   {lang.totalInvoiced}
                 </span>
-                <span className="text-2xl font-black font-mono text-blue-700 bg-blue-50 px-3 py-0.5 rounded-md">
+                <Link
+                  href="/invoices?filter=all"
+                  className="text-2xl font-black font-mono text-blue-700 bg-blue-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+                >
                   {formatMoney(totalInvoicedCents)}
-                </span>
+                </Link>
               </div>
               <div
                 className="hidden sm:block bg-gray-200 shrink-0"
@@ -726,9 +729,12 @@ export default function AnalyticsPage() {
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   {lang.totalCollected}
                 </span>
-                <span className="text-2xl font-black font-mono text-green-600 bg-green-50 px-3 py-0.5 rounded-md">
+                <Link
+                  href="/invoices?filter=paid"
+                  className="text-2xl font-black font-mono text-green-600 bg-green-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+                >
                   {formatMoney(totalCollectedCents)}
-                </span>
+                </Link>
               </div>
               <div
                 className="hidden sm:block bg-gray-200 shrink-0"
@@ -738,9 +744,12 @@ export default function AnalyticsPage() {
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   {lang.outstandingAmount}
                 </span>
-                <span className="text-2xl font-black font-mono text-amber-600 bg-amber-50 px-3 py-0.5 rounded-md">
+                <Link
+                  href="/invoices?filter=unpaid"
+                  className="text-2xl font-black font-mono text-amber-600 bg-amber-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+                >
                   {formatMoney(totalOutstandingCents)}
-                </span>
+                </Link>
               </div>
               <div
                 className="hidden sm:block bg-gray-200 shrink-0"
@@ -750,9 +759,12 @@ export default function AnalyticsPage() {
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   {lang.overdueAmount}
                 </span>
-                <span className="text-2xl font-black font-mono text-red-500 bg-red-50 px-3 py-0.5 rounded-md">
+                <Link
+                  href="/invoices?filter=overdue"
+                  className="text-2xl font-black font-mono text-red-500 bg-red-50 px-3 py-0.5 rounded-md hover:scale-105 hover:brightness-95 shadow-sm hover:shadow transition-all duration-200 cursor-pointer block"
+                >
                   {formatMoney(totalOverdueCents)}
-                </span>
+                </Link>
               </div>
             </div>
           )}
@@ -999,43 +1011,52 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                   {/* Credit Notes */}
-                  {totalCreditedCents > 0 && (
-                    <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col items-center justify-center text-center">
-                      <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2">
-                        {lang.creditNotes}
-                      </span>
-                      <span className="text-3xl font-black font-mono text-purple-600">
-                        -{formatMoney(totalCreditedCents)}
-                      </span>
-                    </div>
-                  )}
+                  <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2">
+                      {lang.creditNotes}
+                    </span>
+                    <span className="text-3xl font-black font-mono text-purple-600">
+                      {totalCreditedCents > 0
+                        ? `-${formatMoney(totalCreditedCents)}`
+                        : '—'}
+                    </span>
+                  </div>
                 </div>
                 {/* Invoice breakdown */}
                 <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+                  <Link
+                    href="/invoices?filter=paid"
+                    className="bg-green-50 p-3 rounded-lg border border-green-100 hover:brightness-95 hover:scale-105 transition-all duration-200 block text-center"
+                  >
                     <p className="text-2xl font-black font-mono text-green-600">
                       {countPaidInvoices}
                     </p>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
                       {lang.invoicePaid}
                     </p>
-                  </div>
-                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                  </Link>
+                  <Link
+                    href="/invoices?filter=unpaid"
+                    className="bg-amber-50 p-3 rounded-lg border border-amber-100 hover:brightness-95 hover:scale-105 transition-all duration-200 block text-center"
+                  >
                     <p className="text-2xl font-black font-mono text-amber-600">
                       {countUnpaidInvoices}
                     </p>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
                       {lang.invoiceUnpaid}
                     </p>
-                  </div>
-                  <div className="bg-red-50 p-3 rounded-lg border border-red-100">
+                  </Link>
+                  <Link
+                    href="/invoices?filter=overdue"
+                    className="bg-red-50 p-3 rounded-lg border border-red-100 hover:brightness-95 hover:scale-105 transition-all duration-200 block text-center"
+                  >
                     <p className="text-2xl font-black font-mono text-red-500">
                       {countOverdueInvoices}
                     </p>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
                       {lang.invoiceOverdue}
                     </p>
-                  </div>
+                  </Link>
                 </div>
               </div>
             )}

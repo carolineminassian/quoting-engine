@@ -61,7 +61,15 @@ export default function InvoicesPage() {
   const [filterDate, setFilterDate] = useState<
     'all' | 'this-month' | 'last-30' | 'this-year' | 'last-year'
   >('all');
-
+  // Initialize filter from URL param (used by analytics links)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const f = params.get('filter');
+    const valid = ['all', 'draft', 'paid', 'unpaid', 'overdue', 'credit_note'];
+    if (f && valid.includes(f)) {
+      setFilterStatus(f as typeof filterStatus);
+    }
+  }, []);
   useEffect(() => {
     async function fetchData() {
       const {
