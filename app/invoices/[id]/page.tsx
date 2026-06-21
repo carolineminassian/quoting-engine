@@ -3071,7 +3071,7 @@ export default function InvoiceView() {
                 )}
 
               {/* NOTES */}
-              {(!invoice.is_locked || invoice.notes) && (
+              {isOwner && (!invoice.is_locked || invoice.notes) && (
                 <section className="mb-10">
                   <p className="text-[11px] uppercase tracking-[0.15em] font-semibold text-gray-400 mb-3">
                     {lang.invoiceNotes}

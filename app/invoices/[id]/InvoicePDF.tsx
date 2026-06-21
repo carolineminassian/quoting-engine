@@ -520,8 +520,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
-    flexDirection: 'row',
-    justifyContent: 'space-between'
+    flexDirection: 'column'
   },
   footerBlock: {
     width: '47%'
@@ -1085,14 +1084,6 @@ export default function InvoicePDF({
             <Text style={styles.textBlockDescription}>{docData.reason}</Text>
           </View>
         )}
-        {!isCredit && docData.notes && (
-          <View style={styles.textBlockRow} wrap={false}>
-            <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>
-              {lang?.invoiceNotes || 'Notes'}
-            </Text>
-            <Text style={styles.textBlockDescription}>{docData.notes}</Text>
-          </View>
-        )}
 
         {/* ═══════════════════════════════════════════════
         TOTALS
@@ -1264,7 +1255,7 @@ export default function InvoicePDF({
                     style={[
                       styles.footerText,
                       styles.footerTextRight,
-                      { width: '100%' }
+                      { width: '100%', textAlign: 'right' }
                     ]}
                   >
                     {(() => {
@@ -1294,6 +1285,7 @@ export default function InvoicePDF({
           {/* Row 2: Business name + address + VAT — centered */}
           <View
             style={{
+              width: '100%',
               borderTopWidth: 0.5,
               borderTopColor: '#f3f4f6',
               paddingTop: 6,
