@@ -74,6 +74,7 @@ export const translations = {
     perMonth: '/mo',
     proFeatures: [
       '✓ Unlimited Estimates',
+      '✓ Integrated Invoicing',
       '✓ Custom Company Logo',
       '✓ Excel Data Export',
       '✓ Bulk PDF Download (ZIP)',
@@ -84,6 +85,7 @@ export const translations = {
       '✓ 10 Estimate Credits',
       '✓ No monthly commitment',
       '✓ Credits never expire',
+      '✗ No Invoicing',
       '✗ No Custom Logo',
       '✗ No Excel Export',
       '✗ No Bulk PDF Download',
@@ -760,6 +762,7 @@ export const translations = {
     perMonth: '/mois',
     proFeatures: [
       '✓ Devis Illimités',
+      '✓ Facturation Intégrée',
       "✓ Logo d'Entreprise Personnalisé",
       '✓ Exportation de Données Excel',
       '✓ Téléchargement PDF Groupé (ZIP)',
@@ -770,6 +773,7 @@ export const translations = {
       '✓ 10 Crédits de Devis',
       '✓ Sans engagement mensuel',
       "✓ Les crédits n'expirent jamais",
+      '✗ Pas de Facturation Intégrée',
       '✗ Pas de Logo Personnalisé',
       "✗ Pas d'Exportation Excel",
       '✗ Pas de Téléchargement PDF Groupé',
