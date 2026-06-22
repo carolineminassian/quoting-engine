@@ -1618,119 +1618,125 @@ export default function EstimateView() {
           {/* ════════════════════════════════════════════════════════
   STATUS BANNER - Always visible when estimate is locked
 ════════════════════════════════════════════════════════ */}
-          {estimate.is_locked && (
-            <div
-              className={`mb-6 px-5 py-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden transition-colors ${
-                estimate.cancelled_at
-                  ? 'bg-gray-50 border-gray-200'
-                  : estimate.superseded_at
-                    ? 'bg-amber-50/50 border-amber-200'
-                    : estimate.client_status === 'approved'
-                      ? 'bg-green-50/50 border-green-200'
-                      : estimate.client_status === 'rejected'
-                        ? 'bg-red-50/50 border-red-200'
-                        : 'bg-blue-50/50 border-blue-200'
-              }`}
-            >
-              <div className="flex items-start gap-3 flex-1 min-w-0">
-                {estimate.cancelled_at ? (
-                  <>
-                    <span className="text-gray-500 text-base leading-none mt-0.5">
-                      ⊘
-                    </span>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-gray-700 font-semibold text-sm">
-                        {lang.estimateCancelled}
+          {estimate.is_locked &&
+            (estimate.client_status !== 'approved' ||
+              activeTab === 'estimate') && (
+              <div
+                className={`mb-6 px-5 py-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden transition-colors ${
+                  estimate.cancelled_at
+                    ? 'bg-gray-50 border-gray-200'
+                    : estimate.superseded_at
+                      ? 'bg-amber-50/50 border-amber-200'
+                      : estimate.client_status === 'approved'
+                        ? 'bg-green-50/50 border-green-200'
+                        : estimate.client_status === 'rejected'
+                          ? 'bg-red-50/50 border-red-200'
+                          : 'bg-blue-50/50 border-blue-200'
+                }`}
+              >
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  {estimate.cancelled_at ? (
+                    <>
+                      <span className="text-gray-500 text-base leading-none mt-0.5">
+                        ⊘
                       </span>
-                      {estimate.cancelled_reason && (
-                        <span className="text-gray-500 text-xs italic mt-0.5 break-words">
-                          "{estimate.cancelled_reason}"
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-gray-700 font-semibold text-sm">
+                          {lang.estimateCancelled}
                         </span>
-                      )}
-                      <span className="text-gray-400 text-[10px] uppercase tracking-wider font-medium mt-1.5">
-                        {t(lang.cancelledOn, {
-                          date: new Date(
-                            estimate.cancelled_at
-                          ).toLocaleDateString(
-                            profile.country === 'FR' ? 'fr-FR' : 'en-US',
-                            { year: 'numeric', month: 'short', day: 'numeric' }
-                          )
-                        })}
+                        {estimate.cancelled_reason && (
+                          <span className="text-gray-500 text-xs italic mt-0.5 break-words">
+                            "{estimate.cancelled_reason}"
+                          </span>
+                        )}
+                        <span className="text-gray-400 text-[10px] uppercase tracking-wider font-medium mt-1.5">
+                          {t(lang.cancelledOn, {
+                            date: new Date(
+                              estimate.cancelled_at
+                            ).toLocaleDateString(
+                              profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                              {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              }
+                            )
+                          })}
+                        </span>
+                      </div>
+                    </>
+                  ) : estimate.superseded_at ? (
+                    <>
+                      <span className="text-amber-600 text-base leading-none mt-0.5">
+                        ↻
                       </span>
-                    </div>
-                  </>
-                ) : estimate.superseded_at ? (
-                  <>
-                    <span className="text-amber-600 text-base leading-none mt-0.5">
-                      ↻
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="text-amber-700 font-semibold text-sm">
-                        {lang.supersededBadge}
+                      <div className="flex flex-col">
+                        <span className="text-amber-700 font-semibold text-sm">
+                          {lang.supersededBadge}
+                        </span>
+                        <span className="text-amber-600/80 text-xs mt-0.5">
+                          {lang.supersededLabel}
+                        </span>
+                      </div>
+                    </>
+                  ) : estimate.client_status === 'approved' ? (
+                    <>
+                      <span className="text-green-600 text-base leading-none">
+                        ✓
                       </span>
-                      <span className="text-amber-600/80 text-xs mt-0.5">
-                        {lang.supersededLabel}
+                      <span className="text-green-700 font-semibold text-sm">
+                        {lang.estimateApproved}
                       </span>
-                    </div>
-                  </>
-                ) : estimate.client_status === 'approved' ? (
-                  <>
-                    <span className="text-green-600 text-base leading-none">
-                      ✓
-                    </span>
-                    <span className="text-green-700 font-semibold text-sm">
-                      {lang.estimateApproved}
-                    </span>
-                  </>
-                ) : estimate.client_status === 'rejected' ? (
-                  <>
-                    <span className="text-red-600 text-base leading-none">
-                      ✕
-                    </span>
-                    <span className="text-red-700 font-semibold text-sm">
-                      {lang.estimateRejected}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-blue-600 text-base leading-none">
-                      ⏳
-                    </span>
-                    <span className="text-blue-700 font-semibold text-sm">
-                      {lang.pendingApproval}
-                    </span>
-                  </>
-                )}
-              </div>
+                    </>
+                  ) : estimate.client_status === 'rejected' ? (
+                    <>
+                      <span className="text-red-600 text-base leading-none">
+                        ✕
+                      </span>
+                      <span className="text-red-700 font-semibold text-sm">
+                        {lang.estimateRejected}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-blue-600 text-base leading-none">
+                        ⏳
+                      </span>
+                      <span className="text-blue-700 font-semibold text-sm">
+                        {lang.pendingApproval}
+                      </span>
+                    </>
+                  )}
+                </div>
 
-              {/* Client approve/reject actions - only show on Estimate tab for pending estimates */}
-              {!isOwner &&
-                !estimate.cancelled_at &&
-                !estimate.superseded_at &&
-                activeTab === 'estimate' &&
-                (estimate.client_status === 'pending' ||
-                  !estimate.client_status) && (
-                  <div className="flex w-full sm:w-auto gap-2.5">
-                    <Button
-                      variant="soft-danger"
-                      size="md"
-                      onClick={() => handleStatusChange('rejected')}
-                      className="flex-1 sm:flex-none px-6"
-                    >
-                      {lang.reject}
-                    </Button>
-                    <Button
-                      variant="success"
-                      size="md"
-                      onClick={() => handleStatusChange('approved')}
-                      className="flex-1 sm:flex-none px-6"
-                    >
-                      {lang.approveEstimate}
-                    </Button>
-                  </div>
-                )}
-            </div>
-          )}
+                {/* Client approve/reject actions - only show on Estimate tab for pending estimates */}
+                {!isOwner &&
+                  !estimate.cancelled_at &&
+                  !estimate.superseded_at &&
+                  activeTab === 'estimate' &&
+                  (estimate.client_status === 'pending' ||
+                    !estimate.client_status) && (
+                    <div className="flex w-full sm:w-auto gap-2.5">
+                      <Button
+                        variant="soft-danger"
+                        size="md"
+                        onClick={() => handleStatusChange('rejected')}
+                        className="flex-1 sm:flex-none px-6"
+                      >
+                        {lang.reject}
+                      </Button>
+                      <Button
+                        variant="success"
+                        size="md"
+                        onClick={() => handleStatusChange('approved')}
+                        className="flex-1 sm:flex-none px-6"
+                      >
+                        {lang.approveEstimate}
+                      </Button>
+                    </div>
+                  )}
+              </div>
+            )}
 
           {/* ════════════════════════════════════════════════════════
   TAB NAVIGATION - Now stays stationary
@@ -1781,6 +1787,17 @@ export default function EstimateView() {
               activeTab === 'estimate' ? 'block' : 'hidden print:block'
             }
           >
+            {estimate.is_locked &&
+              estimate.client_status === 'approved' &&
+              !estimate.cancelled_at &&
+              !estimate.superseded_at && (
+                <div className="mb-4 print:hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
+                  <span className="text-green-600 text-sm leading-none">✓</span>
+                  <span className="text-green-700 font-semibold text-xs uppercase tracking-wider">
+                    {lang.estimateApproved}
+                  </span>
+                </div>
+              )}
             <article className="bg-white shadow-xl border border-gray-200 rounded-2xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
               <div className="p-8 sm:p-12 lg:p-14 print:p-12">
                 {/* Document Header */}

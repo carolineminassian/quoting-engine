@@ -2067,7 +2067,7 @@ export default function InvoiceView() {
                       : 'bg-gray-50 border-gray-200'
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {!invoice.is_locked && (
                 <>
                   <span className="text-amber-600 text-lg">✏</span>
@@ -2109,7 +2109,7 @@ export default function InvoiceView() {
                         finalizedNetOtherInvoicesCents > 0;
 
                       return (
-                        <span className="ml-3 pl-3 border-l border-amber-200 text-xs text-amber-600 font-medium flex items-center gap-2">
+                        <span className="w-full flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-600 font-medium sm:ml-3 sm:w-auto sm:pl-3 sm:border-l sm:border-amber-200">
                           {over > 0 ? (
                             <span className="text-red-500 font-bold">
                               ⚠ {fmt(over)}{' '}

@@ -1105,12 +1105,16 @@ export default function AnalyticsPage() {
                         </div>
                         {/* Collected bar */}
                         <div
-                          className="flex-1 bg-green-100 rounded-t-sm border-t-4 border-green-500 transition-all duration-500 hover:bg-green-200"
+                          className="flex-1 bg-green-100 rounded-t-sm border-t-4 border-green-500 transition-all duration-500 hover:bg-green-200 relative"
                           style={{
                             height: `${(d.collected / maxBillingChartVal) * 100}%`,
                             minHeight: d.collected > 0 ? '4px' : '0'
                           }}
-                        />
+                        >
+                          <div className="absolute -top-8 right-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                            {formatMoney(d.collected)}
+                          </div>
+                        </div>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-black transition-colors">
                         {d.label}
