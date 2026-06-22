@@ -155,6 +155,23 @@ const Icons = {
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
+  ),
+  Share: () => (
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
   )
 };
 
@@ -1304,6 +1321,19 @@ export default function InvoiceView() {
     }
   };
 
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${lang.invoiceLabel} - ${profile.business_name}`,
+          url: window.location.href
+        });
+      } catch (err) {}
+    } else {
+      setDialog({ type: 'alert', message: lang.nativeShareNotSupported });
+    }
+  };
+
   const handleSendFollowUp = async () => {
     if (!invoice?.client_email) return;
 
@@ -1885,9 +1915,9 @@ export default function InvoiceView() {
                   </>
                 ) : (
                   <>
-                    {invoice.client_email &&
-                      !invoice.is_cancelled &&
-                      invoice.payment_status !== 'paid' && (
+                    {!invoice.is_cancelled &&
+                      (invoice.client_email &&
+                      invoice.payment_status !== 'paid' ? (
                         <>
                           {followUpState.mode === 'hidden' && (
                             <Button
@@ -1938,7 +1968,17 @@ export default function InvoiceView() {
                             </Button>
                           )}
                         </>
-                      )}
+                      ) : !invoice.client_email ? (
+                        <Button
+                          variant="dark"
+                          size="md"
+                          onClick={handleNativeShare}
+                          icon={<Icons.Share />}
+                          className="flex-1 sm:flex-none"
+                        >
+                          {lang.share}
+                        </Button>
+                      ) : null)}
 
                     <Button
                       variant="primary"
@@ -1985,26 +2025,25 @@ export default function InvoiceView() {
                                 </MenuItem>
                               </div>
                             )}
-
-                            <div className="py-1">
-                              <MenuItem>
-                                {() => (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    fullWidth
-                                    onClick={() =>
-                                      router.push(`/invoices/${id}/credit-note`)
-                                    }
-                                    className="!justify-start"
-                                    icon={<Icons.CreditNote />}
-                                  >
-                                    {lang.createCreditNote}
-                                  </Button>
-                                )}
-                              </MenuItem>
-                            </div>
+                            {invoice.client_email && (
+                              <div className="py-1">
+                                <MenuItem>
+                                  {() => (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      fullWidth
+                                      onClick={handleNativeShare}
+                                      className="!justify-start"
+                                      icon={<Icons.Share />}
+                                    >
+                                      {lang.share}
+                                    </Button>
+                                  )}
+                                </MenuItem>
+                              </div>
+                            )}
                             {invoice.estimate_id && (
                               <div className="py-1">
                                 <MenuItem>
@@ -2028,6 +2067,25 @@ export default function InvoiceView() {
                                 </MenuItem>
                               </div>
                             )}
+                            <div className="py-1">
+                              <MenuItem>
+                                {() => (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    fullWidth
+                                    onClick={() =>
+                                      router.push(`/invoices/${id}/credit-note`)
+                                    }
+                                    className="!justify-start"
+                                    icon={<Icons.CreditNote />}
+                                  >
+                                    {lang.createCreditNote}
+                                  </Button>
+                                )}
+                              </MenuItem>
+                            </div>
                           </MenuItems>
                         </Transition>
                       </Menu>

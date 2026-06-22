@@ -8,6 +8,8 @@ import Button from '@/components/Button';
 import LinkButton from '@/components/LinkButton';
 import { translations, t } from '@/lib/translations';
 import { formatMoney } from '@/lib/formatMoney';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import type { DialogConfig } from '@/components/ConfirmDialog';
 
 export default function CreateCreditNotePage() {
   const { id } = useParams();
@@ -23,6 +25,7 @@ export default function CreateCreditNotePage() {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [poNumber, setPoNumber] = useState('');
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -92,7 +95,7 @@ export default function CreateCreditNotePage() {
   const remainingCreditableCents =
     (invoice?.total_amount_cents || 0) - (invoice?.credited_amount_cents || 0);
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     setError('');
 
     let amountCents: number;
@@ -128,44 +131,56 @@ export default function CreateCreditNotePage() {
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const {
-        data: { session }
-      } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const res = await fetch('/api/create-credit-note', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          invoiceId: id,
-          amountCents,
-          isFullCredit,
-          reason,
-          poNumber
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        router.push(`/invoices/${id}`);
-      } else {
-        setError(
-          data.error ||
-            (profile?.country === 'FR'
-              ? lang.creditNoteError
-              : lang.creditNoteError)
-        );
+    const capturedAmount = amountCents;
+    setDialog({
+      type: isFullCredit ? 'danger' : 'confirm',
+      title: isFullCredit
+        ? lang.creditNoteFullCancelTitle
+        : lang.creditNotePartialTitle,
+      message: isFullCredit
+        ? t(lang.creditNoteFullCancelMessage, {
+            amount: fmt(capturedAmount),
+            number: invoice.invoice_number
+          })
+        : t(lang.creditNotePartialMessage, {
+            amount: fmt(capturedAmount),
+            number: invoice.invoice_number
+          }),
+      onConfirm: async () => {
+        setDialog(null);
+        setSubmitting(true);
+        try {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+          if (!session) return;
+          const res = await fetch('/api/create-credit-note', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              invoiceId: id,
+              amountCents: capturedAmount,
+              isFullCredit,
+              reason,
+              poNumber
+            })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            router.push(`/invoices/${id}`);
+          } else {
+            setError(data.error || lang.creditNoteError);
+          }
+        } catch {
+          setError(lang.connectionError);
+        } finally {
+          setSubmitting(false);
+        }
       }
-    } catch {
-      setError(lang.connectionError);
-    } finally {
-      setSubmitting(false);
-    }
+    });
   };
 
   if (loading || !lang) return <LoadingDots />;
@@ -194,9 +209,12 @@ export default function CreateCreditNotePage() {
           <h1 className="text-2xl font-black uppercase tracking-tighter mb-1">
             {lang.createCreditNote}
           </h1>
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-widests mb-8">
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widests mb-4">
             {lang.invoiceLabel} {invoice.invoice_number} ·{' '}
             {fmt(invoice.total_amount_cents)}
+          </p>
+          <p className="text-sm text-gray-500 leading-relaxed mb-8">
+            {lang.creditNoteExplainer}
           </p>
 
           {/* Already credited indicator */}
@@ -243,21 +261,33 @@ export default function CreateCreditNotePage() {
 
           {/* Full credit summary */}
           {isFullCredit && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <div className="flex justify-between items-baseline">
-                <span className="text-[10px] font-black uppercase tracking-widests text-gray-400">
-                  {lang.creditNoteAmount}
-                </span>
-                <span className="text-xl font-black font-mono text-gray-900">
-                  {fmt(remainingCreditableCents)}
-                </span>
+            <div className="mb-6 space-y-3">
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-[10px] font-black uppercase tracking-widests text-gray-400">
+                    {lang.creditNoteAmount}
+                  </span>
+                  <span className="text-xl font-black font-mono text-gray-900">
+                    {fmt(remainingCreditableCents)}
+                  </span>
+                </div>
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">
-                {profile?.country === 'FR'
-                  ? 'La facture sera marquée comme annulée après émission.'
-                  : lang.creditNoteFullCreditWarning ||
-                    'The invoice will be marked as cancelled upon issuance.'}
-              </p>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5">
+                <span className="text-red-500 text-base leading-none mt-0.5">
+                  ⚠
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-red-700">
+                    {lang.creditNoteFullWarningTitle}
+                  </p>
+                  <p className="text-xs text-red-600 mt-0.5 leading-relaxed">
+                    {t(lang.creditNoteFullWarning, {
+                      amount: fmt(remainingCreditableCents),
+                      number: invoice.invoice_number
+                    })}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -330,26 +360,6 @@ export default function CreateCreditNotePage() {
 
           {/* Actions */}
           <div className="pt-6 mt-6 border-t border-gray-100">
-            {/* Summary Text (Moved out of the button) */}
-            <div className="mb-5 sm:text-right text-center">
-              <p className="text-sm font-black text-gray-900">
-                {profile?.country === 'FR'
-                  ? "Création d'un avoir de "
-                  : 'Issuing credit note for '}
-                <span className="text-blue-600">
-                  {isFullCredit
-                    ? fmt(remainingCreditableCents)
-                    : fmt(Math.round((parseFloat(partialAmount) || 0) * 100))}
-                </span>
-              </p>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-                {profile?.country === 'FR'
-                  ? 'Cette opération sera enregistrée définitivement.'
-                  : 'This action will be recorded permanently.'}
-              </p>
-            </div>
-
-            {/* Balanced Buttons */}
             <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
               <LinkButton
                 href={`/invoices/${id}`}
@@ -360,19 +370,32 @@ export default function CreateCreditNotePage() {
                 {lang.cancel}
               </LinkButton>
               <Button
-                variant="primary"
+                variant={isFullCredit ? 'danger' : 'primary'}
                 size="md"
                 loading={submitting}
                 loadingText="..."
                 onClick={handleSubmit}
                 className="w-full sm:w-48 justify-center"
               >
-                {lang.createCreditNote}
+                {isFullCredit
+                  ? lang.creditNoteFullWarningTitle
+                  : lang.createCreditNote}
               </Button>
             </div>
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        labels={{
+          notice: lang.notice || 'Notice',
+          cancel: lang.cancel,
+          confirmOk: lang.creditNoteConfirmPartial,
+          deletePermanently: lang.creditNoteConfirmFull
+        }}
+      />
     </main>
   );
 }

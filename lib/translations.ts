@@ -464,6 +464,19 @@ export const translations = {
     relatedInvoice: 'Related Invoice',
     relatedCreditNotes: 'Related Credit Notes',
     viewCreditNote: 'View Credit Note',
+    creditNoteExplainer:
+      'A credit note is an official document that cancels or reduces an invoice. A full credit completely cancels the invoice. A partial credit reduces the amount owed without cancelling it.',
+    creditNoteFullWarningTitle: 'This will cancel the invoice',
+    creditNoteFullWarning:
+      'Issuing a full credit note of {amount} will permanently cancel invoice {number}. This cannot be undone.',
+    creditNoteFullCancelTitle: 'Cancel this invoice?',
+    creditNoteFullCancelMessage:
+      'You are about to permanently cancel invoice {number} by issuing a full credit note of {amount}. The invoice will be voided and this action cannot be undone.',
+    creditNoteConfirmFull: 'Yes, cancel invoice',
+    creditNotePartialTitle: 'Issue partial credit?',
+    creditNotePartialMessage:
+      'You are about to issue a credit note of {amount} against invoice {number}. This will reduce the outstanding balance and cannot be undone.',
+    creditNoteConfirmPartial: 'Issue credit note',
 
     // Payment instructions
     paymentInstructions: 'Payment Instructions',
@@ -1195,7 +1208,19 @@ export const translations = {
     relatedInvoice: 'Facture Associée',
     relatedCreditNotes: 'Avoirs liés à cette facture',
     viewCreditNote: "Voir l'Avoir",
-
+    creditNoteExplainer:
+      "Un avoir est un document officiel qui annule ou réduit une facture. Un avoir total annule complètement la facture. Un avoir partiel réduit le montant dû sans l'annuler.",
+    creditNoteFullWarningTitle: 'Cette opération annulera la facture',
+    creditNoteFullWarning:
+      "L'émission d'un avoir total de {amount} annulera définitivement la facture {number}. Cette action est irréversible.",
+    creditNoteFullCancelTitle: 'Annuler cette facture ?',
+    creditNoteFullCancelMessage:
+      "Vous êtes sur le point d'annuler définitivement la facture {number} en émettant un avoir total de {amount}. La facture sera invalidée et cette action est irréversible.",
+    creditNoteConfirmFull: 'Oui, annuler la facture',
+    creditNotePartialTitle: 'Émettre un avoir partiel ?',
+    creditNotePartialMessage:
+      "Vous êtes sur le point d'émettre un avoir de {amount} sur la facture {number}. Cela réduira le solde restant dû et ne pourra pas être annulé.",
+    creditNoteConfirmPartial: "Émettre l'avoir",
     // Instructions de paiement (sur le PDF et l'email)
     paymentInstructions: 'Instructions de Paiement',
     bankWireInstructions: 'Coordonnées Bancaires / Virement',

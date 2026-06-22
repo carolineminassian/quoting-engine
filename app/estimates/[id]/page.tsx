@@ -1576,24 +1576,6 @@ export default function EstimateView() {
                 ← {lang.dashboard}
               </LinkButton>
             )}
-            {isOwner && !estimate.is_locked && activeTab === 'estimate' && (
-              <div className="flex items-center gap-2.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                  {lang.internalDetails}
-                </span>
-                <button
-                  onClick={() => setShowDetails(!showDetails)}
-                  role="switch"
-                  aria-checked={showDetails}
-                  aria-label={lang.internalDetails}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
-                  />
-                </button>
-              </div>
-            )}
           </div>
 
           {/* ════════════════════════════════════════════════════════
@@ -1810,32 +1792,50 @@ export default function EstimateView() {
 
               {/* ─── ESTIMATE TAB — draft ─── */}
               {activeTab === 'estimate' && !estimate.is_locked && isOwner && (
-                <>
-                  <LinkButton
-                    href={`/new-estimate?edit=${id}`}
-                    variant="soft-primary"
-                    size="md"
-                    className="flex-1 sm:flex-none"
-                  >
-                    {lang.edit}
-                  </LinkButton>
-                  <Button
-                    variant="soft-danger"
-                    size="md"
-                    onClick={handleCancelDraft}
-                    className="flex-1 sm:flex-none"
-                  >
-                    {lang.cancel}
-                  </Button>
-                  <Button
-                    variant="success"
-                    size="md"
-                    onClick={handleFinalize}
-                    className="flex-1 sm:flex-none"
-                  >
-                    {lang.finalize}
-                  </Button>
-                </>
+                <div className="flex items-center justify-between w-full gap-2">
+                  <div className="flex items-center gap-2.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm shrink-0">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                      {lang.internalDetails}
+                    </span>
+                    <button
+                      onClick={() => setShowDetails(!showDetails)}
+                      role="switch"
+                      aria-checked={showDetails}
+                      aria-label={lang.internalDetails}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
+                      />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <LinkButton
+                      href={`/new-estimate?edit=${id}`}
+                      variant="soft-primary"
+                      size="md"
+                      className="flex-1 sm:flex-none"
+                    >
+                      {lang.edit}
+                    </LinkButton>
+                    <Button
+                      variant="soft-danger"
+                      size="md"
+                      onClick={handleCancelDraft}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {lang.cancel}
+                    </Button>
+                    <Button
+                      variant="success"
+                      size="md"
+                      onClick={handleFinalize}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {lang.finalize}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* ─── BILLING TAB ACTIONS ─── */}
