@@ -46,23 +46,42 @@ export async function generateMetadata(): Promise<Metadata> {
     title: isFr
       ? 'PactEstim | Logiciel de Devis Professionnel'
       : 'PactEstim | Professional Estimate Software',
-    description: isFr
-      ? 'Créez, gérez et envoyez des devis professionnels en quelques minutes. Solution simple et efficace pour les artisans et entreprises.'
-      : 'Precision estimates for contractors and businesses. Create, manage, and send detailed project quotes with ease.',
-    keywords: isFr
-      ? 'devis professionnel, logiciel devis, devis artisan, devis entrepreneur, créer devis'
-      : 'estimate software, professional estimates, contractor quotes, business estimates, quote builder',
     openGraph: {
       title: isFr
-        ? 'PactEstim | Logiciel de Devis Professionnel'
-        : 'PactEstim | Professional Estimate Software',
+        ? 'PactEstim | Logiciel de Devis & Facturation'
+        : 'PactEstim | Estimates & Invoicing for Contractors',
       description: isFr
-        ? 'Créez des devis professionnels en quelques minutes.'
-        : 'Create professional estimates in minutes.',
+        ? 'Devis professionnels, approbation client en ligne, facturation automatique. Bilingue FR/EN.'
+        : 'Professional estimates, online client approval, automatic invoicing. Bilingual FR/EN.',
       siteName: 'PactEstim',
       locale: isFr ? 'fr_FR' : 'en_US',
-      type: 'website'
+      type: 'website',
+      url: 'https://pactestim.com',
+      images: [
+        {
+          url: 'https://pactestim.com/og-image.png',
+          width: 1200,
+          height: 630,
+          alt: isFr
+            ? 'PactEstim — Logiciel de Devis et Facturation'
+            : 'PactEstim — Estimates & Invoicing Software'
+        }
+      ]
     },
+    twitter: {
+      card: 'summary_large_image',
+      title: isFr
+        ? 'PactEstim | Logiciel de Devis & Facturation'
+        : 'PactEstim | Estimates & Invoicing for Contractors',
+      description: isFr
+        ? 'Devis professionnels, approbation client en ligne, facturation automatique.'
+        : 'Professional estimates, online client approval, automatic invoicing.',
+      images: ['https://pactestim.com/og-image.png']
+    },
+    keywords: isFr
+      ? 'devis professionnel, devis gratuit, logiciel devis, devis artisan, devis entrepreneur, créer devis, création devis gratuit, facturation automatique, approbation client en ligne, logiciel pour artisans, logiciel pour entrepreneurs, logiciel de facturation'
+      : 'estimate software, free quoting software, free estimate generator, professional estimates, contractor quotes, business estimates, quote builder, automatic invoicing, online client approval, artisan software, freelancer software, small business software, entrepreneur software, billing software',
+
     alternates: {
       languages: {
         'en-US': 'https://pactestim.com',

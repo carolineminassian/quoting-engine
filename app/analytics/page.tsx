@@ -1099,7 +1099,7 @@ export default function AnalyticsPage() {
                             minHeight: d.invoiced > 0 ? '4px' : '0'
                           }}
                         >
-                          <div className="absolute -top-8 left-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                          <div className="absolute -top-8 left-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
                             {formatMoney(d.invoiced)}
                           </div>
                         </div>
@@ -1139,7 +1139,7 @@ export default function AnalyticsPage() {
                         minHeight: '4px'
                       }}
                     >
-                      <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                      <div className="absolute -top-8 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
                         {formatMoney(d.val)}
                       </div>
                     </div>
