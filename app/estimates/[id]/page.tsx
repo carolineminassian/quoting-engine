@@ -2,6 +2,7 @@
 
 import React, { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { saveAs } from 'file-saver';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import LoadingDots from '@/components/LoadingDots';
@@ -344,6 +345,8 @@ export default function EstimateView() {
   const [creditNotes, setCreditNotes] = useState<any[]>([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [bulkSending, setBulkSending] = useState(false);
 
   const refetchBillingDocs = async () => {
     if (!estimate?.id) return;
@@ -966,6 +969,219 @@ export default function EstimateView() {
     }
   };
 
+  const handleBulkFollowUp = async () => {
+    const eligibleIds = invoices
+      .filter(
+        (i) => i.is_locked && !i.is_cancelled && i.payment_status !== 'paid'
+      )
+      .map((i) => i.id);
+    if (eligibleIds.length === 0) return;
+    setBulkSending(true);
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      const res = await fetch('/api/send-bulk-invoice-followup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          invoiceIds: eligibleIds,
+          baseUrl: window.location.origin
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      const parts: string[] = [
+        t(lang.bulkFollowUpResult, { sent: result.sent })
+      ];
+      if (result.skippedNoEmail > 0)
+        parts.push(
+          t(lang.bulkFollowUpSkippedNoEmail, { count: result.skippedNoEmail })
+        );
+      if (result.skippedNeverSent > 0)
+        parts.push(
+          t(lang.bulkFollowUpSkippedNeverSent, {
+            count: result.skippedNeverSent
+          })
+        );
+      if (result.skippedCooldown > 0)
+        parts.push(
+          t(lang.bulkFollowUpSkippedCooldown, { count: result.skippedCooldown })
+        );
+      if (result.skippedPaid > 0)
+        parts.push(
+          t(lang.bulkFollowUpSkippedPaid, { count: result.skippedPaid })
+        );
+      if (result.skippedCancelled > 0)
+        parts.push(
+          t(lang.bulkFollowUpSkippedCancelled, {
+            count: result.skippedCancelled
+          })
+        );
+      setDialog({ type: 'alert', message: parts.join('\n') });
+    } catch (err: any) {
+      setDialog({ type: 'alert', message: err.message || lang.errorGeneric });
+    } finally {
+      setBulkSending(false);
+    }
+  };
+
+  const handleDownloadZIP = async () => {
+    const exportableInvoices = invoices.filter((inv) => inv.is_locked);
+    if (exportableInvoices.length === 0) return;
+    setArchiving(true);
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data: fullInvoices, error: fetchErr } = await supabase
+        .from('invoices')
+        .select(
+          'id, invoice_number, invoice_type, invoice_description, total_amount_cents, subtotal_cents, tax_amount_cents, payment_status, is_locked, is_cancelled, due_date, currency_snapshot, country_snapshot, created_at, client_name, client_email, client_address, business_name_snapshot, sections, line_items, additional_charges, margin_mode_snapshot, global_margin_snapshot, tax_rate_snapshot, show_details_snapshot'
+        )
+        .in(
+          'id',
+          exportableInvoices.map((i) => i.id)
+        )
+        .eq('user_id', session.user.id);
+      if (fetchErr || !fullInvoices)
+        throw new Error('Failed to fetch invoice data');
+      const JSZip = (await import('jszip')).default;
+      const { pdf } = await import('@react-pdf/renderer');
+      const InvoicePDF = (await import('../../invoices/[id]/InvoicePDF'))
+        .default;
+      const zip = new JSZip();
+      for (const inv of fullInvoices) {
+        const country = inv.country_snapshot || profile?.country || 'US';
+        const currentLang =
+          country === 'FR' ? translations.FR : translations.US;
+        const taxRate = inv.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
+        const invProfile = {
+          ...profile,
+          business_name: inv.business_name_snapshot || profile?.business_name,
+          country: inv.country_snapshot || profile?.country,
+          currency: inv.currency_snapshot || profile?.currency,
+          tax_rate: taxRate
+        };
+        const invContext = {
+          margin_mode_snapshot: inv.margin_mode_snapshot,
+          global_margin_snapshot: inv.global_margin_snapshot,
+          tax_rate_snapshot: inv.tax_rate_snapshot
+        };
+        const hasSections =
+          Array.isArray(inv.sections) && inv.sections.length > 0;
+        const isLineItemInvoice = !hasSections;
+        const preparedSections = hasSections
+          ? inv.sections.map((sec: any) => ({
+              title: sec.title || currentLang.professionalServices,
+              description: sec.description || '',
+              total: (() => {
+                let total = 0;
+                if (sec.laborHours > 0)
+                  total += Math.round(
+                    sec.laborHours * getEffectiveLaborRateCents(invContext, sec)
+                  );
+                (sec.items || []).forEach((it: any) => {
+                  total += Math.round(
+                    (it.qty || 0) *
+                      getEffectiveItemCostCents(
+                        invContext,
+                        sec,
+                        it,
+                        materialsById
+                      )
+                  );
+                });
+                return total / 100;
+              })(),
+              hasDetails: inv.show_details_snapshot === true,
+              laborHours: sec.laborHours || 0,
+              laborType: sec.laborType,
+              laborRate: getEffectiveLaborRateCents(invContext, sec) / 100,
+              laborTaxRate: sec.laborTaxRate ?? taxRate,
+              items: (sec.items || []).map((item: any) => {
+                const m = materialsById.get(item.materialId);
+                return {
+                  name: item.name || m?.name || currentLang.itemLabel,
+                  qty: item.qty || 0,
+                  unit:
+                    (currentLang?.units as Record<string, string>)?.[
+                      item.unit || m?.unit || ''
+                    ] ||
+                    item.unit ||
+                    m?.unit ||
+                    '',
+                  cost:
+                    getEffectiveItemCostCents(
+                      invContext,
+                      sec,
+                      item,
+                      materialsById
+                    ) / 100,
+                  taxRate: item.taxRate ?? taxRate
+                };
+              })
+            }))
+          : [];
+        const preparedAdditionalCharges = (inv.additional_charges || []).map(
+          (charge: any) => ({
+            name: charge.name || '',
+            isPercentage: !!charge.isPercentage,
+            percentageRate: charge.percentageRate || 0,
+            qty: charge.qty || 1,
+            unit:
+              (currentLang?.units as Record<string, string>)?.[charge.unit] ||
+              charge.unit ||
+              'ea',
+            costPerUnitCents: charge.costPerUnitCents || 0,
+            taxRate: charge.taxRate ?? taxRate,
+            amountCents: getAdditionalChargeAmountCents(
+              invContext,
+              charge,
+              inv.sections || [],
+              materialsById
+            ),
+            basisLabel: currentLang.basisProject
+          })
+        );
+        const storedSubtotal = inv.subtotal_cents || 0;
+        const storedTax = inv.tax_amount_cents || 0;
+        const storedTotal = inv.total_amount_cents || 0;
+        const taxGroups: [number, number][] =
+          storedTax > 0 ? [[taxRate, storedTax / 100]] : [];
+        const blob = await pdf(
+          <InvoicePDF
+            invoice={inv}
+            profile={invProfile}
+            lang={currentLang}
+            subtotal={storedSubtotal / 100}
+            taxGroups={taxGroups as any}
+            grandTotal={storedTotal / 100}
+            sections={preparedSections}
+            lineItems={isLineItemInvoice ? inv.line_items || [] : undefined}
+            additionalCharges={preparedAdditionalCharges}
+            isDraft={false}
+          />
+        ).toBlob();
+        zip.file(`${currentLang.invoiceLabel}-${inv.invoice_number}.pdf`, blob);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      saveAs(
+        zipBlob,
+        `Invoices_${estimate.id.slice(0, 8)}_${new Date().toISOString().slice(0, 10)}.zip`
+      );
+    } catch (err) {
+      console.error(err);
+      setDialog({ type: 'alert', message: lang.pdfError });
+    } finally {
+      setArchiving(false);
+    }
+  };
+
   const handleNativeShare = async () => {
     if (navigator.share) {
       try {
@@ -1352,275 +1568,390 @@ export default function EstimateView() {
       <main className="flex-1 p-4 sm:p-8 print:p-0">
         <div className="max-w-4xl mx-auto print:max-w-none print:w-full">
           {/* ════════════════════════════════════════════════════════
-  ACTION TOOLBAR - Consistent across all tabs
+  BACK BUTTON ROW
 ════════════════════════════════════════════════════════ */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
-            {/* Left side - Always show dashboard link */}
+          <div className="flex items-center gap-3 mb-4 print:hidden">
             {isOwner && (
-              <div className="flex items-center gap-3">
-                <LinkButton href="/dashboard" variant="secondary" size="sm">
-                  ← {lang.dashboard}
-                </LinkButton>
-
-                {/* Details toggle - only on Estimate tab for drafts */}
-                {!estimate.is_locked && activeTab === 'estimate' && (
-                  <div className="flex items-center gap-2.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                      {lang.internalDetails}
-                    </span>
-                    <button
-                      onClick={() => setShowDetails(!showDetails)}
-                      role="switch"
-                      aria-checked={showDetails}
-                      aria-label={lang.internalDetails}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
-                      />
-                    </button>
-                  </div>
-                )}
+              <LinkButton href="/dashboard" variant="secondary" size="sm">
+                ← {lang.dashboard}
+              </LinkButton>
+            )}
+            {isOwner && !estimate.is_locked && activeTab === 'estimate' && (
+              <div className="flex items-center gap-2.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                  {lang.internalDetails}
+                </span>
+                <button
+                  onClick={() => setShowDetails(!showDetails)}
+                  role="switch"
+                  aria-checked={showDetails}
+                  aria-label={lang.internalDetails}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${showDetails ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${showDetails ? 'translate-x-5' : 'translate-x-1'}`}
+                  />
+                </button>
               </div>
             )}
+          </div>
 
-            {/* Right side - Tab-specific actions */}
-            <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
-              {/* ─── ESTIMATE TAB ACTIONS ─── */}
-              {activeTab === 'estimate' && (
+          {/* ════════════════════════════════════════════════════════
+  TAB NAVIGATION - Now stays stationary
+════════════════════════════════════════════════════════ */}
+          <div
+            role="tablist"
+            aria-label={lang?.tabsLabel || 'Document sections'}
+            className="flex gap-6 sm:gap-8 border-b border-gray-200 mb-3 print:hidden overflow-x-auto scrollbar-hide"
+          >
+            <TabButton
+              id="tab-estimate"
+              label={lang?.estimateTab || 'Estimate'}
+              isActive={activeTab === 'estimate'}
+              onClick={() => setActiveTab('estimate')}
+              controls="panel-estimate"
+            />
+
+            {showBillingTab && (
+              <TabButton
+                id="tab-billing"
+                label={lang?.billingTab || 'Billing'}
+                isActive={activeTab === 'billing'}
+                onClick={() => setActiveTab('billing')}
+                controls="panel-billing"
+              />
+            )}
+
+            {showDiscussionTab && (
+              <TabButton
+                id="tab-discussion"
+                label={lang?.discussionTab || 'Discussion'}
+                isActive={activeTab === 'discussion'}
+                onClick={() => setActiveTab('discussion')}
+                badge={comments.length}
+                controls="panel-discussion"
+              />
+            )}
+          </div>
+
+          {/* ════════════════════════════════════════════════════════
+  PER-TAB ACTIONS ROW
+════════════════════════════════════════════════════════ */}
+          {(activeTab === 'estimate' ||
+            (activeTab === 'billing' && isOwner)) && (
+            <div className="flex flex-wrap gap-2 items-center justify-end mb-6 print:hidden">
+              {/* ─── ESTIMATE TAB — locked ─── */}
+              {activeTab === 'estimate' && estimate.is_locked && (
                 <>
-                  {estimate.is_locked ? (
-                    <>
-                      {/* Send / Follow-up button */}
-                      {isOwner &&
-                        estimate.client_email &&
-                        !estimate.cancelled_at &&
-                        !estimate.superseded_at &&
-                        (() => {
-                          const followUpState = getFollowUpState();
-                          if (followUpState.mode === 'hidden') {
-                            return (
-                              <Button
-                                variant="dark"
-                                size="md"
-                                loading={sending}
-                                loadingText={lang.sending}
-                                onClick={() => handleSend('email')}
-                                className="flex-1 sm:flex-none"
-                                icon={<Icons.Send />}
-                              >
-                                {lang.emailBtn}
-                              </Button>
-                            );
-                          }
-                          if (followUpState.mode === 'cooldown') {
-                            const dateStr =
-                              followUpState.cooldownUntil!.toLocaleDateString(
-                                profile.country === 'FR' ? 'fr-FR' : 'en-US',
-                                {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric'
-                                }
-                              );
-                            return (
-                              <Button
-                                variant="secondary"
-                                size="md"
-                                disabled
-                                title={t(lang.followUpCooldown, {
-                                  date: dateStr
-                                })}
-                                className="flex-1 sm:flex-none opacity-60"
-                              >
-                                {lang.followUpBtn} · {dateStr}
-                              </Button>
-                            );
-                          }
+                  {isOwner &&
+                    !estimate.cancelled_at &&
+                    !estimate.superseded_at &&
+                    (estimate.client_email ? (
+                      (() => {
+                        const followUpState = getFollowUpState();
+                        if (followUpState.mode === 'hidden') {
                           return (
                             <Button
                               variant="dark"
                               size="md"
                               loading={sending}
-                              loadingText={lang.followUpSending}
-                              onClick={handleSendFollowUp}
+                              loadingText={lang.sending}
+                              onClick={() => handleSend('email')}
                               className="flex-1 sm:flex-none"
                               icon={<Icons.Send />}
                             >
-                              {lang.followUpBtn}
+                              {lang.emailBtn}
                             </Button>
                           );
-                        })()}
-
-                      {/* Download PDF */}
-                      <Button
-                        variant="primary"
-                        size="md"
-                        loading={loading}
-                        loadingText={lang.generating}
-                        onClick={handleDownloadPDF}
-                        className="flex-1 sm:flex-none"
-                        icon={<Icons.Download />}
-                      >
-                        <span className="hidden sm:inline">
-                          {lang.downloadPdf}
-                        </span>
-                        <span className="sm:hidden">PDF</span>
-                      </Button>
-
-                      {/* Owner menu */}
-                      {isOwner && !estimate.cancelled_at && (
-                        <Menu as="div" className="relative">
-                          <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:shadow transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-                            <Icons.MoreVertical />
-                          </MenuButton>
-                          <Transition
-                            as={Fragment}
-                            enter="transition ease-out duration-100"
-                            enterFrom="opacity-0 scale-95"
-                            enterTo="opacity-100 scale-100"
-                            leave="transition ease-in duration-75"
-                            leaveFrom="opacity-100 scale-100"
-                            leaveTo="opacity-0 scale-95"
+                        }
+                        if (followUpState.mode === 'cooldown') {
+                          const dateStr =
+                            followUpState.cooldownUntil!.toLocaleDateString(
+                              profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                              {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              }
+                            );
+                          return (
+                            <Button
+                              variant="secondary"
+                              size="md"
+                              disabled
+                              title={t(lang.followUpCooldown, {
+                                date: dateStr
+                              })}
+                              className="flex-1 sm:flex-none opacity-60"
+                            >
+                              {lang.followUpBtn} · {dateStr}
+                            </Button>
+                          );
+                        }
+                        return (
+                          <Button
+                            variant="dark"
+                            size="md"
+                            loading={sending}
+                            loadingText={lang.followUpSending}
+                            onClick={handleSendFollowUp}
+                            className="flex-1 sm:flex-none"
+                            icon={<Icons.Send />}
                           >
-                            <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none divide-y divide-gray-100">
-                              {/* Save as Template — Pro only */}
-                              {profile?.subscription_tier === 'pro' && (
-                                <div className="py-1">
-                                  <MenuItem>
-                                    {({ active }) => (
-                                      <button
-                                        onClick={() => {
-                                          setTemplateName(
-                                            estimate.client_name || ''
-                                          );
-                                          setTemplateModalOpen(true);
-                                        }}
-                                        className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
-                                      >
-                                        <Icons.Template />
-                                        {lang.saveAsTemplate}
-                                      </button>
-                                    )}
-                                  </MenuItem>
-                                </div>
-                              )}
-
-                              <div className="py-1">
-                                {!estimate.superseded_at && (
-                                  <MenuItem>
-                                    {({ active }) => (
-                                      <button
-                                        onClick={handleCreateRevision}
-                                        className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
-                                      >
-                                        <Icons.Refresh />
-                                        {lang.createRevision}
-                                      </button>
-                                    )}
-                                  </MenuItem>
+                            {lang.followUpBtn}
+                          </Button>
+                        );
+                      })()
+                    ) : (
+                      <Button
+                        variant="dark"
+                        size="md"
+                        onClick={handleNativeShare}
+                        className="flex-1 sm:flex-none"
+                        icon={<Icons.Share />}
+                      >
+                        {lang.share}
+                      </Button>
+                    ))}
+                  <Button
+                    variant="primary"
+                    size="md"
+                    loading={loading}
+                    loadingText={lang.generating}
+                    onClick={handleDownloadPDF}
+                    className="flex-1 sm:flex-none"
+                    icon={<Icons.Download />}
+                  >
+                    <span className="hidden sm:inline">{lang.downloadPdf}</span>
+                    <span className="sm:hidden">PDF</span>
+                  </Button>
+                  {isOwner && !estimate.cancelled_at && (
+                    <Menu as="div" className="relative">
+                      <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:shadow transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <Icons.MoreVertical />
+                      </MenuButton>
+                      <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="opacity-0 scale-95"
+                        enterTo="opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="opacity-100 scale-100"
+                        leaveTo="opacity-0 scale-95"
+                      >
+                        <MenuItems className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none divide-y divide-gray-100">
+                          {profile?.subscription_tier === 'pro' && (
+                            <div className="py-1">
+                              <MenuItem>
+                                {({ active }) => (
+                                  <button
+                                    onClick={() => {
+                                      setTemplateName(
+                                        estimate.client_name || ''
+                                      );
+                                      setTemplateModalOpen(true);
+                                    }}
+                                    className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                  >
+                                    <Icons.Template />
+                                    {lang.saveAsTemplate}
+                                  </button>
                                 )}
-                                <MenuItem>
-                                  {({ active }) => (
-                                    <button
-                                      onClick={handleNativeShare}
-                                      className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
-                                    >
-                                      <Icons.Share />
-                                      {lang.share}
-                                    </button>
-                                  )}
-                                </MenuItem>
-                              </div>
-                              <div className="py-1">
-                                <MenuItem>
-                                  {({ active }) => (
-                                    <button
-                                      onClick={() => setCancelModalOpen(true)}
-                                      className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
-                                    >
-                                      <Icons.Cancel />
-                                      {lang.cancelEstimateBtn}
-                                    </button>
-                                  )}
-                                </MenuItem>
-                              </div>
-                            </MenuItems>
-                          </Transition>
-                        </Menu>
-                      )}
-                    </>
-                  ) : (
-                    // Draft actions
-                    isOwner && (
-                      <>
-                        <LinkButton
-                          href={`/new-estimate?edit=${id}`}
-                          variant="soft-primary"
-                          size="md"
-                          className="flex-1 sm:flex-none"
-                        >
-                          {lang.edit}
-                        </LinkButton>
-                        <Button
-                          variant="soft-danger"
-                          size="md"
-                          onClick={handleCancelDraft}
-                          className="flex-1 sm:flex-none"
-                        >
-                          {lang.cancel}
-                        </Button>
-                        <Button
-                          variant="success"
-                          size="md"
-                          onClick={handleFinalize}
-                          className="flex-1 sm:flex-none"
-                        >
-                          {lang.finalize}
-                        </Button>
-                      </>
-                    )
+                              </MenuItem>
+                            </div>
+                          )}
+                          <div className="py-1">
+                            {!estimate.superseded_at && (
+                              <MenuItem>
+                                {({ active }) => (
+                                  <button
+                                    onClick={handleCreateRevision}
+                                    className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                  >
+                                    <Icons.Refresh />
+                                    {lang.createRevision}
+                                  </button>
+                                )}
+                              </MenuItem>
+                            )}
+                            {estimate.client_email && (
+                              <MenuItem>
+                                {({ active }) => (
+                                  <button
+                                    onClick={handleNativeShare}
+                                    className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                  >
+                                    <Icons.Share />
+                                    {lang.share}
+                                  </button>
+                                )}
+                              </MenuItem>
+                            )}
+                          </div>
+                          <div className="py-1">
+                            <MenuItem>
+                              {({ active }) => (
+                                <button
+                                  onClick={() => setCancelModalOpen(true)}
+                                  className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
+                                >
+                                  <Icons.Cancel />
+                                  {lang.cancelEstimateBtn}
+                                </button>
+                              )}
+                            </MenuItem>
+                          </div>
+                        </MenuItems>
+                      </Transition>
+                    </Menu>
                   )}
                 </>
               )}
 
-              {/* ─── BILLING TAB ACTIONS ─── */}
-              {activeTab === 'billing' &&
-                canCreateInvoice &&
-                (profile?.subscription_tier === 'pro' ? (
-                  <Button
-                    variant="primary"
-                    size="md"
-                    loading={creatingInvoice}
-                    loadingText={lang?.creating || 'Creating...'}
-                    onClick={handleCreateInvoice}
-                    icon={<Icons.Plus />}
-                    className="w-full sm:w-auto"
-                  >
-                    {lang?.createInvoice || 'Create Invoice'}
-                  </Button>
-                ) : (
+              {/* ─── ESTIMATE TAB — draft ─── */}
+              {activeTab === 'estimate' && !estimate.is_locked && isOwner && (
+                <>
                   <LinkButton
-                    href="/upgrade"
-                    variant="primary"
+                    href={`/new-estimate?edit=${id}`}
+                    variant="soft-primary"
                     size="md"
-                    className="w-full sm:w-auto"
+                    className="flex-1 sm:flex-none"
                   >
-                    {lang?.upgradeToPro || 'Upgrade to Pro'}
+                    {lang.edit}
                   </LinkButton>
-                ))}
+                  <Button
+                    variant="soft-danger"
+                    size="md"
+                    onClick={handleCancelDraft}
+                    className="flex-1 sm:flex-none"
+                  >
+                    {lang.cancel}
+                  </Button>
+                  <Button
+                    variant="success"
+                    size="md"
+                    onClick={handleFinalize}
+                    className="flex-1 sm:flex-none"
+                  >
+                    {lang.finalize}
+                  </Button>
+                </>
+              )}
 
-              {/* ─── DISCUSSION TAB ACTIONS ─── */}
-              {/* Currently no actions needed, but you could add "Mark all read" etc here */}
+              {/* ─── BILLING TAB ACTIONS ─── */}
+              {activeTab === 'billing' && isOwner && (
+                <>
+                  {canCreateInvoice &&
+                    (profile?.subscription_tier === 'pro' ||
+                    profile?.lifetime_access ? (
+                      <Button
+                        variant="primary"
+                        size="md"
+                        loading={creatingInvoice}
+                        loadingText={lang?.creating || 'Creating...'}
+                        onClick={handleCreateInvoice}
+                        icon={<Icons.Plus />}
+                        className="flex-1 sm:flex-none"
+                      >
+                        {lang?.createInvoice || 'Create Invoice'}
+                      </Button>
+                    ) : (
+                      <LinkButton
+                        href="/upgrade"
+                        variant="primary"
+                        size="md"
+                        className="flex-1 sm:flex-none"
+                      >
+                        {lang?.upgradeToPro || 'Upgrade to Pro'}
+                      </LinkButton>
+                    ))}
+                  {(profile?.subscription_tier === 'pro' ||
+                    profile?.lifetime_access) && (
+                    <Button
+                      variant="dark"
+                      size="md"
+                      loading={bulkSending}
+                      loadingText={lang?.sending || 'Sending...'}
+                      onClick={handleBulkFollowUp}
+                      disabled={
+                        bulkSending ||
+                        invoices.filter(
+                          (i) =>
+                            i.is_locked &&
+                            !i.is_cancelled &&
+                            i.payment_status !== 'paid'
+                        ).length === 0
+                      }
+                      icon={<Icons.Send />}
+                      className="flex-1 sm:flex-none disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {lang?.bulkFollowUp || 'Bulk Follow-up'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    loading={archiving}
+                    loadingText={lang?.archiving || 'Archiving...'}
+                    onClick={() => {
+                      if (
+                        !(
+                          profile?.subscription_tier === 'pro' ||
+                          profile?.lifetime_access
+                        )
+                      ) {
+                        setDialog({
+                          type: 'alert',
+                          message:
+                            lang?.proFeatureMessage ||
+                            'This feature requires a Pro plan.'
+                        });
+                        return;
+                      }
+                      handleDownloadZIP();
+                    }}
+                    disabled={
+                      archiving ||
+                      invoices.filter((i) => i.is_locked).length === 0
+                    }
+                    icon={
+                      <svg
+                        className="w-3.5 h-3.5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                        />
+                      </svg>
+                    }
+                    className="flex-1 sm:flex-none disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t(lang?.downloadPdfsZip || 'ZIP ({count})', {
+                      count: invoices.filter((i) => i.is_locked).length
+                    })}
+                  </Button>
+                </>
+              )}
             </div>
-          </div>
+          )}
 
           {/* ════════════════════════════════════════════════════════
-  STATUS BANNER - Always visible when estimate is locked
-════════════════════════════════════════════════════════ */}
-          {estimate.is_locked &&
-            (estimate.client_status !== 'approved' ||
-              activeTab === 'estimate') && (
+            TAB PANEL: ESTIMATE DOCUMENT
+        ════════════════════════════════════════════════════════ */}
+          <div
+            id="panel-estimate"
+            role="tabpanel"
+            aria-labelledby="tab-estimate"
+            className={
+              activeTab === 'estimate' ? 'block' : 'hidden print:block'
+            }
+          >
+            {estimate.is_locked && (
               <div
                 className={`mb-6 px-5 py-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden transition-colors ${
                   estimate.cancelled_at
@@ -1708,12 +2039,9 @@ export default function EstimateView() {
                     </>
                   )}
                 </div>
-
-                {/* Client approve/reject actions - only show on Estimate tab for pending estimates */}
                 {!isOwner &&
                   !estimate.cancelled_at &&
                   !estimate.superseded_at &&
-                  activeTab === 'estimate' &&
                   (estimate.client_status === 'pending' ||
                     !estimate.client_status) && (
                     <div className="flex w-full sm:w-auto gap-2.5">
@@ -1737,67 +2065,6 @@ export default function EstimateView() {
                   )}
               </div>
             )}
-
-          {/* ════════════════════════════════════════════════════════
-  TAB NAVIGATION - Now stays stationary
-════════════════════════════════════════════════════════ */}
-          <div
-            role="tablist"
-            aria-label={lang?.tabsLabel || 'Document sections'}
-            className="flex gap-6 sm:gap-8 border-b border-gray-200 mb-8 print:hidden overflow-x-auto scrollbar-hide"
-          >
-            <TabButton
-              id="tab-estimate"
-              label={lang?.estimateTab || 'Estimate'}
-              isActive={activeTab === 'estimate'}
-              onClick={() => setActiveTab('estimate')}
-              controls="panel-estimate"
-            />
-
-            {showBillingTab && (
-              <TabButton
-                id="tab-billing"
-                label={lang?.billingTab || 'Billing'}
-                isActive={activeTab === 'billing'}
-                onClick={() => setActiveTab('billing')}
-                controls="panel-billing"
-              />
-            )}
-
-            {showDiscussionTab && (
-              <TabButton
-                id="tab-discussion"
-                label={lang?.discussionTab || 'Discussion'}
-                isActive={activeTab === 'discussion'}
-                onClick={() => setActiveTab('discussion')}
-                badge={comments.length}
-                controls="panel-discussion"
-              />
-            )}
-          </div>
-
-          {/* ════════════════════════════════════════════════════════
-            TAB PANEL: ESTIMATE DOCUMENT
-        ════════════════════════════════════════════════════════ */}
-          <div
-            id="panel-estimate"
-            role="tabpanel"
-            aria-labelledby="tab-estimate"
-            className={
-              activeTab === 'estimate' ? 'block' : 'hidden print:block'
-            }
-          >
-            {estimate.is_locked &&
-              estimate.client_status === 'approved' &&
-              !estimate.cancelled_at &&
-              !estimate.superseded_at && (
-                <div className="mb-4 print:hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
-                  <span className="text-green-600 text-sm leading-none">✓</span>
-                  <span className="text-green-700 font-semibold text-xs uppercase tracking-wider">
-                    {lang.estimateApproved}
-                  </span>
-                </div>
-              )}
             <article className="bg-white shadow-xl border border-gray-200 rounded-2xl overflow-hidden print:shadow-none print:border-none print:rounded-none">
               <div className="p-8 sm:p-12 lg:p-14 print:p-12">
                 {/* Document Header */}

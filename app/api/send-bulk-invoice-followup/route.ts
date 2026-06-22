@@ -71,22 +71,38 @@ export async function POST(request: Request) {
     const now = Date.now();
 
     let sent = 0;
-    let skipped = 0;
+    let skippedNoEmail = 0;
+    let skippedNeverSent = 0;
+    let skippedCooldown = 0;
+    let skippedPaid = 0;
+    let skippedCancelled = 0;
     let failed = 0;
     const successfulIds: string[] = [];
 
     for (const inv of invoices) {
       // Eligibility: must be unpaid, not cancelled, have a client email,
       // have been sent at least once already, and not in cooldown
+      if (!inv.client_email) {
+        skippedNoEmail++;
+        continue;
+      }
+      if (inv.is_cancelled) {
+        skippedCancelled++;
+        continue;
+      }
+      if (inv.payment_status === 'paid') {
+        skippedPaid++;
+        continue;
+      }
+      if (!inv.last_email_sent_at) {
+        skippedNeverSent++;
+        continue;
+      }
       if (
-        !inv.client_email ||
-        inv.is_cancelled ||
-        inv.payment_status === 'paid' ||
-        !inv.last_email_sent_at ||
-        (inv.last_followup_sent_at &&
-          now - new Date(inv.last_followup_sent_at).getTime() < sevenDaysMs)
+        inv.last_followup_sent_at &&
+        now - new Date(inv.last_followup_sent_at).getTime() < sevenDaysMs
       ) {
-        skipped++;
+        skippedCooldown++;
         continue;
       }
 
@@ -205,7 +221,15 @@ export async function POST(request: Request) {
         .in('id', successfulIds);
     }
 
-    return NextResponse.json({ sent, skipped, failed });
+    return NextResponse.json({
+      sent,
+      skippedNoEmail,
+      skippedNeverSent,
+      skippedCooldown,
+      skippedPaid,
+      skippedCancelled,
+      failed
+    });
   } catch (err: any) {
     console.error('Bulk invoice follow-up route error:', err);
     return NextResponse.json(

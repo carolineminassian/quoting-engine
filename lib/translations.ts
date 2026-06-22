@@ -313,6 +313,16 @@ export const translations = {
     smsSentSuccess: 'SMS sent successfully to {target}',
     sendError: 'Error: {msg}',
     failedToSend: 'Failed to send',
+    bulkFollowUp: 'Bulk Follow-up',
+
+    bulkFollowUpResult: '{sent} follow-up(s) sent.',
+    bulkFollowUpSkippedNoEmail: '{count} skipped — no email address on file.',
+    bulkFollowUpSkippedNeverSent:
+      '{count} skipped — initial invoice email was never sent.',
+    bulkFollowUpSkippedCooldown:
+      '{count} skipped — follow-up cooldown still active.',
+    bulkFollowUpSkippedPaid: '{count} skipped — already marked as paid.',
+    bulkFollowUpSkippedCancelled: '{count} skipped — invoice is cancelled.',
 
     // Tab names (these were missing or inconsistent)
     estimateTab: 'Estimate', // FR: 'Devis'
@@ -933,7 +943,17 @@ export const translations = {
     noDescriptionSuggestions:
       'Aucune description enregistrée pour cette catégorie.',
     removeDescription: 'Supprimer des suggestions',
-
+    bulkFollowUp: 'Relance groupée',
+    bulkFollowUpResult: '{sent} relance(s) envoyée(s).',
+    bulkFollowUpSkippedNoEmail:
+      '{count} ignoré(s) — aucune adresse e-mail renseignée.',
+    bulkFollowUpSkippedNeverSent:
+      '{count} ignoré(s) — e-mail initial jamais envoyé.',
+    bulkFollowUpSkippedCooldown:
+      '{count} ignoré(s) — délai de relance toujours actif.',
+    bulkFollowUpSkippedPaid:
+      '{count} ignoré(s) — déjà marqué(s) comme payé(s).',
+    bulkFollowUpSkippedCancelled: '{count} ignoré(s) — facture annulée.',
     // Additional Charges
     additionalCharges: 'Frais Supplémentaires',
     additionalChargesDesc:
