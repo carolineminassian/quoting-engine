@@ -35,6 +35,10 @@ export default function AnalyticsPage() {
   const [rawInvoices, setRawInvoices] = useState<any[]>([]);
   const [rawCreditNotes, setRawCreditNotes] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(1.1);
+  const [activeBarIndex, setActiveBarIndex] = useState<number | null>(null);
+  const [activeRevenueBarIndex, setActiveRevenueBarIndex] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -1085,7 +1089,10 @@ export default function AnalyticsPage() {
                   {billingChartData.map((d, i) => (
                     <div
                       key={i}
-                      className="flex-1 h-full flex flex-col justify-end items-center gap-3 group"
+                      className="flex-1 h-full flex flex-col justify-end items-center gap-3 group cursor-pointer"
+                      onClick={() =>
+                        setActiveBarIndex(activeBarIndex === i ? null : i)
+                      }
                     >
                       <div
                         className="w-full flex items-end gap-0.5"
@@ -1099,7 +1106,9 @@ export default function AnalyticsPage() {
                             minHeight: d.invoiced > 0 ? '4px' : '0'
                           }}
                         >
-                          <div className="absolute -top-8 left-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                          <div
+                            className={`absolute -top-8 left-0 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none ${activeBarIndex === i ? 'opacity-100' : 'opacity-0'} sm:opacity-0 sm:group-hover:opacity-100`}
+                          >
                             {formatMoney(d.invoiced)}
                           </div>
                         </div>
@@ -1111,7 +1120,9 @@ export default function AnalyticsPage() {
                             minHeight: d.collected > 0 ? '4px' : '0'
                           }}
                         >
-                          <div className="absolute -top-8 right-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                          <div
+                            className={`absolute -top-8 right-0 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none ${activeBarIndex === i ? 'opacity-100' : 'opacity-0'} sm:opacity-0 sm:group-hover:opacity-100`}
+                          >
                             {formatMoney(d.collected)}
                           </div>
                         </div>
@@ -1134,7 +1145,12 @@ export default function AnalyticsPage() {
                 {chartData.map((d, i) => (
                   <div
                     key={i}
-                    className="flex-1 h-full flex flex-col justify-end items-center gap-3 group"
+                    className="flex-1 h-full flex flex-col justify-end items-center gap-3 group cursor-pointer"
+                    onClick={() =>
+                      setActiveRevenueBarIndex(
+                        activeRevenueBarIndex === i ? null : i
+                      )
+                    }
                   >
                     <div
                       className="w-full bg-blue-100 rounded-t-sm border-t-4 border-blue-600 transition-all duration-500 hover:bg-blue-200 relative flex justify-center"
@@ -1143,7 +1159,9 @@ export default function AnalyticsPage() {
                         minHeight: '4px'
                       }}
                     >
-                      <div className="absolute -top-8 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none">
+                      <div
+                        className={`absolute -top-8 transition-opacity bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded font-mono whitespace-nowrap z-10 pointer-events-none ${activeRevenueBarIndex === i ? 'opacity-100' : 'opacity-0'} sm:opacity-0 sm:group-hover:opacity-100`}
+                      >
                         {formatMoney(d.val)}
                       </div>
                     </div>
