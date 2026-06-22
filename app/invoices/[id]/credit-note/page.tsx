@@ -209,12 +209,9 @@ export default function CreateCreditNotePage() {
           <h1 className="text-2xl font-black uppercase tracking-tighter mb-1">
             {lang.createCreditNote}
           </h1>
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-widests mb-4">
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widests mb-8">
             {lang.invoiceLabel} {invoice.invoice_number} ·{' '}
             {fmt(invoice.total_amount_cents)}
-          </p>
-          <p className="text-sm text-gray-500 leading-relaxed mb-8">
-            {lang.creditNoteExplainer}
           </p>
 
           {/* Already credited indicator */}
