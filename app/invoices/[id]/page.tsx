@@ -1819,9 +1819,13 @@ export default function InvoiceView() {
           {isOwner && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
               <div className="flex items-center gap-3">
-                <LinkButton href="/invoices" variant="secondary" size="sm">
+                <LinkButton
+                  href={`/estimates/${invoice.estimate_id}?tab=billing`}
+                  variant="secondary"
+                  size="sm"
+                >
                   <Icons.ArrowLeft />
-                  <span className="ml-1.5">{lang.invoices}</span>
+                  <span className="ml-1.5">{lang.backToEstimate}</span>
                 </LinkButton>
 
                 {!invoice.is_locked && !isLineItemInvoice && (
@@ -1931,13 +1935,13 @@ export default function InvoiceView() {
                                   fullWidth
                                   onClick={() =>
                                     router.push(
-                                      `/estimates/${invoice.estimate_id}?tab=billing`
+                                      `/estimates/${invoice.estimate_id}`
                                     )
                                   }
                                   className="!justify-start"
                                   icon={<Icons.ExternalLink />}
                                 >
-                                  {lang.relatedEstimate}
+                                  {lang.viewEstimateDocument}
                                 </Button>
                               )}
                             </MenuItem>
@@ -2088,13 +2092,13 @@ export default function InvoiceView() {
                                       fullWidth
                                       onClick={() =>
                                         router.push(
-                                          `/estimates/${invoice.estimate_id}?tab=billing`
+                                          `/estimates/${invoice.estimate_id}`
                                         )
                                       }
                                       className="!justify-start"
                                       icon={<Icons.ExternalLink />}
                                     >
-                                      {lang.relatedEstimate}
+                                      {lang.viewEstimateDocument}
                                     </Button>
                                   )}
                                 </MenuItem>

@@ -408,7 +408,8 @@ export const translations = {
     invoiceSent: 'Sent',
     invoicePaidOn: 'Paid on {date}',
     invoiceOverdueSince: 'Overdue since {date}',
-    relatedEstimate: 'Related Estimate',
+    viewEstimateDocument: 'View Related Estimate',
+    backToEstimate: 'Billing Hub',
     cancelInvoice: 'Cancel Invoice',
     cancelInvoiceConfirm:
       'Cancel this invoice? This action is permanent. You can issue a credit note to document the cancellation.',
@@ -1221,7 +1222,8 @@ export const translations = {
     invoiceSent: 'Envoyée',
     invoicePaidOn: 'Payée le {date}',
     invoiceOverdueSince: 'En retard depuis le {date}',
-    relatedEstimate: 'Devis Associé',
+    viewEstimateDocument: 'Voir le Devis Associé',
+    backToEstimate: 'Hub de Facturation',
     cancelInvoice: 'Annuler la Facture',
     cancelInvoiceConfirm:
       "Annuler cette facture ? Cette action est définitive. Vous pouvez émettre un avoir pour documenter l'annulation.",
