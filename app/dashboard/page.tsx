@@ -505,7 +505,7 @@ export default function DashboardPage() {
           />
         ).toBlob();
 
-        const filename = `${currentLang.estimateLabel}-${est.custom_id || est.id.slice(0, 8)}.pdf`;
+        const filename = `${currentLang.estimateLabel}-${est.estimate_number || est.custom_id || est.id.slice(0, 8)}.pdf`;
         zip.file(filename, docBlob);
       }
 
@@ -1733,7 +1733,9 @@ export default function DashboardPage() {
                     </span>
                     <span className="hidden sm:inline">•</span>
                     <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-[10px] text-gray-500">
-                      {est.custom_id || est.id.slice(0, 8)}
+                      {est.estimate_number ||
+                        est.custom_id ||
+                        est.id.slice(0, 8)}
                     </span>
                   </div>
 
