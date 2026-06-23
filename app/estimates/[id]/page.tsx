@@ -328,7 +328,7 @@ export default function EstimateView() {
   const [submittingComment, setSubmittingComment] = useState(false);
 
   const [dialog, setDialog] = useState<{
-    type: 'alert' | 'confirm';
+    type: 'alert' | 'confirm' | 'danger';
     title?: string;
     message: string;
     onConfirm?: () => void;
