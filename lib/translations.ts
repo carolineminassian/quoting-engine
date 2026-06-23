@@ -361,7 +361,9 @@ export const translations = {
     poPlaceholder: 'e.g. PO-12345',
     lessDepositPaid: 'Less: deposit paid',
     balanceSubtotal: 'Balance subtotal',
-
+    numberOfInvoices: 'Number of Invoices',
+    scheduleExceedsRemaining:
+      'Total scheduled ({total}) exceeds the remaining balance ({max}).',
     bankDetails: 'Bank Details',
     invoicingLegal: 'Invoicing & Legal',
     invoiceContactNote: 'Questions about this invoice?',
@@ -1171,7 +1173,9 @@ export const translations = {
     poNumber: 'N° de commande (PO)',
     poPlaceholder: 'Ex: PO-12345',
     lessDepositPaid: 'Moins : acompte versé',
-
+    numberOfInvoices: 'Nombre de factures',
+    scheduleExceedsRemaining:
+      'Le total planifié ({total}) dépasse le solde restant ({max}).',
     bankDetails: 'Coordonnées Bancaires',
     invoicingLegal: 'Facturation & Légal',
     invoiceContactNote: 'Des questions sur cette facture ?',

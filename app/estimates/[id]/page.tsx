@@ -374,7 +374,7 @@ export default function EstimateView() {
   const [scheduleAmountDollars, setScheduleAmountDollars] = useState('');
   const [scheduleStartDate, setScheduleStartDate] = useState('');
   const [scheduleMode, setScheduleMode] = useState<'draft' | 'auto'>('draft');
-  const [scheduleIsFinite, setScheduleIsFinite] = useState(false);
+  const [scheduleIsFinite, setScheduleIsFinite] = useState(true);
   const [scheduleTotalInvoices, setScheduleTotalInvoices] = useState(6);
   const [creatingSchedule, setCreatingSchedule] = useState(false);
   const [paymentSchedules, setPaymentSchedules] = useState<any[]>([]);
@@ -1260,6 +1260,7 @@ export default function EstimateView() {
   const [deletingAllDrafts, setDeletingAllDrafts] = useState(false);
 
   const handleDeleteAllDrafts = async () => {
+    setDialog(null);
     const draftIds = allBillingDocs
       .filter((d) => d.docType === 'invoice' && !d.is_locked && !d.is_cancelled)
       .map((d) => d.id);
@@ -1336,6 +1337,17 @@ export default function EstimateView() {
       setDialog({
         type: 'alert',
         message: t(lang.amountExceedsRemaining, {
+          max: fmt(remainingForInstallments)
+        })
+      });
+      return;
+    }
+    const totalScheduledCents = amountCents * scheduleTotalInvoices;
+    if (totalScheduledCents > remainingForInstallments) {
+      setDialog({
+        type: 'alert',
+        message: t(lang.scheduleExceedsRemaining, {
+          total: fmt(totalScheduledCents),
           max: fmt(remainingForInstallments)
         })
       });
@@ -3908,43 +3920,43 @@ export default function EstimateView() {
 
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                    {lang?.billingDuration || 'Billing Duration'}
+                    {lang?.numberOfInvoices || 'Number of Invoices'}
                   </label>
-                  <div className="flex border border-gray-200 rounded-xl p-1 bg-gray-50/50 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setScheduleIsFinite(false)}
-                      className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${!scheduleIsFinite ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      {lang?.indefinite || 'Indefinite'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setScheduleIsFinite(true)}
-                      className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${scheduleIsFinite ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      {lang?.fixedNumber || 'Fixed Number'}
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
+                      value={scheduleTotalInvoices}
+                      onChange={(e) =>
+                        setScheduleTotalInvoices(parseInt(e.target.value) || 1)
+                      }
+                      className="w-20 p-2 border border-gray-200 rounded-lg text-sm font-mono font-bold text-center focus:outline-none focus:border-blue-500"
+                    />
+                    <span className="text-xs text-gray-500">
+                      {lang?.invoices || 'invoices'}
+                    </span>
                   </div>
-                  {scheduleIsFinite && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={120}
-                        value={scheduleTotalInvoices}
-                        onChange={(e) =>
-                          setScheduleTotalInvoices(
-                            parseInt(e.target.value) || 1
-                          )
-                        }
-                        className="w-20 p-2 border border-gray-200 rounded-lg text-sm font-mono font-bold text-center focus:outline-none focus:border-blue-500"
-                      />
-                      <span className="text-xs text-gray-500">
-                        {lang?.invoices || 'invoices'}
-                      </span>
-                    </div>
-                  )}
+                  {scheduleAmountDollars &&
+                    scheduleTotalInvoices > 0 &&
+                    (() => {
+                      const totalCents =
+                        Math.round(
+                          (parseFloat(scheduleAmountDollars) || 0) * 100
+                        ) * scheduleTotalInvoices;
+                      const exceeds = totalCents > remainingForInstallments;
+                      return (
+                        <div
+                          className={`mt-2 p-2 rounded-lg border text-xs font-bold ${exceeds ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-200 text-gray-600'}`}
+                        >
+                          {profile.country === 'FR'
+                            ? `Total : ${fmt(totalCents)} / ${fmt(remainingForInstallments)}`
+                            : `Total: ${fmt(totalCents)} / ${fmt(remainingForInstallments)}`}
+                          {exceeds &&
+                            ` ⚠ ${profile.country === 'FR' ? 'Dépasse le solde restant' : 'Exceeds remaining balance'}`}
+                        </div>
+                      );
+                    })()}
                 </div>
               </div>
 
