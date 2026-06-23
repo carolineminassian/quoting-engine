@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       .from('estimates')
       .update({ client_status: status })
       .eq('id', estimateId)
-      .select('user_id, client_name, client_email, custom_id')
+      .select('user_id, client_name, client_email, custom_id, estimate_number')
       .single();
 
     if (updateError) throw updateError;
@@ -76,7 +76,8 @@ export async function POST(request: Request) {
     const emailPromises = [];
 
     // Format a safe fallback ID using the estimateId from the request payload
-    const displayId = estimate.custom_id || estimateId.slice(0, 8);
+    const displayId =
+      estimate.estimate_number || estimate.custom_id || estimateId.slice(0, 8);
 
     // 3. Email 1: Notification to Business Owner — only if they haven't opted out
     const ownerWantsNotification =

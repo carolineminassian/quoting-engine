@@ -1232,7 +1232,7 @@ export default function InvoicePDF({
               <Text
                 style={[styles.footerText, { marginTop: 4, fontSize: 7.5 }]}
               >
-                {lang?.complianceText ||
+                {lang?.invoiceComplianceText ||
                   (isFr
                     ? "Document généré conformément à l'article 286 du code général des impôts."
                     : 'Certified digital invoice record.')}

@@ -289,6 +289,8 @@ export const translations = {
     complianceLegal: 'Compliance & Legal',
     complianceText:
       'Standard business estimate. Certified digital record. Valid for 30 days from issuance.',
+    invoiceComplianceText:
+      'This invoice is issued in accordance with applicable billing regulations. Payment is due by the date indicated above. Please retain this document for your records.',
     termsHeader: 'Terms',
     termsWithDeposit:
       'Deposit of {pct}% due upon acceptance to initiate work. Balance due {balance}',
@@ -1108,6 +1110,8 @@ export const translations = {
     complianceLegal: 'Conformité & Mentions Légales',
     complianceText:
       "Document généré conformément à l'article 286 du code général des impôts (Loi Anti-Fraude TVA). Ce document est inaltérable une fois finalisé.",
+    invoiceComplianceText:
+      'La présente facture est émise conformément à la réglementation en vigueur. Le règlement est dû à la date indiquée ci-dessus. Veuillez conserver ce document pour vos archives.',
     termsHeader: 'Conditions de Paiement',
     termsWithDeposit:
       'Acompte de {pct}% exigible à la signature pour le lancement du projet. Solde dû {balance}',

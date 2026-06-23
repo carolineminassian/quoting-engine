@@ -546,21 +546,34 @@ export default function InvoiceView() {
             : estimateRes.data?.additional_charges || [];
 
         if (inv.invoice_type === 'installment') {
-          // Installment invoices always render as a single line item.
-          // Using sections would recalculate from the full estimate total,
-          // not the individual installment amount stored in total_amount_cents.
+          // Installment invoices render as a single line item.
+          // unit_price = full estimate subtotal, quantity = installment fraction
+          // so users adjust via quantity (e.g. 0.25 × $4,000 = $1,000).
           const taxRate =
             inv.tax_rate_snapshot ?? profileData?.default_tax_rate ?? 0;
-          const subtotalCents = Math.round(
+          const installmentSubtotalCents = Math.round(
             inv.total_amount_cents / (1 + taxRate / 100)
           );
+          const estimateSubtotalCents = estimateRes.data
+            ? Math.max(
+                0,
+                (estimateRes.data.total_amount_cents || 0) -
+                  (estimateRes.data.tax_amount_cents || 0)
+              )
+            : installmentSubtotalCents;
+          const quantity =
+            estimateSubtotalCents > 0
+              ? parseFloat(
+                  (installmentSubtotalCents / estimateSubtotalCents).toFixed(4)
+                )
+              : 1;
           setLineItems([
             {
               description:
                 inv.invoice_description || pageLang.invoiceItemFallback,
-              quantity: 1,
-              unit_price_cents: subtotalCents,
-              amount_cents: subtotalCents,
+              quantity,
+              unit_price_cents: estimateSubtotalCents,
+              amount_cents: installmentSubtotalCents,
               tax_rate: taxRate
             }
           ]);
