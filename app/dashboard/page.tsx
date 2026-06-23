@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { translations, t } from '@/lib/translations';
 import {
   getMultiplier,
+  getAdditionalChargeAmountCents,
   getEffectiveLaborRateCents,
   getEffectiveItemCostCents,
   getSectionTotalCents,
@@ -895,6 +896,45 @@ export default function DashboardPage() {
 
             csv += `${baseInfo},${serviceTitle},${serviceDesc},${costCategory},${escapeCsv(name)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
           });
+        });
+
+        // Additional Charges
+        (e.additional_charges || []).forEach((charge: any) => {
+          const chargeCategoryLabel = escapeCsv(
+            isFr ? 'Frais Supplémentaires' : 'Additional Charges'
+          );
+          const taxRate = charge.taxRate || 0;
+          const clientPriceBeforeTax =
+            getAdditionalChargeAmountCents(
+              e,
+              charge,
+              e.sections || [],
+              materialsById
+            ) / 100;
+          const taxAmount = clientPriceBeforeTax * (taxRate / 100);
+          const clientPriceInclTax = clientPriceBeforeTax + taxAmount;
+
+          if (!charge.isPercentage) {
+            const costPerUnit = (charge.costPerUnitCents || 0) / 100;
+            const qty = charge.qty || 1;
+            const baseAmount = costPerUnit * qty;
+            const marginAmount = clientPriceBeforeTax - baseAmount;
+            const marginPct =
+              baseAmount > 0 ? (marginAmount / baseAmount) * 100 : 0;
+            let unit = charge.unit || 'ea';
+            if (lang?.units?.[unit]) unit = lang.units[unit];
+            const costCategory = escapeCsv(isFr ? 'Frais Fixe' : 'Flat Charge');
+
+            csv += `${baseInfo},${chargeCategoryLabel},${escapeCsv('')},${costCategory},${escapeCsv(charge.name || '')},${formatQty(qty)},${escapeCsv(unit)},${formatNum(costPerUnit)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
+          } else {
+            // Percentage charge — pure markup, no underlying cost basis
+            const percentageRate = charge.percentageRate || 0;
+            const costCategory = escapeCsv(
+              isFr ? 'Frais Proportionnel' : 'Percentage Charge'
+            );
+
+            csv += `${baseInfo},${chargeCategoryLabel},${escapeCsv('')},${costCategory},${escapeCsv(charge.name || '')},${formatNum(percentageRate)},${escapeCsv('%')},${formatNum(0)},${formatNum(0)},${formatPct(percentageRate)},${formatNum(clientPriceBeforeTax)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
+          }
         });
       });
     }
