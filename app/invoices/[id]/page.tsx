@@ -2246,6 +2246,15 @@ export default function InvoiceView() {
                             ? lang.invoiceSent
                             : lang.invoiceUnpaid}
                   </span>
+                  {invoice.invoice_type === 'installment' &&
+                    invoice.installment_number &&
+                    invoice.installment_total && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 ml-2">
+                        {profile.country === 'FR'
+                          ? `Versement ${invoice.installment_number} sur ${invoice.installment_total}`
+                          : `Installment ${invoice.installment_number} of ${invoice.installment_total}`}
+                      </span>
+                    )}
                 </>
               )}
             </div>
