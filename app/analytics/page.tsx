@@ -98,7 +98,7 @@ export default function AnalyticsPage() {
         supabase
           .from('estimates')
           .select(
-            'total_amount_cents, tax_amount_cents, created_at, sections, client_name, currency_snapshot, client_status, cancelled_at, cancelled_reason'
+            'total_amount_cents, tax_amount_cents, created_at, sections, additional_charges, client_name, currency_snapshot, client_status, cancelled_at, cancelled_reason'
           )
           .eq('user_id', user.id)
           .eq('is_locked', true)
@@ -233,6 +233,7 @@ export default function AnalyticsPage() {
   let totalTaxCents = 0;
   let totalLaborCostCents = 0;
   let totalMaterialCostCents = 0;
+  let totalAdditionalChargeCostCents = 0;
 
   const serviceMap: { [key: string]: number } = {};
   const clientMap: { [key: string]: { total: number; count: number } } = {};
@@ -289,11 +290,29 @@ export default function AnalyticsPage() {
         serviceMap[title] = (serviceMap[title] || 0) + sectionTotalNormalized;
       });
     }
+
+    // Flat additional charges represent real costs (permits, equipment, insurance, etc.)
+    // that are included in total_amount_cents as revenue but must also be
+    // deducted as costs. Percentage charges are pure markup — no underlying cost.
+    if (Array.isArray(est.additional_charges)) {
+      est.additional_charges.forEach((charge: any) => {
+        if (!charge.isPercentage) {
+          const rawCost = (charge.costPerUnitCents || 0) * (charge.qty || 1);
+          totalAdditionalChargeCostCents += getAmountInTargetCurrency(
+            rawCost,
+            estCurrency
+          );
+        }
+      });
+    }
   });
 
   const count = countApproved;
   const netRevenueHT = totalRevenueCents - totalTaxCents;
-  const totalCostBasis = totalLaborCostCents + totalMaterialCostCents;
+  const totalCostBasis =
+    totalLaborCostCents +
+    totalMaterialCostCents +
+    totalAdditionalChargeCostCents;
   const netMarginCents = Math.max(0, netRevenueHT - totalCostBasis);
 
   const totalCombinedStructure = totalLaborCostCents + totalMaterialCostCents;
