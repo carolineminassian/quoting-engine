@@ -545,7 +545,28 @@ export default function InvoiceView() {
             ? inv.additional_charges
             : estimateRes.data?.additional_charges || [];
 
-        if (sourceSections.length > 0) {
+        if (inv.invoice_type === 'installment') {
+          // Installment invoices always render as a single line item.
+          // Using sections would recalculate from the full estimate total,
+          // not the individual installment amount stored in total_amount_cents.
+          const taxRate =
+            inv.tax_rate_snapshot ?? profileData?.default_tax_rate ?? 0;
+          const subtotalCents = Math.round(
+            inv.total_amount_cents / (1 + taxRate / 100)
+          );
+          setLineItems([
+            {
+              description:
+                inv.invoice_description || pageLang.invoiceItemFallback,
+              quantity: 1,
+              unit_price_cents: subtotalCents,
+              amount_cents: subtotalCents,
+              tax_rate: taxRate
+            }
+          ]);
+          setSections([]);
+          setAdditionalCharges([]);
+        } else if (sourceSections.length > 0) {
           setSections(sourceSections);
           setAdditionalCharges(sourceAdditionalCharges);
           setLineItems([]);
@@ -563,7 +584,6 @@ export default function InvoiceView() {
           const subtotalCents = Math.round(
             inv.total_amount_cents / (1 + taxRate / 100)
           );
-
           setLineItems([
             {
               description:

@@ -1023,7 +1023,7 @@ function NewEstimateContent() {
     };
 
     // Assign sequential estimate number at creation only — never overwrite on edit
-    let insertPayload = payload;
+    let insertPayload: typeof payload & { estimate_number?: string } = payload;
     if (!editId) {
       const {
         data: { user: currentUser }

@@ -348,6 +348,43 @@ export default function EstimateView() {
   const [archiving, setArchiving] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
 
+  // ─── Installment plan ─────────────────────────────────────────────────────
+  const [showInstallmentModal, setShowInstallmentModal] = useState(false);
+  const [installmentMode, setInstallmentMode] = useState<'equal' | 'custom'>(
+    'equal'
+  );
+  const [installmentCount, setInstallmentCount] = useState(3);
+  const [installmentFrequency, setInstallmentFrequency] = useState<
+    'monthly' | 'biweekly' | 'weekly' | 'custom'
+  >('monthly');
+  const [installmentCustomDays, setInstallmentCustomDays] = useState(30);
+  const [installmentStartDate, setInstallmentStartDate] = useState('');
+  const [customInstallments, setCustomInstallments] = useState([
+    { amountCents: 0, dueDate: '' },
+    { amountCents: 0, dueDate: '' }
+  ]);
+  const [creatingPlan, setCreatingPlan] = useState(false);
+
+  // ─── Recurring schedule ───────────────────────────────────────────────────
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleFrequency, setScheduleFrequency] = useState<
+    'monthly' | 'biweekly' | 'weekly' | 'custom'
+  >('monthly');
+  const [scheduleCustomDays, setScheduleCustomDays] = useState(30);
+  const [scheduleAmountDollars, setScheduleAmountDollars] = useState('');
+  const [scheduleStartDate, setScheduleStartDate] = useState('');
+  const [scheduleMode, setScheduleMode] = useState<'draft' | 'auto'>('draft');
+  const [scheduleIsFinite, setScheduleIsFinite] = useState(false);
+  const [scheduleTotalInvoices, setScheduleTotalInvoices] = useState(6);
+  const [creatingSchedule, setCreatingSchedule] = useState(false);
+  const [paymentSchedules, setPaymentSchedules] = useState<any[]>([]);
+  const [togglingScheduleId, setTogglingScheduleId] = useState<string | null>(
+    null
+  );
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(
+    null
+  );
+
   const refetchBillingDocs = async () => {
     if (!estimate?.id) return;
 
@@ -360,7 +397,7 @@ export default function EstimateView() {
       supabase
         .from('invoices')
         .select(
-          'id, invoice_number, invoice_type, invoice_description, total_amount_cents, payment_status, is_locked, is_cancelled, paid_at, due_date, currency_snapshot, country_snapshot, created_at'
+          'id, invoice_number, invoice_type, invoice_description, total_amount_cents, subtotal_cents, tax_amount_cents, credited_amount_cents, payment_status, is_locked, is_cancelled, paid_at, due_date, currency_snapshot, country_snapshot, created_at, installment_number, installment_total, payment_schedule_id'
         )
         .eq('estimate_id', estimate.id)
         .eq('user_id', user.id)
@@ -447,7 +484,7 @@ export default function EstimateView() {
           supabase
             .from('invoices')
             .select(
-              'id, invoice_number, invoice_type, invoice_description, total_amount_cents, payment_status, is_locked, is_cancelled, paid_at, due_date, currency_snapshot, country_snapshot, created_at'
+              'id, invoice_number, invoice_type, invoice_description, total_amount_cents, subtotal_cents, tax_amount_cents, credited_amount_cents, payment_status, is_locked, is_cancelled, paid_at, due_date, currency_snapshot, country_snapshot, created_at, installment_number, installment_total, payment_schedule_id'
             )
             .eq('estimate_id', est.id)
             .eq('user_id', user.id),
@@ -576,6 +613,31 @@ export default function EstimateView() {
   ].sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  const remainingForInstallments = Math.max(
+    0,
+    (estimate?.total_amount_cents || 0) -
+      allBillingDocs
+        .filter(
+          (d) => d.docType === 'invoice' && !d.is_cancelled && d.is_locked
+        )
+        .reduce(
+          (sum: number, d) =>
+            sum +
+            Math.max(
+              0,
+              (d.total_amount_cents || 0) - (d.credited_amount_cents || 0)
+            ),
+          0
+        )
+  );
+
+  const hasInstallmentPlan = allBillingDocs.some(
+    (d) =>
+      d.docType === 'invoice' &&
+      d.invoice_type === 'installment' &&
+      !d.is_cancelled
   );
 
   // ─── Helper Functions ────────────────────────────────────
@@ -1188,6 +1250,138 @@ export default function EstimateView() {
       setDialog({ type: 'alert', message: lang.pdfError });
     } finally {
       setArchiving(false);
+    }
+  };
+
+  const fetchPaymentSchedules = async () => {
+    if (!estimate?.id || !isOwner) return;
+    const { data } = await supabase
+      .from('payment_schedules')
+      .select('*')
+      .eq('estimate_id', estimate.id)
+      .order('created_at', { ascending: false });
+    if (data) setPaymentSchedules(data);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'billing' && estimate?.id && isOwner) {
+      fetchPaymentSchedules();
+    }
+  }, [activeTab, estimate?.id, isOwner]);
+
+  const handleCreateInstallmentPlan = async (
+    installments: { amountCents: number; dueDate: string }[]
+  ) => {
+    setCreatingPlan(true);
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      const res = await fetch('/api/create-installment-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ estimateId: estimate.id, installments })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShowInstallmentModal(false);
+      setInvoices((prev) => [...prev, ...data.invoices]);
+    } catch (err: any) {
+      setDialog({ type: 'alert', message: err.message });
+    } finally {
+      setCreatingPlan(false);
+    }
+  };
+
+  const handleCreateSchedule = async () => {
+    const amountCents = Math.round(
+      (parseFloat(scheduleAmountDollars) || 0) * 100
+    );
+    if (!amountCents || amountCents <= 0) {
+      setDialog({
+        type: 'alert',
+        message: lang?.enterValidAmount || 'Please enter a valid amount.'
+      });
+      return;
+    }
+    if (!scheduleStartDate) {
+      setDialog({
+        type: 'alert',
+        message: lang?.selectStartDate || 'Please select a start date.'
+      });
+      return;
+    }
+    setCreatingSchedule(true);
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      const res = await fetch('/api/payment-schedules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          estimateId: estimate.id,
+          frequency: scheduleFrequency,
+          customIntervalDays: scheduleCustomDays,
+          amountCents,
+          startDate: scheduleStartDate,
+          mode: scheduleMode,
+          totalInvoices: scheduleIsFinite ? scheduleTotalInvoices : null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShowScheduleModal(false);
+      await fetchPaymentSchedules();
+    } catch (err: any) {
+      setDialog({ type: 'alert', message: err.message });
+    } finally {
+      setCreatingSchedule(false);
+    }
+  };
+
+  const handleToggleSchedule = async (
+    scheduleId: string,
+    currentActive: boolean
+  ) => {
+    setTogglingScheduleId(scheduleId);
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      await fetch(`/api/payment-schedules/${scheduleId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ is_active: !currentActive })
+      });
+      await fetchPaymentSchedules();
+    } finally {
+      setTogglingScheduleId(null);
+    }
+  };
+
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    setDeletingScheduleId(scheduleId);
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      await fetch(`/api/payment-schedules/${scheduleId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      });
+      await fetchPaymentSchedules();
+    } finally {
+      setDeletingScheduleId(null);
     }
   };
 
@@ -1850,6 +2044,7 @@ export default function EstimateView() {
               {/* ─── BILLING TAB ACTIONS ─── */}
               {activeTab === 'billing' && isOwner && (
                 <>
+                  {/* Create Invoice — primary */}
                   {canCreateInvoice &&
                     (profile?.subscription_tier === 'pro' ||
                     profile?.lifetime_access ? (
@@ -1874,6 +2069,8 @@ export default function EstimateView() {
                         {lang?.upgradeToPro || 'Upgrade to Pro'}
                       </LinkButton>
                     ))}
+
+                  {/* Bulk Follow-up — primary */}
                   {(profile?.subscription_tier === 'pro' ||
                     profile?.lifetime_access) && (
                     <Button
@@ -1897,53 +2094,158 @@ export default function EstimateView() {
                       {lang?.bulkFollowUp || 'Bulk Follow-up'}
                     </Button>
                   )}
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    loading={archiving}
-                    loadingText={lang?.archiving || 'Archiving...'}
-                    onClick={() => {
-                      if (
-                        !(
-                          profile?.subscription_tier === 'pro' ||
-                          profile?.lifetime_access
-                        )
-                      ) {
-                        setDialog({
-                          type: 'alert',
-                          message:
-                            lang?.proFeatureMessage ||
-                            'This feature requires a Pro plan.'
-                        });
-                        return;
-                      }
-                      handleDownloadZIP();
-                    }}
-                    disabled={
-                      archiving ||
-                      invoices.filter((i) => i.is_locked).length === 0
-                    }
-                    icon={
-                      <svg
-                        className="w-3.5 h-3.5 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        viewBox="0 0 24 24"
+
+                  {/* Three-dots: ZIP + Installments + Automated Recurring */}
+                  {(profile?.subscription_tier === 'pro' ||
+                    profile?.lifetime_access) && (
+                    <Menu as="div" className="relative shrink-0">
+                      <MenuButton className="inline-flex items-center justify-center h-[38px] w-[38px] rounded-xl bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:shadow transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <Icons.MoreVertical />
+                      </MenuButton>
+                      <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="opacity-0 scale-95"
+                        enterTo="opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="opacity-100 scale-100"
+                        leaveTo="opacity-0 scale-95"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                        />
-                      </svg>
-                    }
-                    className="flex-1 sm:flex-none disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {t(lang?.downloadPdfsZip || 'ZIP ({count})', {
-                      count: invoices.filter((i) => i.is_locked).length
-                    })}
-                  </Button>
+                        <MenuItems className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden focus:outline-none divide-y divide-gray-100">
+                          {remainingForInstallments > 0 &&
+                            estimate?.client_status === 'approved' &&
+                            !estimate?.cancelled_at && (
+                              <div className="py-1">
+                                <MenuItem>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={() => {
+                                        setInstallmentMode('equal');
+                                        setInstallmentCount(3);
+                                        setInstallmentFrequency('monthly');
+                                        setInstallmentCustomDays(30);
+                                        setInstallmentStartDate(
+                                          new Date().toISOString().split('T')[0]
+                                        );
+                                        setCustomInstallments([
+                                          { amountCents: 0, dueDate: '' },
+                                          { amountCents: 0, dueDate: '' }
+                                        ]);
+                                        setShowInstallmentModal(true);
+                                      }}
+                                      className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                    >
+                                      <svg
+                                        className="w-4 h-4 shrink-0"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.5"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M3 6h18M3 12h18M3 18h18"
+                                        />
+                                      </svg>
+                                      {lang?.splitIntoInstallments ||
+                                        'Split into Installments'}
+                                    </button>
+                                  )}
+                                </MenuItem>
+                              </div>
+                            )}
+                          {remainingForInstallments > 0 &&
+                            estimate?.client_status === 'approved' &&
+                            !estimate?.cancelled_at && (
+                              <div className="py-1">
+                                <MenuItem>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={() => {
+                                        setScheduleAmountDollars('');
+                                        setScheduleStartDate(
+                                          new Date().toISOString().split('T')[0]
+                                        );
+                                        setScheduleFrequency('monthly');
+                                        setScheduleCustomDays(30);
+                                        setScheduleMode('draft');
+                                        setScheduleIsFinite(false);
+                                        setScheduleTotalInvoices(6);
+                                        setShowScheduleModal(true);
+                                      }}
+                                      className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                    >
+                                      <svg
+                                        className="w-4 h-4 shrink-0"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.5"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <rect
+                                          x="3"
+                                          y="4"
+                                          width="18"
+                                          height="18"
+                                          rx="2"
+                                          ry="2"
+                                        />
+                                        <line x1="16" y1="2" x2="16" y2="6" />
+                                        <line x1="8" y1="2" x2="8" y2="6" />
+                                        <line x1="3" y1="10" x2="21" y2="10" />
+                                      </svg>
+                                      {lang?.automatedRecurringBilling ||
+                                        'Automated Recurring Billing'}
+                                    </button>
+                                  )}
+                                </MenuItem>
+                              </div>
+                            )}
+                          <div className="py-1">
+                            <MenuItem>
+                              {({ active }) => (
+                                <button
+                                  onClick={() => handleDownloadZIP()}
+                                  disabled={
+                                    archiving ||
+                                    invoices.filter((i) => i.is_locked)
+                                      .length === 0
+                                  }
+                                  className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                                >
+                                  <svg
+                                    className="w-4 h-4 shrink-0 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                                    />
+                                  </svg>
+                                  {archiving
+                                    ? lang?.archiving || 'Archiving...'
+                                    : t(
+                                        lang?.downloadPdfsZip ||
+                                          'ZIP ({count})',
+                                        {
+                                          count: invoices.filter(
+                                            (i) => i.is_locked
+                                          ).length
+                                        }
+                                      )}
+                                </button>
+                              )}
+                            </MenuItem>
+                          </div>
+                        </MenuItems>
+                      </Transition>
+                    </Menu>
+                  )}
                 </>
               )}
             </div>
@@ -2728,6 +3030,16 @@ export default function EstimateView() {
                                     )}
                                   </p>
                                 )}
+                                {isInv &&
+                                  doc.invoice_type === 'installment' &&
+                                  doc.installment_number &&
+                                  doc.installment_total && (
+                                    <p className="text-[10px] text-indigo-600 font-bold mt-0.5 uppercase tracking-wider">
+                                      {profile.country === 'FR'
+                                        ? `Versement ${doc.installment_number} sur ${doc.installment_total}`
+                                        : `Installment ${doc.installment_number} of ${doc.installment_total}`}
+                                    </p>
+                                  )}
                               </div>
                             </div>
 
@@ -2779,6 +3091,117 @@ export default function EstimateView() {
                     </div>
                   )}
                 </div>
+
+                {/* ── Recurring Schedules ──────────────────────────── */}
+                {isOwner &&
+                  (profile?.subscription_tier === 'pro' ||
+                    profile?.lifetime_access) &&
+                  paymentSchedules.length > 0 && (
+                    <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 pt-4 border-t border-gray-100">
+                        {lang?.recurringSchedules || 'Recurring Schedules'}
+                      </p>
+                      <div className="space-y-2">
+                        {paymentSchedules.map((schedule) => {
+                          const freqLabel =
+                            schedule.frequency === 'monthly'
+                              ? lang?.monthly || 'Monthly'
+                              : schedule.frequency === 'biweekly'
+                                ? lang?.biweekly || 'Bi-weekly'
+                                : schedule.frequency === 'weekly'
+                                  ? lang?.weekly || 'Weekly'
+                                  : `${lang?.every || 'Every'} ${schedule.interval_days} ${lang?.days || 'days'}`;
+                          const modeLabel =
+                            schedule.mode === 'auto'
+                              ? lang?.autoMode || 'Auto'
+                              : lang?.draftMode || 'Draft';
+                          const symbol =
+                            estimate?.currency_snapshot === 'EUR' ? '€' : '$';
+                          return (
+                            <div
+                              key={schedule.id}
+                              className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border bg-white gap-3 transition-all ${!schedule.is_active ? 'opacity-50 border-gray-100' : 'border-gray-200'}`}
+                            >
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${schedule.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                                  >
+                                    {schedule.is_active
+                                      ? lang?.active || 'Active'
+                                      : lang?.paused || 'Paused'}
+                                  </span>
+                                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                    {freqLabel} · {modeLabel}
+                                  </span>
+                                </div>
+                                <p className="font-mono text-sm font-bold text-gray-900">
+                                  {symbol}
+                                  {(schedule.amount_cents / 100).toFixed(2)}
+                                  {schedule.total_invoices
+                                    ? ` · ${schedule.invoices_created}/${schedule.total_invoices} ${lang?.invoices || 'invoices'}`
+                                    : ` · ${lang?.indefinite || 'Indefinite'}`}
+                                </p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  {lang?.nextRun || 'Next'}:{' '}
+                                  {new Date(
+                                    schedule.next_run_date
+                                  ).toLocaleDateString(
+                                    profile.country === 'FR'
+                                      ? 'fr-FR'
+                                      : 'en-US',
+                                    {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    }
+                                  )}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  loading={togglingScheduleId === schedule.id}
+                                  onClick={() =>
+                                    handleToggleSchedule(
+                                      schedule.id,
+                                      schedule.is_active
+                                    )
+                                  }
+                                >
+                                  {schedule.is_active
+                                    ? lang?.pause || 'Pause'
+                                    : lang?.resume || 'Resume'}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  loading={deletingScheduleId === schedule.id}
+                                  onClick={() =>
+                                    setDialog({
+                                      type: 'danger',
+                                      title:
+                                        lang?.deleteScheduleTitle ||
+                                        'Delete schedule?',
+                                      message:
+                                        lang?.deleteScheduleMessage ||
+                                        'This will permanently delete the recurring billing schedule. Invoices already created will not be affected.',
+                                      onConfirm: () =>
+                                        handleDeleteSchedule(schedule.id)
+                                    })
+                                  }
+                                  className="!text-red-500 hover:!bg-red-50 hover:!text-red-700"
+                                >
+                                  {lang?.delete || 'Delete'}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           )}
@@ -2896,6 +3319,579 @@ export default function EstimateView() {
             </div>
           )}
         </div>
+        {/* ══════════════════════════════════════════════════════════════
+        INSTALLMENT PLAN MODAL
+      ══════════════════════════════════════════════════════════════ */}
+        {showInstallmentModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-base font-black uppercase tracking-tighter">
+                  {lang?.splitIntoInstallments || 'Split into Installments'}
+                </h2>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  {lang?.installmentModalSubtitle ||
+                    'Split the remaining balance into a series of scheduled payments. Each installment becomes its own invoice.'}
+                </p>
+                <p className="text-xs text-gray-400 font-bold mt-2">
+                  {profile.country === 'FR'
+                    ? 'Solde restant'
+                    : 'Remaining balance'}
+                  :{' '}
+                  <span className="text-gray-700">
+                    {fmt(remainingForInstallments)}
+                  </span>
+                </p>
+              </div>
+
+              <div className="p-6 border-b border-gray-100">
+                <div className="flex border border-gray-200 rounded-xl p-1 bg-gray-50/50 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setInstallmentMode('equal')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${installmentMode === 'equal' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    {lang?.equalSplit || 'Equal Split'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInstallmentMode('custom')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${installmentMode === 'custom' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    {lang?.customAmounts || 'Custom Amounts'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {installmentMode === 'equal' ? (
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                        {lang?.numberOfInstallments || 'Number of Installments'}
+                        :{' '}
+                        <span className="text-gray-900 text-sm">
+                          {installmentCount}
+                        </span>
+                      </label>
+                      <input
+                        type="range"
+                        min={2}
+                        max={12}
+                        value={installmentCount}
+                        onChange={(e) =>
+                          setInstallmentCount(parseInt(e.target.value))
+                        }
+                        className="w-full accent-blue-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                        <span>2</span>
+                        <span>12</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        {lang?.frequency || 'Frequency'}
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {(
+                          ['monthly', 'biweekly', 'weekly', 'custom'] as const
+                        ).map((freq) => (
+                          <button
+                            key={freq}
+                            type="button"
+                            onClick={() => setInstallmentFrequency(freq)}
+                            className={`py-2 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${installmentFrequency === freq ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                          >
+                            {freq === 'monthly'
+                              ? lang?.monthly || 'Monthly'
+                              : freq === 'biweekly'
+                                ? lang?.biweekly || 'Bi-weekly'
+                                : freq === 'weekly'
+                                  ? lang?.weekly || 'Weekly'
+                                  : lang?.custom || 'Custom'}
+                          </button>
+                        ))}
+                      </div>
+                      {installmentFrequency === 'custom' && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={365}
+                            value={installmentCustomDays}
+                            onChange={(e) =>
+                              setInstallmentCustomDays(
+                                parseInt(e.target.value) || 30
+                              )
+                            }
+                            className="w-20 p-2 border border-gray-200 rounded-lg text-sm font-mono font-bold text-center focus:outline-none focus:border-blue-500"
+                          />
+                          <span className="text-xs text-gray-500">
+                            {lang?.days || 'days'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                        {lang?.startDate || 'Start Date'}
+                      </label>
+                      <input
+                        type="date"
+                        value={installmentStartDate}
+                        onChange={(e) =>
+                          setInstallmentStartDate(e.target.value)
+                        }
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full p-3 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {installmentStartDate && remainingForInstallments > 0 && (
+                      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                          {lang?.preview || 'Preview'}
+                        </p>
+                        <div className="space-y-2">
+                          {Array.from({ length: installmentCount }, (_, i) => {
+                            const intervalDays =
+                              installmentFrequency === 'monthly'
+                                ? 30
+                                : installmentFrequency === 'biweekly'
+                                  ? 14
+                                  : installmentFrequency === 'weekly'
+                                    ? 7
+                                    : installmentCustomDays;
+                            const dueDate = new Date(installmentStartDate);
+                            dueDate.setDate(
+                              dueDate.getDate() + i * intervalDays
+                            );
+                            const base = Math.floor(
+                              remainingForInstallments / installmentCount
+                            );
+                            const amount =
+                              i === installmentCount - 1
+                                ? remainingForInstallments -
+                                  base * (installmentCount - 1)
+                                : base;
+                            return (
+                              <div
+                                key={i}
+                                className="flex justify-between items-center text-xs"
+                              >
+                                <span className="text-gray-500">
+                                  {profile.country === 'FR'
+                                    ? `Versement ${i + 1}`
+                                    : `Installment ${i + 1}`}{' '}
+                                  ·{' '}
+                                  {dueDate.toLocaleDateString(
+                                    profile.country === 'FR'
+                                      ? 'fr-FR'
+                                      : 'en-US',
+                                    {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    }
+                                  )}
+                                </span>
+                                <span className="font-mono font-bold text-gray-900">
+                                  {fmt(amount)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {customInstallments.map((inst, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-gray-400 w-6 shrink-0">
+                          {i + 1}
+                        </span>
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold pointer-events-none">
+                            {estimate?.currency_snapshot === 'EUR' ? '€' : '$'}
+                          </span>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={
+                              inst.amountCents > 0
+                                ? (inst.amountCents / 100).toFixed(2)
+                                : ''
+                            }
+                            onChange={(e) => {
+                              const updated = [...customInstallments];
+                              updated[i] = {
+                                ...updated[i],
+                                amountCents: Math.round(
+                                  (parseFloat(e.target.value) || 0) * 100
+                                )
+                              };
+                              setCustomInstallments(updated);
+                            }}
+                            className="w-full pl-7 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <input
+                          type="date"
+                          value={inst.dueDate}
+                          onChange={(e) => {
+                            const updated = [...customInstallments];
+                            updated[i] = {
+                              ...updated[i],
+                              dueDate: e.target.value
+                            };
+                            setCustomInstallments(updated);
+                          }}
+                          className="flex-1 p-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500"
+                        />
+                        {customInstallments.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCustomInstallments((prev) =>
+                                prev.filter((_, idx) => idx !== i)
+                              )
+                            }
+                            className="text-red-400 hover:text-red-600 text-xl font-bold leading-none cursor-pointer shrink-0"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomInstallments((prev) => [
+                          ...prev,
+                          { amountCents: 0, dueDate: '' }
+                        ])
+                      }
+                      className="text-[10px] font-black uppercase tracking-wider text-blue-600 hover:text-blue-700 cursor-pointer"
+                    >
+                      + {lang?.addInstallment || 'Add Installment'}
+                    </button>
+                    {(() => {
+                      const total = customInstallments.reduce(
+                        (s, inst) => s + (inst.amountCents || 0),
+                        0
+                      );
+                      const diff = total - remainingForInstallments;
+                      const ok = Math.abs(diff) <= 2;
+                      return (
+                        <div
+                          className={`p-3 rounded-xl border text-xs font-bold ${ok ? 'bg-green-50 border-green-200 text-green-700' : diff > 0 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-amber-50 border-amber-200 text-amber-700'}`}
+                        >
+                          {ok
+                            ? '✓ '
+                            : diff > 0
+                              ? `⚠ ${profile.country === 'FR' ? 'Dépassement de' : 'Over by'} ${fmt(diff)} — `
+                              : `⚠ ${fmt(-diff)} ${profile.country === 'FR' ? 'restant — ' : 'remaining — '}`}
+                          {profile.country === 'FR'
+                            ? `Total : ${fmt(total)} / ${fmt(remainingForInstallments)}`
+                            : `Total: ${fmt(total)} / ${fmt(remainingForInstallments)}`}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3 justify-end">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setShowInstallmentModal(false)}
+                  className="sm:w-32 justify-center"
+                >
+                  {lang?.cancel || 'Cancel'}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  loading={creatingPlan}
+                  loadingText="..."
+                  onClick={() => {
+                    if (installmentMode === 'equal') {
+                      if (!installmentStartDate) {
+                        setDialog({
+                          type: 'alert',
+                          message:
+                            lang?.selectStartDate ||
+                            'Please select a start date.'
+                        });
+                        return;
+                      }
+                      const intervalDays =
+                        installmentFrequency === 'monthly'
+                          ? 30
+                          : installmentFrequency === 'biweekly'
+                            ? 14
+                            : installmentFrequency === 'weekly'
+                              ? 7
+                              : installmentCustomDays;
+                      const base = Math.floor(
+                        remainingForInstallments / installmentCount
+                      );
+                      const installments = Array.from(
+                        { length: installmentCount },
+                        (_, i) => {
+                          const d = new Date(installmentStartDate);
+                          d.setDate(d.getDate() + i * intervalDays);
+                          return {
+                            amountCents:
+                              i === installmentCount - 1
+                                ? remainingForInstallments -
+                                  base * (installmentCount - 1)
+                                : base,
+                            dueDate: d.toISOString().split('T')[0]
+                          };
+                        }
+                      );
+                      handleCreateInstallmentPlan(installments);
+                    } else {
+                      const allFilled = customInstallments.every(
+                        (inst) => inst.amountCents > 0 && inst.dueDate
+                      );
+                      const total = customInstallments.reduce(
+                        (s, inst) => s + inst.amountCents,
+                        0
+                      );
+                      if (!allFilled) {
+                        setDialog({
+                          type: 'alert',
+                          message:
+                            lang?.fillAllInstallments ||
+                            'Please fill in all amounts and dates.'
+                        });
+                        return;
+                      }
+                      if (Math.abs(total - remainingForInstallments) > 2) {
+                        setDialog({
+                          type: 'alert',
+                          message:
+                            lang?.installmentTotalMismatch ||
+                            'Total must equal the remaining balance.'
+                        });
+                        return;
+                      }
+                      handleCreateInstallmentPlan(customInstallments);
+                    }
+                  }}
+                  className="sm:w-40 justify-center"
+                >
+                  {lang?.createPlan || 'Create Plan'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+        RECURRING SCHEDULE MODAL
+      ══════════════════════════════════════════════════════════════ */}
+        {showScheduleModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-base font-black uppercase tracking-tighter">
+                  {lang?.automatedRecurringBillingSetup ||
+                    'Set Up Automated Recurring Billing'}
+                </h2>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  {lang?.automatedRecurringBillingSubtitle ||
+                    'Unlike installments, recurring billing generates invoices automatically on an ongoing schedule — no manual setup needed each time.'}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    {lang?.amountPerPeriod || 'Amount Per Period'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold pointer-events-none">
+                      {estimate?.currency_snapshot === 'EUR' ? '€' : '$'}
+                    </span>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={scheduleAmountDollars}
+                      onChange={(e) => setScheduleAmountDollars(e.target.value)}
+                      className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-mono font-bold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    {lang?.frequency || 'Frequency'}
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(['monthly', 'biweekly', 'weekly', 'custom'] as const).map(
+                      (freq) => (
+                        <button
+                          key={freq}
+                          type="button"
+                          onClick={() => setScheduleFrequency(freq)}
+                          className={`py-2 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${scheduleFrequency === freq ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                        >
+                          {freq === 'monthly'
+                            ? lang?.monthly || 'Monthly'
+                            : freq === 'biweekly'
+                              ? lang?.biweekly || 'Bi-weekly'
+                              : freq === 'weekly'
+                                ? lang?.weekly || 'Weekly'
+                                : lang?.custom || 'Custom'}
+                        </button>
+                      )
+                    )}
+                  </div>
+                  {scheduleFrequency === 'custom' && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={scheduleCustomDays}
+                        onChange={(e) =>
+                          setScheduleCustomDays(parseInt(e.target.value) || 30)
+                        }
+                        className="w-20 p-2 border border-gray-200 rounded-lg text-sm font-mono font-bold text-center focus:outline-none focus:border-blue-500"
+                      />
+                      <span className="text-xs text-gray-500">
+                        {lang?.days || 'days'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    {lang?.startDate || 'Start Date'}
+                  </label>
+                  <input
+                    type="date"
+                    value={scheduleStartDate}
+                    onChange={(e) => setScheduleStartDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    {lang?.invoiceMode || 'Invoice Mode'}
+                  </label>
+                  <div className="flex border border-gray-200 rounded-xl p-1 bg-gray-50/50 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleMode('draft')}
+                      className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${scheduleMode === 'draft' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {lang?.draftMode || 'Draft'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleMode('auto')}
+                      className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${scheduleMode === 'auto' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {lang?.autoMode || 'Auto'}
+                    </button>
+                  </div>
+                  {scheduleMode === 'draft' && (
+                    <p className="text-[10px] text-gray-400 font-bold mt-2">
+                      {lang?.draftModeHint ||
+                        'A draft invoice will be created each period for you to review and send.'}
+                    </p>
+                  )}
+                  {scheduleMode === 'auto' && (
+                    <p className="text-[10px] text-amber-600 font-bold mt-2">
+                      ⚠{' '}
+                      {lang?.autoModeWarning ||
+                        'Invoices will be automatically finalized and emailed to the client without review.'}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    {lang?.billingDuration || 'Billing Duration'}
+                  </label>
+                  <div className="flex border border-gray-200 rounded-xl p-1 bg-gray-50/50 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleIsFinite(false)}
+                      className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${!scheduleIsFinite ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {lang?.indefinite || 'Indefinite'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleIsFinite(true)}
+                      className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${scheduleIsFinite ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {lang?.fixedNumber || 'Fixed Number'}
+                    </button>
+                  </div>
+                  {scheduleIsFinite && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={120}
+                        value={scheduleTotalInvoices}
+                        onChange={(e) =>
+                          setScheduleTotalInvoices(
+                            parseInt(e.target.value) || 1
+                          )
+                        }
+                        className="w-20 p-2 border border-gray-200 rounded-lg text-sm font-mono font-bold text-center focus:outline-none focus:border-blue-500"
+                      />
+                      <span className="text-xs text-gray-500">
+                        {lang?.invoices || 'invoices'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3 justify-end">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setShowScheduleModal(false)}
+                  className="sm:w-32 justify-center"
+                >
+                  {lang?.cancel || 'Cancel'}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  loading={creatingSchedule}
+                  loadingText="..."
+                  onClick={handleCreateSchedule}
+                  className="sm:w-48 justify-center"
+                >
+                  {lang?.activateSchedule || 'Activate Schedule'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
