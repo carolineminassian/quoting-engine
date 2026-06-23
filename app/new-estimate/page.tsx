@@ -1022,13 +1022,30 @@ function NewEstimateContent() {
           : `${paymentDays}_days`
     };
 
+    // Assign sequential estimate number at creation only — never overwrite on edit
+    let insertPayload = payload;
+    if (!editId) {
+      const {
+        data: { user: currentUser }
+      } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: estimateNumber } = await supabase.rpc(
+          'generate_estimate_number',
+          { p_user_id: currentUser.id, p_country: profile?.country || 'US' }
+        );
+        if (estimateNumber) {
+          insertPayload = { ...payload, estimate_number: estimateNumber };
+        }
+      }
+    }
+
     const res = editId
       ? await supabase
           .from('estimates')
           .update(payload)
           .eq('id', editId)
           .select()
-      : await supabase.from('estimates').insert([payload]).select();
+      : await supabase.from('estimates').insert([insertPayload]).select();
 
     if (!res.error) {
       if (client.name) {

@@ -133,7 +133,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const estimateRef = estimate.custom_id || estimate.id.slice(0, 8);
+    const estimateRef =
+      estimate.estimate_number || estimate.custom_id || estimate.id.slice(0, 8);
 
     const computeDueDate = (daysFromNow: number): string => {
       const d = new Date();

@@ -654,7 +654,10 @@ export default function EstimateView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           estimateId: estimate.id,
-          customId: estimate.custom_id || estimate.id.slice(0, 8),
+          customId:
+            estimate.estimate_number ||
+            estimate.custom_id ||
+            estimate.id.slice(0, 8),
           clientName: estimate.client_name,
           clientEmail: estimate.client_email,
           estimateUrl: window.location.href,
@@ -855,7 +858,10 @@ export default function EstimateView() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               estimateId: estimate.id,
-              customId: estimate.custom_id || estimate.id.slice(0, 8),
+              customId:
+                estimate.estimate_number ||
+                estimate.custom_id ||
+                estimate.id.slice(0, 8),
               clientName: payload.author_name,
               commentContent: cleanCommentText,
               ownerId: estimate.user_id,
@@ -874,7 +880,10 @@ export default function EstimateView() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              customId: estimate.custom_id || estimate.id.slice(0, 8),
+              customId:
+                estimate.estimate_number ||
+                estimate.custom_id ||
+                estimate.id.slice(0, 8),
               ownerName: payload.author_name,
               commentContent: cleanCommentText,
               ownerId: estimate.user_id,
@@ -1286,7 +1295,7 @@ export default function EstimateView() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${lang.estimateLabel}-${estimate.custom_id || estimate.id.slice(0, 8)}.pdf`;
+      link.download = `${lang.estimateLabel}-${estimate.estimate_number || estimate.custom_id || estimate.id.slice(0, 8)}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2090,7 +2099,10 @@ export default function EstimateView() {
                       {lang.estimateLabel}
                     </p>
                     <p className="font-mono text-sm sm:text-base font-bold text-gray-900">
-                      #{estimate.custom_id || estimate.id.slice(0, 8)}
+                      #
+                      {estimate.estimate_number ||
+                        estimate.custom_id ||
+                        estimate.id.slice(0, 8)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1 font-medium">
                       {new Date(estimate.created_at).toLocaleDateString(

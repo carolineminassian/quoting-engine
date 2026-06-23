@@ -504,7 +504,10 @@ export default function EstimatePDF({
               {isFr ? 'Devis' : 'Estimate'}
             </Text>
             <Text style={styles.documentRef}>
-              #{estimate.custom_id || estimate.id.slice(0, 8)}
+              #
+              {estimate.estimate_number ||
+                estimate.custom_id ||
+                estimate.id.slice(0, 8)}
             </Text>
             <Text style={styles.documentDate}>{formattedDate}</Text>
           </View>
