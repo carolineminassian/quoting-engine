@@ -360,8 +360,8 @@ export default function EstimateView() {
   const [installmentCustomDays, setInstallmentCustomDays] = useState(30);
   const [installmentStartDate, setInstallmentStartDate] = useState('');
   const [customInstallments, setCustomInstallments] = useState([
-    { amountCents: 0, dueDate: '' },
-    { amountCents: 0, dueDate: '' }
+    { amountCents: 0, dueDate: '', rawAmount: '' },
+    { amountCents: 0, dueDate: '', rawAmount: '' }
   ]);
   const [creatingPlan, setCreatingPlan] = useState(false);
 
@@ -639,6 +639,10 @@ export default function EstimateView() {
       d.invoice_type === 'installment' &&
       !d.is_cancelled
   );
+
+  const draftInvoiceCount = allBillingDocs.filter(
+    (d) => d.docType === 'invoice' && !d.is_locked && !d.is_cancelled
+  ).length;
 
   // ─── Helper Functions ────────────────────────────────────
   const getFollowUpState = () => {
@@ -1253,6 +1257,30 @@ export default function EstimateView() {
     }
   };
 
+  const [deletingAllDrafts, setDeletingAllDrafts] = useState(false);
+
+  const handleDeleteAllDrafts = async () => {
+    const draftIds = allBillingDocs
+      .filter((d) => d.docType === 'invoice' && !d.is_locked && !d.is_cancelled)
+      .map((d) => d.id);
+    if (draftIds.length === 0) return;
+    setDeletingAllDrafts(true);
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .in('id', draftIds)
+        .eq('is_locked', false);
+      if (!error) {
+        setInvoices((prev) => prev.filter((inv) => !draftIds.includes(inv.id)));
+      }
+    } catch (err) {
+      console.error('Failed to delete all drafts:', err);
+    } finally {
+      setDeletingAllDrafts(false);
+    }
+  };
+
   const fetchPaymentSchedules = async () => {
     if (!estimate?.id || !isOwner) return;
     const { data } = await supabase
@@ -1301,9 +1329,15 @@ export default function EstimateView() {
       (parseFloat(scheduleAmountDollars) || 0) * 100
     );
     if (!amountCents || amountCents <= 0) {
+      setDialog({ type: 'alert', message: lang.enterValidAmount });
+      return;
+    }
+    if (amountCents > remainingForInstallments) {
       setDialog({
         type: 'alert',
-        message: lang?.enterValidAmount || 'Please enter a valid amount.'
+        message: t(lang.amountExceedsRemaining, {
+          max: fmt(remainingForInstallments)
+        })
       });
       return;
     }
@@ -1370,6 +1404,7 @@ export default function EstimateView() {
   };
 
   const handleDeleteSchedule = async (scheduleId: string) => {
+    setDialog(null);
     setDeletingScheduleId(scheduleId);
     try {
       const {
@@ -2128,8 +2163,16 @@ export default function EstimateView() {
                                           new Date().toISOString().split('T')[0]
                                         );
                                         setCustomInstallments([
-                                          { amountCents: 0, dueDate: '' },
-                                          { amountCents: 0, dueDate: '' }
+                                          {
+                                            amountCents: 0,
+                                            dueDate: '',
+                                            rawAmount: ''
+                                          },
+                                          {
+                                            amountCents: 0,
+                                            dueDate: '',
+                                            rawAmount: ''
+                                          }
                                         ]);
                                         setShowInstallmentModal(true);
                                       }}
@@ -2242,6 +2285,45 @@ export default function EstimateView() {
                               )}
                             </MenuItem>
                           </div>
+                          {draftInvoiceCount > 0 && (
+                            <div className="py-1">
+                              <MenuItem>
+                                {({ active }) => (
+                                  <button
+                                    onClick={() =>
+                                      setDialog({
+                                        type: 'danger',
+                                        title: lang.deleteAllDraftsTitle,
+                                        message: t(
+                                          lang.deleteAllDraftsMessage,
+                                          { count: draftInvoiceCount }
+                                        ),
+                                        onConfirm: handleDeleteAllDrafts
+                                      })
+                                    }
+                                    disabled={deletingAllDrafts}
+                                    className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 disabled:opacity-40 ${active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
+                                  >
+                                    <svg
+                                      className="w-4 h-4 shrink-0"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2.5"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <polyline points="3 6 5 6 21 6" />
+                                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                      <path d="M10 11v6M14 11v6" />
+                                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                    </svg>
+                                    {deletingAllDrafts
+                                      ? '...'
+                                      : lang.deleteAllDrafts}
+                                  </button>
+                                )}
+                              </MenuItem>
+                            </div>
+                          )}
                         </MenuItems>
                       </Transition>
                     </Menu>
@@ -3524,15 +3606,12 @@ export default function EstimateView() {
                             min="0.01"
                             step="0.01"
                             placeholder="0.00"
-                            value={
-                              inst.amountCents > 0
-                                ? (inst.amountCents / 100).toFixed(2)
-                                : ''
-                            }
+                            value={inst.rawAmount}
                             onChange={(e) => {
                               const updated = [...customInstallments];
                               updated[i] = {
                                 ...updated[i],
+                                rawAmount: e.target.value,
                                 amountCents: Math.round(
                                   (parseFloat(e.target.value) || 0) * 100
                                 )
@@ -3575,7 +3654,7 @@ export default function EstimateView() {
                       onClick={() =>
                         setCustomInstallments((prev) => [
                           ...prev,
-                          { amountCents: 0, dueDate: '' }
+                          { amountCents: 0, dueDate: '', rawAmount: '' }
                         ])
                       }
                       className="text-[10px] font-black uppercase tracking-wider text-blue-600 hover:text-blue-700 cursor-pointer"

@@ -328,6 +328,12 @@ export const translations = {
     estimateTab: 'Estimate', // FR: 'Devis'
     billingTab: 'Billing', // FR: 'Facturation'
     discussionTab: 'Discussion', // FR: 'Messages'
+    deleteAllDrafts: 'Delete All Drafts',
+    deleteAllDraftsTitle: 'Delete all drafts?',
+    deleteAllDraftsMessage:
+      'This will permanently delete {count} invoice draft(s). This cannot be undone.',
+    amountExceedsRemaining:
+      'Amount cannot exceed the remaining balance ({max}).',
 
     // Additional missing keys
     discussionSubtitle:
@@ -1133,6 +1139,12 @@ export const translations = {
     estimateTab: 'Devis', // FR: 'Devis'
     billingTab: 'Facturation', // FR: 'Facturation'
     discussionTab: 'Messages', // FR: 'Messages'
+    deleteAllDrafts: 'Supprimer tous les brouillons',
+    deleteAllDraftsTitle: 'Supprimer tous les brouillons ?',
+    deleteAllDraftsMessage:
+      'Cela supprimera définitivement {count} brouillon(s) de facture. Cette action est irréversible.',
+    amountExceedsRemaining:
+      'Le montant ne peut pas dépasser le solde restant ({max}).',
 
     // Additional missing keys
     discussionSubtitle:
