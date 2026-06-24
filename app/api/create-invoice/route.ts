@@ -208,13 +208,15 @@ export async function POST(request: Request) {
       amountCents,
       description,
       depositPercentage,
-      depositInvoiceRef
+      depositInvoiceRef,
+      dueDateOverride
     }: {
       invoiceType: 'full' | 'deposit' | 'balance';
       amountCents: number;
       description: string | null;
       depositPercentage: number;
-      depositInvoiceRef?: string | null;
+      depositInvoiceRef?: string | null | undefined;
+      dueDateOverride?: string;
     }) => {
       // Placeholder only. Real sequential number is assigned at finalize
       // (/api/finalize-invoice) so deleted drafts never burn a number.
@@ -227,6 +229,7 @@ export async function POST(request: Request) {
         .insert([
           {
             ...baseFields,
+            due_date: dueDateOverride || dueDate,
             invoice_number: invoiceNumber,
             invoice_type: invoiceType,
             invoice_description: description,
@@ -296,7 +299,8 @@ export async function POST(request: Request) {
           amountCents,
           description,
           depositPercentage: depositPct,
-          depositInvoiceRef: null
+          depositInvoiceRef: null,
+          dueDateOverride: new Date().toISOString()
         });
 
         return NextResponse.json(

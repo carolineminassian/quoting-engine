@@ -131,6 +131,12 @@ const styles = StyleSheet.create({
     color: '#111827',
     letterSpacing: -0.3
   },
+  businessAddress: {
+    fontSize: 8,
+    color: '#6b7280',
+    marginTop: 2,
+    letterSpacing: 0.1
+  },
   letterheadRight: {
     alignItems: 'flex-end',
     minWidth: 180
@@ -665,7 +671,41 @@ export default function InvoicePDF({
               // eslint-disable-next-line jsx-a11y/alt-text
               <Image src={profile.logo_url} style={styles.logo} />
             )}
-            <Text style={styles.businessName}>{profile.business_name}</Text>
+            <View style={{ flexDirection: 'column' }}>
+              <Text style={styles.businessName}>{profile.business_name}</Text>
+              {profile.business_address && (
+                <Text style={styles.businessAddress}>
+                  {profile.business_address}
+                </Text>
+              )}
+              {(profile.business_city ||
+                profile.business_state ||
+                profile.business_zip) && (
+                <Text style={styles.businessAddress}>
+                  {[
+                    profile.business_city,
+                    profile.business_state,
+                    profile.business_zip
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
+                </Text>
+              )}
+              {profile.vat_number && (
+                <Text style={styles.businessAddress}>
+                  {isFr
+                    ? `N° TVA : ${profile.vat_number}`
+                    : `VAT: ${profile.vat_number}`}
+                </Text>
+              )}
+              {profile.company_reg_number && (
+                <Text style={styles.businessAddress}>
+                  {isFr
+                    ? `SIRET : ${profile.company_reg_number}`
+                    : `Reg: ${profile.company_reg_number}`}
+                </Text>
+              )}
+            </View>
           </View>
 
           <View style={styles.letterheadRight}>
