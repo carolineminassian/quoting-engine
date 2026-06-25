@@ -584,8 +584,7 @@ export default function EstimateView() {
   const showBillingTab =
     isOwner &&
     estimate?.client_status === 'approved' &&
-    !estimate?.cancelled_at &&
-    !estimate?.superseded_at;
+    !estimate?.cancelled_at;
 
   const finalizedInvoices = invoices.filter(
     (inv) => inv.is_locked && !inv.is_cancelled
@@ -798,11 +797,13 @@ export default function EstimateView() {
   const handleCreateRevision = async () => {
     setLoading(true);
 
-    const baseCustomId = estimate.custom_id
-      ? estimate.custom_id.split('-V')[0]
-      : estimate.id.slice(0, 8);
+    const baseNumber = (
+      estimate.estimate_number ||
+      estimate.custom_id ||
+      estimate.id.slice(0, 8)
+    ).split('-V')[0];
     const nextVersion = (estimate.version || 1) + 1;
-    const newCustomId = `${baseCustomId}-V${nextVersion}`;
+    const revisionId = `${baseNumber}-V${nextVersion}`;
 
     const newEstimatePayload = {
       user_id: estimate.user_id,
@@ -824,12 +825,17 @@ export default function EstimateView() {
       is_locked: false,
       parent_estimate_id: estimate.parent_estimate_id || estimate.id,
       version: nextVersion,
-      custom_id: newCustomId
+      custom_id: revisionId
     };
 
     const { data, error } = await supabase
       .from('estimates')
-      .insert([newEstimatePayload])
+      .insert([
+        {
+          ...newEstimatePayload,
+          estimate_number: revisionId
+        }
+      ])
       .select()
       .single();
 
@@ -2638,7 +2644,7 @@ export default function EstimateView() {
                           </div>
                         ) : (
                           sec.items.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                            <div className="mt-3 space-y-1">
                               {sec.items.map((item: any, i: number) => {
                                 const m = materialsById.get(item.materialId);
                                 const displayName =
@@ -2647,11 +2653,10 @@ export default function EstimateView() {
                                 const displayUnit =
                                   lang?.units?.[rawUnit] || rawUnit;
                                 return (
-                                  <span
-                                    key={i}
-                                    className="text-xs text-gray-500"
-                                  >
-                                    {displayName}
+                                  <p key={i} className="text-xs text-gray-500">
+                                    <span className="text-gray-700 font-medium">
+                                      {displayName}
+                                    </span>
                                     {(item.qty > 0 || displayUnit) && (
                                       <span className="text-gray-400">
                                         {' '}
@@ -2659,7 +2664,7 @@ export default function EstimateView() {
                                         {displayUnit ? ` ${displayUnit}` : ''}
                                       </span>
                                     )}
-                                  </span>
+                                  </p>
                                 );
                               })}
                             </div>

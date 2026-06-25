@@ -365,6 +365,7 @@ export default function InvoiceView() {
   const [lang, setLang] = useState<any>();
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [depositInvoices, setDepositInvoices] = useState<any[]>([]);
 
   const [creditNotes, setCreditNotes] = useState<any[]>([]);
   const [finalizedNetOtherInvoicesCents, setFinalizedNetOtherInvoicesCents] =
@@ -515,13 +516,14 @@ export default function InvoiceView() {
 
         // For balance invoices, find the finalized deposit invoice for the deduction line
         if (inv.invoice_type === 'balance') {
-          const dep = (estimateInvoicesRes.data || []).find(
+          const allDeposits = (estimateInvoicesRes.data || []).filter(
             (other: any) =>
               other.invoice_type === 'deposit' &&
               other.is_locked &&
               !other.is_cancelled
           );
-          setDepositInvoice(dep || null);
+          setDepositInvoices(allDeposits);
+          setDepositInvoice(allDeposits[0] || null);
         }
 
         setDraftData({
@@ -1643,7 +1645,13 @@ export default function InvoiceView() {
       const depositRefs =
         invoice.deposit_invoice_refs && invoice.deposit_invoice_refs.length > 0
           ? invoice.deposit_invoice_refs
-          : null;
+          : depositInvoices.length > 1
+            ? depositInvoices.map((d) => ({
+                invoice_number: d.invoice_number,
+                invoice_date: d.invoice_date,
+                subtotal_cents: d.subtotal_cents || d.subtotal_amount_cents || 0
+              }))
+            : null;
 
       const fullProjectSubtotalForPDF =
         invoice.invoice_type === 'balance'
@@ -2419,6 +2427,7 @@ export default function InvoiceView() {
                         <input
                           type="date"
                           value={draftData.dueDate}
+                          min={draftData.invoiceDate}
                           onChange={(e) =>
                             handleDraftChange('dueDate', e.target.value)
                           }
@@ -2736,48 +2745,9 @@ export default function InvoiceView() {
                                     )}
                                   </div>
                                 )}
-                                {sec.items &&
-                                  sec.items.length > 0 &&
-                                  !isStructurallyEditable &&
-                                  !isShowingDetails && (
-                                    <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1.5">
-                                      {sec.items.map(
-                                        (item: any, itemIdx: number) => {
-                                          const m = materialsById.get(
-                                            item.materialId
-                                          );
-                                          const name =
-                                            item.name ||
-                                            m?.name ||
-                                            lang.itemLabel;
-                                          const rawUnit =
-                                            item.unit || m?.unit || '';
-                                          const displayUnit =
-                                            lang?.units?.[rawUnit] || rawUnit;
-                                          return (
-                                            <span
-                                              key={itemIdx}
-                                              className="inline-flex items-center gap-1 bg-gray-100 rounded-full px-2.5 py-0.5 text-xs font-medium text-gray-600"
-                                            >
-                                              {name}
-                                              {(item.qty > 0 ||
-                                                displayUnit) && (
-                                                <span className="text-gray-400">
-                                                  {' '}
-                                                  · {item.qty}
-                                                  {displayUnit
-                                                    ? ` ${displayUnit}`
-                                                    : ''}
-                                                </span>
-                                              )}
-                                            </span>
-                                          );
-                                        }
-                                      )}
-                                    </div>
-                                  )}
+
                                 {sec.items && sec.items.length > 0 && (
-                                  <div className="space-y-3">
+                                  <div className="flex flex-col w-full">
                                     {sec.items.map(
                                       (item: any, itemIdx: number) => {
                                         const m = materialsById.get(
@@ -3004,8 +2974,6 @@ export default function InvoiceView() {
                                           );
                                         }
 
-                                        // Read-only: detail list only when showing details; pills handled separately above
-                                        if (!isShowingDetails) return null;
                                         return (
                                           <div
                                             key={itemIdx}
@@ -3018,23 +2986,47 @@ export default function InvoiceView() {
                                                   lang.itemLabel}
                                               </p>
                                               <p className="text-xs text-gray-500 mt-0.5">
-                                                {item.qty} ×{' '}
-                                                {fmt(unitCostCents)}
-                                                {(item.taxRate ?? 0) > 0 && (
-                                                  <span className="text-gray-400 ml-2">
-                                                    ({lang.tax} {item.taxRate}%)
-                                                  </span>
-                                                )}
+                                                {(() => {
+                                                  const rawUnit =
+                                                    item.unit || m?.unit || '';
+                                                  const displayUnit =
+                                                    lang?.units?.[rawUnit] ||
+                                                    rawUnit;
+                                                  return (
+                                                    <>
+                                                      {item.qty}
+                                                      {displayUnit
+                                                        ? ` ${displayUnit}`
+                                                        : ''}
+                                                      {isShowingDetails && (
+                                                        <>
+                                                          {' '}
+                                                          × {fmt(unitCostCents)}
+                                                        </>
+                                                      )}
+                                                      {isShowingDetails &&
+                                                        (item.taxRate ?? 0) >
+                                                          0 && (
+                                                          <span className="text-gray-400 ml-2">
+                                                            ({lang.tax}{' '}
+                                                            {item.taxRate}%)
+                                                          </span>
+                                                        )}
+                                                    </>
+                                                  );
+                                                })()}
                                               </p>
                                             </div>
-                                            <span className="font-mono font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap">
-                                              {fmt(
-                                                Math.round(
-                                                  (item.qty || 0) *
-                                                    unitCostCents
-                                                )
-                                              )}
-                                            </span>
+                                            {isShowingDetails && (
+                                              <span className="font-mono font-bold text-sm text-gray-900 tabular-nums whitespace-nowrap">
+                                                {fmt(
+                                                  Math.round(
+                                                    (item.qty || 0) *
+                                                      unitCostCents
+                                                  )
+                                                )}
+                                              </span>
+                                            )}
                                           </div>
                                         );
                                       }
@@ -3061,7 +3053,7 @@ export default function InvoiceView() {
                             ) : (
                               sec.items &&
                               sec.items.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 pl-0 sm:pl-4">
+                                <div className="mt-3 space-y-1 pl-0 sm:pl-4">
                                   {sec.items.map((item: any, i: number) => {
                                     const m = materialsById.get(
                                       item.materialId
@@ -3071,11 +3063,10 @@ export default function InvoiceView() {
                                     const rawUnit = item.unit || m?.unit || '';
                                     const displayUnit =
                                       lang?.units?.[rawUnit] || rawUnit;
-
                                     return (
-                                      <span
+                                      <p
                                         key={i}
-                                        className="text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100"
+                                        className="text-xs text-gray-500"
                                       >
                                         <span className="text-gray-700 font-medium">
                                           {displayName}
@@ -3089,7 +3080,7 @@ export default function InvoiceView() {
                                               : ''}
                                           </span>
                                         )}
-                                      </span>
+                                      </p>
                                     );
                                   })}
                                 </div>
@@ -3333,32 +3324,16 @@ export default function InvoiceView() {
                               </div>
                             )
                           )
-                        : (() => {
-                            const depositSubtotalCents = Math.max(
-                              0,
-                              baseTotals.subtotalCents -
-                                billedTotals.subtotalCents
-                            );
-                            const depRef = depositInvoice?.invoice_number
-                              ? `${depositInvoice.invoice_number}${
-                                  depositInvoice.invoice_date
-                                    ? ` · ${new Date(
-                                        depositInvoice.invoice_date
-                                      ).toLocaleDateString(
-                                        profile?.country === 'FR'
-                                          ? 'fr-FR'
-                                          : 'en-US',
-                                        {
-                                          year: 'numeric',
-                                          month: 'short',
-                                          day: 'numeric'
-                                        }
-                                      )}`
-                                    : ''
-                                }`
-                              : null;
-                            return (
-                              <div className="flex justify-between items-start text-sm pb-3 border-b border-dashed border-gray-200">
+                        : depositInvoices.length > 1
+                          ? depositInvoices.map((dep: any, idx: number) => (
+                              <div
+                                key={dep.invoice_number || idx}
+                                className={`flex justify-between items-start text-sm ${
+                                  idx === depositInvoices.length - 1
+                                    ? 'pb-3 border-b border-dashed border-gray-200'
+                                    : 'pb-1'
+                                }`}
+                              >
                                 <div>
                                   <span className="text-gray-500">
                                     {lang.lessDepositPaid ||
@@ -3366,19 +3341,83 @@ export default function InvoiceView() {
                                         ? 'Moins : acompte versé'
                                         : 'Less: deposit paid')}
                                   </span>
-                                  {depRef && (
-                                    <p className="text-[10px] text-gray-400 mt-0.5">
-                                      {depRef}
-                                    </p>
-                                  )}
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {[
+                                      dep.invoice_number,
+                                      dep.invoice_date
+                                        ? new Date(
+                                            dep.invoice_date
+                                          ).toLocaleDateString(
+                                            profile?.country === 'FR'
+                                              ? 'fr-FR'
+                                              : 'en-US',
+                                            {
+                                              year: 'numeric',
+                                              month: 'short',
+                                              day: 'numeric'
+                                            }
+                                          )
+                                        : null
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' · ')}
+                                  </p>
                                 </div>
                                 <span className="font-mono text-gray-700 tabular-nums whitespace-nowrap">
-                                  -{fmt(depositSubtotalCents)}
+                                  -
+                                  {fmt(
+                                    dep.subtotal_cents ||
+                                      dep.subtotal_amount_cents ||
+                                      0
+                                  )}
                                 </span>
                               </div>
-                            );
-                          })()}
-
+                            ))
+                          : (() => {
+                              const depositSubtotalCents = Math.max(
+                                0,
+                                baseTotals.subtotalCents -
+                                  billedTotals.subtotalCents
+                              );
+                              const depRef = depositInvoice?.invoice_number
+                                ? `${depositInvoice.invoice_number}${
+                                    depositInvoice.invoice_date
+                                      ? ` · ${new Date(
+                                          depositInvoice.invoice_date
+                                        ).toLocaleDateString(
+                                          profile?.country === 'FR'
+                                            ? 'fr-FR'
+                                            : 'en-US',
+                                          {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric'
+                                          }
+                                        )}`
+                                      : ''
+                                  }`
+                                : null;
+                              return (
+                                <div className="flex justify-between items-start text-sm pb-3 border-b border-dashed border-gray-200">
+                                  <div>
+                                    <span className="text-gray-500">
+                                      {lang.lessDepositPaid ||
+                                        (profile?.country === 'FR'
+                                          ? 'Moins : acompte versé'
+                                          : 'Less: deposit paid')}
+                                    </span>
+                                    {depRef && (
+                                      <p className="text-[10px] text-gray-400 mt-0.5">
+                                        {depRef}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span className="font-mono text-gray-700 tabular-nums whitespace-nowrap">
+                                    -{fmt(depositSubtotalCents)}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                       {/* Balance subtotal */}
                       <div className="flex justify-between items-baseline text-sm">
                         <span className="text-gray-700 font-bold">
