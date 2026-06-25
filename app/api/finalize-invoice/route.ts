@@ -29,7 +29,9 @@ export async function POST(request: Request) {
 
     const { data: invoice, error: invError } = await supabaseAdmin
       .from('invoices')
-      .select('user_id, is_locked, country_snapshot')
+      .select(
+        'user_id, is_locked, country_snapshot, invoice_type, installment_total, estimate_id'
+      )
       .eq('id', invoiceId)
       .single();
 
@@ -60,12 +62,44 @@ export async function POST(request: Request) {
       );
     }
 
+    let depositRefsUpdate = {};
+    if (
+      invoice.invoice_type === 'balance' &&
+      invoice.installment_total &&
+      invoice.estimate_id
+    ) {
+      const { data: priorDeposits } = await supabaseAdmin
+        .from('invoices')
+        .select(
+          'id, invoice_number, invoice_date, total_amount_cents, subtotal_cents'
+        )
+        .eq('estimate_id', invoice.estimate_id)
+        .eq('invoice_type', 'deposit')
+        .eq('is_locked', true)
+        .eq('is_cancelled', false)
+        .neq('id', invoiceId)
+        .order('invoice_date', { ascending: true });
+
+      if (priorDeposits && priorDeposits.length > 0) {
+        depositRefsUpdate = {
+          deposit_invoice_refs: priorDeposits.map((d) => ({
+            id: d.id,
+            invoice_number: d.invoice_number,
+            invoice_date: d.invoice_date,
+            total_amount_cents: d.total_amount_cents,
+            subtotal_cents: d.subtotal_cents || 0
+          }))
+        };
+      }
+    }
+
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('invoices')
       .update({
         invoice_number: invoiceNumber,
         is_locked: true,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        ...depositRefsUpdate
       })
       .eq('id', invoiceId)
       .eq('is_locked', false) // guard against double-finalize

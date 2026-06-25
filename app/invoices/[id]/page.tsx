@@ -545,41 +545,7 @@ export default function InvoiceView() {
             ? inv.additional_charges
             : estimateRes.data?.additional_charges || [];
 
-        if (inv.invoice_type === 'installment') {
-          // Installment invoices render as a single line item.
-          // unit_price = full estimate subtotal, quantity = installment fraction
-          // so users adjust via quantity (e.g. 0.25 × $4,000 = $1,000).
-          const taxRate =
-            inv.tax_rate_snapshot ?? profileData?.default_tax_rate ?? 0;
-          const installmentSubtotalCents = Math.round(
-            inv.total_amount_cents / (1 + taxRate / 100)
-          );
-          const estimateSubtotalCents = estimateRes.data
-            ? Math.max(
-                0,
-                (estimateRes.data.total_amount_cents || 0) -
-                  (estimateRes.data.tax_amount_cents || 0)
-              )
-            : installmentSubtotalCents;
-          const quantity =
-            estimateSubtotalCents > 0
-              ? parseFloat(
-                  (installmentSubtotalCents / estimateSubtotalCents).toFixed(4)
-                )
-              : 1;
-          setLineItems([
-            {
-              description:
-                inv.invoice_description || pageLang.invoiceItemFallback,
-              quantity,
-              unit_price_cents: estimateSubtotalCents,
-              amount_cents: installmentSubtotalCents,
-              tax_rate: taxRate
-            }
-          ]);
-          setSections([]);
-          setAdditionalCharges([]);
-        } else if (sourceSections.length > 0) {
+        if (sourceSections.length > 0) {
           setSections(sourceSections);
           setAdditionalCharges(sourceAdditionalCharges);
           setLineItems([]);
@@ -1674,11 +1640,25 @@ export default function InvoiceView() {
             : undefined;
 
       // Balance invoice: pass deduction row data
+      const depositRefs =
+        invoice.deposit_invoice_refs && invoice.deposit_invoice_refs.length > 0
+          ? invoice.deposit_invoice_refs
+          : null;
+
       const fullProjectSubtotalForPDF =
-        invoice.invoice_type === 'balance' ? baseTotals.subtotalCents / 100 : 0;
+        invoice.invoice_type === 'balance'
+          ? depositRefs
+            ? (depositRefs.reduce(
+                (sum: number, d: any) => sum + (d.subtotal_cents || 0),
+                0
+              ) +
+                billedTotals.subtotalCents) /
+              100
+            : baseTotals.subtotalCents / 100
+          : 0;
 
       const depositSubtotalForPDF =
-        invoice.invoice_type === 'balance'
+        invoice.invoice_type === 'balance' && !depositRefs
           ? Math.max(0, baseTotals.subtotalCents - billedTotals.subtotalCents) /
             100
           : 0;
@@ -1699,15 +1679,16 @@ export default function InvoiceView() {
           isDraft={!invoice.is_locked}
           fullProjectSubtotal={fullProjectSubtotalForPDF}
           depositSubtotal={depositSubtotalForPDF}
-          depositRef={depositInvoice?.invoice_number}
+          depositRef={!depositRefs ? depositInvoice?.invoice_number : undefined}
           depositDate={
-            depositInvoice?.invoice_date
+            !depositRefs && depositInvoice?.invoice_date
               ? new Date(depositInvoice.invoice_date).toLocaleDateString(
                   profile?.country === 'FR' ? 'fr-FR' : 'en-US',
                   { year: 'numeric', month: 'short', day: 'numeric' }
                 )
               : undefined
           }
+          depositInvoiceRefs={depositRefs ?? undefined}
         />
       ).toBlob();
 
@@ -2263,13 +2244,17 @@ export default function InvoiceView() {
                             ? lang.invoiceSent
                             : lang.invoiceUnpaid}
                   </span>
-                  {invoice.invoice_type === 'installment' &&
-                    invoice.installment_number &&
-                    invoice.installment_total && (
+                  {invoice.installment_number &&
+                    invoice.installment_total &&
+                    invoice.invoice_type !== 'balance' && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 ml-2">
-                        {profile.country === 'FR'
-                          ? `Versement ${invoice.installment_number} sur ${invoice.installment_total}`
-                          : `Installment ${invoice.installment_number} of ${invoice.installment_total}`}
+                        {invoice.invoice_type === 'deposit'
+                          ? profile.country === 'FR'
+                            ? `Acompte ${invoice.installment_number}/${invoice.installment_total - 1}`
+                            : `Deposit ${invoice.installment_number} of ${invoice.installment_total - 1}`
+                          : profile.country === 'FR'
+                            ? `Versement ${invoice.installment_number} sur ${invoice.installment_total}`
+                            : `Installment ${invoice.installment_number} of ${invoice.installment_total}`}
                       </span>
                     )}
                 </>
@@ -2751,6 +2736,46 @@ export default function InvoiceView() {
                                     )}
                                   </div>
                                 )}
+                                {sec.items &&
+                                  sec.items.length > 0 &&
+                                  !isStructurallyEditable &&
+                                  !isShowingDetails && (
+                                    <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1.5">
+                                      {sec.items.map(
+                                        (item: any, itemIdx: number) => {
+                                          const m = materialsById.get(
+                                            item.materialId
+                                          );
+                                          const name =
+                                            item.name ||
+                                            m?.name ||
+                                            lang.itemLabel;
+                                          const rawUnit =
+                                            item.unit || m?.unit || '';
+                                          const displayUnit =
+                                            lang?.units?.[rawUnit] || rawUnit;
+                                          return (
+                                            <span
+                                              key={itemIdx}
+                                              className="inline-flex items-center gap-1 bg-gray-100 rounded-full px-2.5 py-0.5 text-xs font-medium text-gray-600"
+                                            >
+                                              {name}
+                                              {(item.qty > 0 ||
+                                                displayUnit) && (
+                                                <span className="text-gray-400">
+                                                  {' '}
+                                                  · {item.qty}
+                                                  {displayUnit
+                                                    ? ` ${displayUnit}`
+                                                    : ''}
+                                                </span>
+                                              )}
+                                            </span>
+                                          );
+                                        }
+                                      )}
+                                    </div>
+                                  )}
                                 {sec.items && sec.items.length > 0 && (
                                   <div className="space-y-3">
                                     {sec.items.map(
@@ -2979,7 +3004,8 @@ export default function InvoiceView() {
                                           );
                                         }
 
-                                        // Read-only path (deposit/balance drafts + locked)
+                                        // Read-only: detail list only when showing details; pills handled separately above
+                                        if (!isShowingDetails) return null;
                                         return (
                                           <div
                                             key={itemIdx}
@@ -3235,61 +3261,123 @@ export default function InvoiceView() {
                   {isBalanceInvoice && (
                     <>
                       {/* Full project subtotal */}
-                      <div className="flex justify-between items-baseline text-sm">
-                        <span className="text-gray-500">
-                          {lang.approvedProjectSubtotal}
-                        </span>
-                        <span className="font-mono text-gray-700 tabular-nums">
-                          {fmt(baseTotals.subtotalCents)}
-                        </span>
-                      </div>
-
-                      {/* Deposit deduction */}
                       {(() => {
-                        const depositSubtotalCents = Math.max(
-                          0,
-                          baseTotals.subtotalCents - billedTotals.subtotalCents
-                        );
-                        const depRef = depositInvoice?.invoice_number
-                          ? `${depositInvoice.invoice_number}${
-                              depositInvoice.invoice_date
-                                ? ` · ${new Date(
-                                    depositInvoice.invoice_date
-                                  ).toLocaleDateString(
-                                    profile?.country === 'FR'
-                                      ? 'fr-FR'
-                                      : 'en-US',
-                                    {
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric'
-                                    }
-                                  )}`
-                                : ''
-                            }`
-                          : null;
-
+                        const multiDepositRefs =
+                          invoice.deposit_invoice_refs?.length > 0
+                            ? invoice.deposit_invoice_refs
+                            : null;
+                        const fullSubtotalCents = multiDepositRefs
+                          ? multiDepositRefs.reduce(
+                              (sum: number, d: any) =>
+                                sum + (d.subtotal_cents || 0),
+                              0
+                            ) + billedTotals.subtotalCents
+                          : baseTotals.subtotalCents;
                         return (
-                          <div className="flex justify-between items-start text-sm pb-3 border-b border-dashed border-gray-200">
-                            <div>
-                              <span className="text-gray-500">
-                                {lang.lessDepositPaid ||
-                                  (profile?.country === 'FR'
-                                    ? 'Moins : acompte versé'
-                                    : 'Less: deposit paid')}
-                              </span>
-                              {depRef && (
-                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                  {depRef}
-                                </p>
-                              )}
-                            </div>
-                            <span className="font-mono text-gray-700 tabular-nums whitespace-nowrap">
-                              -{fmt(depositSubtotalCents)}
+                          <div className="flex justify-between items-baseline text-sm">
+                            <span className="text-gray-500">
+                              {lang.approvedProjectSubtotal}
+                            </span>
+                            <span className="font-mono text-gray-700 tabular-nums">
+                              {fmt(fullSubtotalCents)}
                             </span>
                           </div>
                         );
                       })()}
+
+                      {/* Deposit deduction(s) */}
+                      {invoice.deposit_invoice_refs?.length > 0
+                        ? invoice.deposit_invoice_refs.map(
+                            (dep: any, idx: number) => (
+                              <div
+                                key={dep.invoice_number || idx}
+                                className={`flex justify-between items-start text-sm ${
+                                  idx ===
+                                  invoice.deposit_invoice_refs.length - 1
+                                    ? 'pb-3 border-b border-dashed border-gray-200'
+                                    : 'pb-1'
+                                }`}
+                              >
+                                <div>
+                                  <span className="text-gray-500">
+                                    {lang.lessDepositPaid ||
+                                      (profile?.country === 'FR'
+                                        ? 'Moins : acompte versé'
+                                        : 'Less: deposit paid')}
+                                  </span>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {[
+                                      dep.invoice_number,
+                                      dep.invoice_date
+                                        ? new Date(
+                                            dep.invoice_date
+                                          ).toLocaleDateString(
+                                            profile?.country === 'FR'
+                                              ? 'fr-FR'
+                                              : 'en-US',
+                                            {
+                                              year: 'numeric',
+                                              month: 'short',
+                                              day: 'numeric'
+                                            }
+                                          )
+                                        : null
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' · ')}
+                                  </p>
+                                </div>
+                                <span className="font-mono text-gray-700 tabular-nums whitespace-nowrap">
+                                  -{fmt(dep.subtotal_cents)}
+                                </span>
+                              </div>
+                            )
+                          )
+                        : (() => {
+                            const depositSubtotalCents = Math.max(
+                              0,
+                              baseTotals.subtotalCents -
+                                billedTotals.subtotalCents
+                            );
+                            const depRef = depositInvoice?.invoice_number
+                              ? `${depositInvoice.invoice_number}${
+                                  depositInvoice.invoice_date
+                                    ? ` · ${new Date(
+                                        depositInvoice.invoice_date
+                                      ).toLocaleDateString(
+                                        profile?.country === 'FR'
+                                          ? 'fr-FR'
+                                          : 'en-US',
+                                        {
+                                          year: 'numeric',
+                                          month: 'short',
+                                          day: 'numeric'
+                                        }
+                                      )}`
+                                    : ''
+                                }`
+                              : null;
+                            return (
+                              <div className="flex justify-between items-start text-sm pb-3 border-b border-dashed border-gray-200">
+                                <div>
+                                  <span className="text-gray-500">
+                                    {lang.lessDepositPaid ||
+                                      (profile?.country === 'FR'
+                                        ? 'Moins : acompte versé'
+                                        : 'Less: deposit paid')}
+                                  </span>
+                                  {depRef && (
+                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                      {depRef}
+                                    </p>
+                                  )}
+                                </div>
+                                <span className="font-mono text-gray-700 tabular-nums whitespace-nowrap">
+                                  -{fmt(depositSubtotalCents)}
+                                </span>
+                              </div>
+                            );
+                          })()}
 
                       {/* Balance subtotal */}
                       <div className="flex justify-between items-baseline text-sm">
@@ -3448,7 +3536,7 @@ export default function InvoiceView() {
                       {lang.complianceLegal}
                     </p>
                     <p className="text-[10px] text-gray-400 leading-relaxed italic">
-                      {lang.complianceText}
+                      {lang.invoiceComplianceText}
                     </p>
                   </div>
                   <div className="sm:text-right">

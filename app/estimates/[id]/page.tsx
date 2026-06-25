@@ -3125,13 +3125,17 @@ export default function EstimateView() {
                                   </p>
                                 )}
                                 {isInv &&
-                                  doc.invoice_type === 'installment' &&
                                   doc.installment_number &&
-                                  doc.installment_total && (
+                                  doc.installment_total &&
+                                  doc.invoice_type !== 'balance' && (
                                     <p className="text-[10px] text-indigo-600 font-bold mt-0.5 uppercase tracking-wider">
-                                      {profile.country === 'FR'
-                                        ? `Versement ${doc.installment_number} sur ${doc.installment_total}`
-                                        : `Installment ${doc.installment_number} of ${doc.installment_total}`}
+                                      {doc.invoice_type === 'deposit'
+                                        ? profile.country === 'FR'
+                                          ? `Acompte ${doc.installment_number}/${doc.installment_total - 1}`
+                                          : `Deposit ${doc.installment_number} of ${doc.installment_total - 1}`
+                                        : profile.country === 'FR'
+                                          ? `Versement ${doc.installment_number} sur ${doc.installment_total}`
+                                          : `Installment ${doc.installment_number} of ${doc.installment_total}`}
                                     </p>
                                   )}
                               </div>

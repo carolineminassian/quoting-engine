@@ -218,7 +218,6 @@ export async function POST(request: Request) {
       is_locked: false,
       is_cancelled: false,
       payment_status: 'unpaid',
-      invoice_type: 'installment',
       installment_total: totalCount,
       deposit_enabled: false,
       deposit_percentage: 0
@@ -235,15 +234,35 @@ export async function POST(request: Request) {
       const invoiceDate = new Date(dueDate);
       invoiceDate.setDate(invoiceDate.getDate() - paymentDays);
 
-      const description = isFr
-        ? `Versement ${i + 1} sur ${totalCount} — Devis #${estimateRef}`
-        : `Installment ${i + 1} of ${totalCount} — Estimate #${estimateRef}`;
+      const isLast = i === installments.length - 1;
+      const invoiceType = estimate.deposit_enabled
+        ? isLast
+          ? 'balance'
+          : 'deposit'
+        : 'full';
+
+      let description: string;
+      if (estimate.deposit_enabled) {
+        const depositCount = totalCount - 1;
+        description = isLast
+          ? isFr
+            ? `Solde final — Devis #${estimateRef}`
+            : `Final Balance — Estimate #${estimateRef}`
+          : isFr
+            ? `Acompte ${i + 1}/${depositCount} — Devis #${estimateRef}`
+            : `Deposit ${i + 1} of ${depositCount} — Estimate #${estimateRef}`;
+      } else {
+        description = isFr
+          ? `Versement ${i + 1} sur ${totalCount} — Devis #${estimateRef}`
+          : `Installment ${i + 1} of ${totalCount} — Estimate #${estimateRef}`;
+      }
 
       const { data: invoice, error } = await supabaseAdmin
         .from('invoices')
         .insert([
           {
             ...baseFields,
+            invoice_type: invoiceType,
             invoice_number: `DRAFT-${crypto.randomUUID().slice(0, 8)}`,
             invoice_description: description,
             installment_number: i + 1,

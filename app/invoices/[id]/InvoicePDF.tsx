@@ -69,6 +69,12 @@ interface InvoicePDFProps {
   depositSubtotal?: number;
   depositRef?: string;
   depositDate?: string;
+  // Multi-deposit deduction rows (installment plan with deposit)
+  depositInvoiceRefs?: {
+    invoice_number: string;
+    invoice_date: string;
+    subtotal_cents: number;
+  }[];
 }
 
 // ============================================================
@@ -574,7 +580,12 @@ export default function InvoicePDF({
   fullProjectSubtotal = 0,
   depositSubtotal = 0,
   depositRef,
-  depositDate
+  depositDate,
+  depositInvoiceRefs = [] as {
+    invoice_number: string;
+    invoice_date: string;
+    subtotal_cents: number;
+  }[]
 }: InvoicePDFProps) {
   const isFr = profile.country === 'FR';
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
@@ -1147,39 +1158,94 @@ export default function InvoicePDF({
                     </Text>
                   </View>
 
-                  <View
-                    style={[
-                      styles.totalRow,
-                      {
-                        paddingBottom: 6,
-                        marginBottom: 4,
-                        borderBottomWidth: 0.5,
-                        borderBottomColor: '#e5e7eb',
-                        borderBottomStyle: 'dashed'
-                      }
-                    ]}
-                  >
-                    <View>
-                      <Text style={styles.totalLabel}>
-                        {isFr ? 'Moins : acompte versé' : 'Less: deposit paid'}
-                      </Text>
-                      {(depositRef || depositDate) && (
-                        <Text
-                          style={[
-                            styles.totalLabel,
-                            { fontSize: 7.5, marginTop: 1 }
-                          ]}
-                        >
-                          {[depositRef, depositDate]
-                            .filter(Boolean)
-                            .join(' · ')}
+                  {depositInvoiceRefs && depositInvoiceRefs.length > 0 ? (
+                    depositInvoiceRefs.map((dep, idx) => (
+                      <View
+                        key={dep.invoice_number || idx}
+                        style={[
+                          styles.totalRow,
+                          idx === depositInvoiceRefs.length - 1
+                            ? {
+                                paddingBottom: 6,
+                                marginBottom: 4,
+                                borderBottomWidth: 0.5,
+                                borderBottomColor: '#e5e7eb',
+                                borderBottomStyle: 'dashed'
+                              }
+                            : {}
+                        ]}
+                      >
+                        <View>
+                          <Text style={styles.totalLabel}>
+                            {isFr
+                              ? 'Moins : acompte versé'
+                              : 'Less: deposit paid'}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.totalLabel,
+                              { fontSize: 7.5, marginTop: 1 }
+                            ]}
+                          >
+                            {[
+                              dep.invoice_number,
+                              dep.invoice_date
+                                ? new Date(dep.invoice_date).toLocaleDateString(
+                                    locale,
+                                    {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    }
+                                  )
+                                : null
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Text>
+                        </View>
+                        <Text style={styles.totalValue}>
+                          -{formatCents(dep.subtotal_cents)}
                         </Text>
-                      )}
+                      </View>
+                    ))
+                  ) : (
+                    <View
+                      style={[
+                        styles.totalRow,
+                        {
+                          paddingBottom: 6,
+                          marginBottom: 4,
+                          borderBottomWidth: 0.5,
+                          borderBottomColor: '#e5e7eb',
+                          borderBottomStyle: 'dashed'
+                        }
+                      ]}
+                    >
+                      <View>
+                        <Text style={styles.totalLabel}>
+                          {isFr
+                            ? 'Moins : acompte versé'
+                            : 'Less: deposit paid'}
+                        </Text>
+                        {(depositRef || depositDate) && (
+                          <Text
+                            style={[
+                              styles.totalLabel,
+                              { fontSize: 7.5, marginTop: 1 }
+                            ]}
+                          >
+                            {[depositRef, depositDate]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={styles.totalValue}>
+                        -{formatPrice(depositSubtotal)}
+                      </Text>
                     </View>
-                    <Text style={styles.totalValue}>
-                      -{formatPrice(depositSubtotal)}
-                    </Text>
-                  </View>
+                  )}
                 </>
               )}
 
