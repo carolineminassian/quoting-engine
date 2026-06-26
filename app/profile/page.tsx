@@ -90,7 +90,15 @@ export default function ProfilePage() {
       if (prof) {
         setProfile(prof);
         setLang(prof.country === 'FR' ? translations.FR : translations.US);
-        setBusinessName(prof.business_name || '');
+        const _pending = (() => {
+          try {
+            const r = localStorage.getItem('pactestim_pending_estimate');
+            return r ? JSON.parse(r) : null;
+          } catch {
+            return null;
+          }
+        })();
+        setBusinessName(prof.business_name || _pending?.businessName || '');
         setTaxRate(prof.default_tax_rate || 0);
         setHourlyRate(prof.default_hourly_rate || 0);
         setDailyRate(prof.default_daily_rate || 0);
@@ -254,6 +262,20 @@ export default function ProfilePage() {
 
     // Notify navbar (and any other listening component) that the profile changed
     window.dispatchEvent(new CustomEvent('profileUpdated'));
+
+    // If the user came from a pending estimate (pre-auth flow), send them back
+    const _hasPending = (() => {
+      try {
+        return !!localStorage.getItem('pactestim_pending_estimate');
+      } catch {
+        return false;
+      }
+    })();
+
+    if (_hasPending) {
+      router.push('/new-estimate');
+      return;
+    }
 
     setDialog({
       type: 'alert',
