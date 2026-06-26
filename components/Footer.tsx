@@ -59,6 +59,8 @@ export default function Footer() {
 
   // Hide footer on the estimate view so it doesn't print on client PDFs
   if (pathname?.startsWith('/estimates/')) return null;
+  // Landing page has its own footer
+  if (pathname === '/') return null;
 
   // Don't render until language is loaded (prevents English flash for FR users)
   if (!lang) return null;

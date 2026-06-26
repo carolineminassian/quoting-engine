@@ -234,7 +234,7 @@ export default function LandingPage() {
               href="/new-estimate"
               className="w-full sm:w-auto bg-blue-600 text-white px-10 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-blue-700 transition-transform hover:scale-105 active:scale-95"
             >
-              {t.btnStart}
+              {t.btnStartHero}
             </Link>
             <Link
               href="/login"
@@ -353,13 +353,64 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── TESTIMONIALS ── */}
+      <section className="py-20 px-6 bg-white border-b border-gray-100">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-14">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-3">
+              {t.testimonialTitle}
+            </p>
+            <p className="text-gray-500 font-medium max-w-xl mx-auto leading-relaxed">
+              {t.testimonialSubtitle}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {t.testimonials.map((testimonial, i) => (
+              <div
+                key={i}
+                className="bg-gray-50 rounded-2xl p-7 border border-gray-100 flex flex-col"
+              >
+                <div className="flex gap-0.5 mb-4">
+                  {[...Array(5)].map((_, s) => (
+                    <svg
+                      key={s}
+                      className="w-4 h-4 text-amber-400"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed italic flex-1 mb-6">
+                  &ldquo;{testimonial.quote}&rdquo;
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-sm shrink-0">
+                    {testimonial.initial}
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-gray-900">
+                      {testimonial.name}
+                    </p>
+                    <p className="text-[10px] text-gray-400 font-bold">
+                      {testimonial.role} · {testimonial.location}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── WHO IT'S FOR ── */}
       <section className="py-16 px-6 bg-gray-900">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-8">
             {t.forTitle}
           </p>
-          <div className="flex flex-wrap justify-center gap-3">
+          <div className="flex flex-wrap justify-center gap-3 mb-8">
             {t.trades.map((trade, i) => (
               <span
                 key={i}
@@ -369,6 +420,9 @@ export default function LandingPage() {
               </span>
             ))}
           </div>
+          <p className="text-sm text-gray-500 italic font-medium">
+            {t.tradeQuote}
+          </p>
         </div>
       </section>
 
@@ -405,6 +459,12 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
+              <Link
+                href="/new-estimate"
+                className="block w-full text-center bg-gray-900 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-700 transition-colors"
+              >
+                {t.planFreeCta}
+              </Link>
             </div>
             {/* Pro */}
             <div className="bg-white rounded-2xl p-8 border-2 border-blue-600 relative shadow-xl">
@@ -433,6 +493,15 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
+              <Link
+                href="/upgrade"
+                className="block w-full text-center bg-blue-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/25"
+              >
+                {t.planProCta}
+              </Link>
+              <p className="text-center text-[9px] text-gray-400 font-bold mt-3">
+                {t.pricingSecure} · {t.pricingCancel}
+              </p>
             </div>
             {/* Lifetime — hidden when sold out */}
             {lifetimeSpotsUsed < MAX_LIFETIME_SPOTS && (
@@ -449,7 +518,7 @@ export default function LandingPage() {
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-6">
                   {t.planLifetimeAlt}
                 </p>
-                <ul className="space-y-2 mb-8">
+                <ul className="space-y-2 mb-6">
                   {t.planLifetimeFeatures.map((f, i) => (
                     <li
                       key={i}
@@ -459,6 +528,33 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
+                <div className="mb-5">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[10px] text-amber-400 font-black">
+                      {(t.lifetimeSpotsLeft as string).replace(
+                        '{n}',
+                        String(MAX_LIFETIME_SPOTS - lifetimeSpotsUsed)
+                      )}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-amber-400 h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${Math.min(100, (lifetimeSpotsUsed / MAX_LIFETIME_SPOTS) * 100)}%`
+                      }}
+                    />
+                  </div>
+                </div>
+                <Link
+                  href="/upgrade"
+                  className="block w-full text-center bg-amber-400 text-gray-900 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-amber-300 transition-colors"
+                >
+                  {t.planLifetimeCta}
+                </Link>
+                <p className="text-center text-[9px] text-gray-500 font-bold mt-3">
+                  {t.pricingOneTime}
+                </p>
               </div>
             )}
           </div>
@@ -511,6 +607,69 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="py-12 px-6 bg-gray-900">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-8 mb-8 pb-8 border-b border-gray-800">
+            <div className="text-center sm:text-left">
+              <div className="flex items-center gap-2.5 justify-center sm:justify-start mb-2">
+                <svg
+                  className="w-6 h-6 text-white"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M16 2L28 9V23L16 30L4 23V9L16 2Z"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9 20L14 14L19 18L25 10M25 10H20M25 10V15"
+                    stroke="#2563eb"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-lg tracking-tighter font-sans">
+                  <span className="font-black text-white">Pact</span>
+                  <span className="font-light text-blue-400">Estim</span>
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 font-medium max-w-xs">
+                {t.footerTagline}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              <Link
+                href="/privacy"
+                className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+              >
+                {t.privacy}
+              </Link>
+              <Link
+                href="/terms"
+                className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+              >
+                {t.terms}
+              </Link>
+              <a
+                href="mailto:support@pactestim.com"
+                className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+              >
+                {t.footerContact}
+              </a>
+            </div>
+          </div>
+          <p className="text-center text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+            {t.allRights}
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

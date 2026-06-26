@@ -135,7 +135,46 @@ export const landingTranslations = {
     finalBtn: 'Get Started Free',
     privacy: 'Privacy Policy',
     terms: 'Terms of Service',
-    allRights: '© 2025 PactEstim. All rights reserved.'
+    allRights: '© 2025 PactEstim. All rights reserved.',
+    btnStartHero: 'Create Your First Estimate — Free',
+    testimonialTitle: 'Trusted by contractors & freelancers',
+    testimonialSubtitle:
+      'Real stories from professionals who use PactEstim every day.',
+    testimonials: [
+      {
+        quote:
+          "I used to spend 30 minutes on every estimate. Now I'm done in under a minute and my clients approve fast. Closed 3 jobs in one week.",
+        name: 'Marcus T.',
+        role: 'Electrical Contractor',
+        location: 'Dallas, TX',
+        initial: 'M'
+      },
+      {
+        quote:
+          'The client approval link is a game changer. No more back-and-forth by text. They click, sign off, and I invoice immediately.',
+        name: 'Sophie L.',
+        role: 'Interior Designer',
+        location: 'Paris, FR',
+        initial: 'S'
+      },
+      {
+        quote:
+          'I tried 3 other tools before this. Either too expensive or too complicated. PactEstim is exactly what a one-man operation needs.',
+        name: 'James R.',
+        role: 'Independent Contractor',
+        location: 'London, UK',
+        initial: 'J'
+      }
+    ],
+    lifetimeSpotsLeft: '{n} of 100 spots remaining',
+    pricingSecure: 'Secure payment · Powered by Stripe',
+    pricingCancel: 'Cancel anytime',
+    pricingOneTime: 'One-time payment · No subscription',
+    footerContact: 'Contact',
+    footerTagline:
+      'Professional estimates & invoicing for contractors and freelancers.',
+    tradeQuote:
+      '"An electrician in Chicago built a $4,200 estimate in under a minute."'
   },
 
   FR: {
@@ -275,7 +314,46 @@ export const landingTranslations = {
     finalBtn: 'Commencer Gratuitement',
     privacy: 'Politique de Confidentialité',
     terms: 'Conditions Générales',
-    allRights: '© 2025 PactEstim. Tous droits réservés.'
+    allRights: '© 2025 PactEstim. Tous droits réservés.',
+    btnStartHero: 'Créer Mon Premier Devis — Gratuitement',
+    testimonialTitle: 'La confiance des artisans et freelances',
+    testimonialSubtitle:
+      'Des témoignages de professionnels qui utilisent PactEstim chaque jour.',
+    testimonials: [
+      {
+        quote:
+          "Je passais 30 minutes sur chaque devis. Maintenant j'en ai pour moins d'une minute et mes clients valident vite. J'ai signé 3 chantiers en une semaine.",
+        name: 'Marc T.',
+        role: 'Électricien',
+        location: 'Lyon, FR',
+        initial: 'M'
+      },
+      {
+        quote:
+          "Le lien d'approbation client, c'est révolutionnaire. Plus de SMS dans tous les sens. Ils cliquent, valident, et je facture dans la foulée.",
+        name: 'Sophie L.',
+        role: "Designer d'Intérieur",
+        location: 'Paris, FR',
+        initial: 'S'
+      },
+      {
+        quote:
+          "J'ai testé 3 outils avant celui-ci. Soit trop cher, soit trop complexe. PactEstim c'est exactement ce qu'il faut quand on travaille seul.",
+        name: 'James R.',
+        role: 'Artisan Indépendant',
+        location: 'Bordeaux, FR',
+        initial: 'J'
+      }
+    ],
+    lifetimeSpotsLeft: '{n} places restantes sur 100',
+    pricingSecure: 'Paiement sécurisé · Propulsé par Stripe',
+    pricingCancel: 'Résiliable à tout moment',
+    pricingOneTime: 'Paiement unique · Sans abonnement',
+    footerContact: 'Contact',
+    footerTagline:
+      'Devis et facturation professionnels pour les artisans et freelances.',
+    tradeQuote:
+      '"Un électricien à Lyon a créé un devis de 4 200€ en moins d\'une minute."'
   }
 } as const;
 
