@@ -135,7 +135,7 @@ export const landingTranslations = {
     finalBtn: 'Get Started Free',
     privacy: 'Privacy Policy',
     terms: 'Terms of Service',
-    allRights: '© 2025 PactEstim. All rights reserved.',
+    allRights: '© 2026 PactEstim. All rights reserved.',
     btnStartHero: 'Create Your First Estimate — Free',
     testimonialTitle: 'Trusted by contractors & freelancers',
     testimonialSubtitle:
@@ -314,7 +314,7 @@ export const landingTranslations = {
     finalBtn: 'Commencer Gratuitement',
     privacy: 'Politique de Confidentialité',
     terms: 'Conditions Générales',
-    allRights: '© 2025 PactEstim. Tous droits réservés.',
+    allRights: '© 2026 PactEstim. Tous droits réservés.',
     btnStartHero: 'Créer Mon Premier Devis — Gratuitement',
     testimonialTitle: 'La confiance des artisans et freelances',
     testimonialSubtitle:
