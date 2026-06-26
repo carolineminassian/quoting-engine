@@ -356,7 +356,7 @@ export const translations = {
     creating: 'Creating...',
 
     // ===== INVOICING =====
-    invoices: 'Billing',
+    invoices: 'Invoices',
     poNumber: 'PO Number',
     poPlaceholder: 'e.g. PO-12345',
     lessDepositPaid: 'Less: deposit paid',
@@ -1170,7 +1170,7 @@ export const translations = {
     creating: 'Création...',
 
     // ===== FACTURATION =====
-    invoices: 'Facturation',
+    invoices: 'Factures',
     poNumber: 'N° de commande (PO)',
     poPlaceholder: 'Ex: PO-12345',
     lessDepositPaid: 'Moins : acompte versé',
