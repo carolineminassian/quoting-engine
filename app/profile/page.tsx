@@ -79,6 +79,14 @@ export default function ProfilePage() {
       } = await supabase.auth.getUser();
       if (!user) return router.push('/');
 
+      // Check if user clicked a paid plan on the home page before signing up
+      const pendingPlan = localStorage.getItem('pactestim_pending_plan');
+      if (pendingPlan) {
+        // Leave the key in localStorage so the upgrade page knows which tier to highlight/trigger
+        router.push('/upgrade');
+        return;
+      }
+
       setAuthEmail(user.email || '');
 
       const { data: prof } = await supabase

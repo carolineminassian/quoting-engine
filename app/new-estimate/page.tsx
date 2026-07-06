@@ -400,6 +400,7 @@ function NewEstimateContent() {
             phone: foundClient.phone || '',
             address: foundClient.address || '',
             city: foundClient.city || '',
+            state: foundClient.state || '',
             zip: foundClient.zip || '',
             country: foundClient.country || ''
           });

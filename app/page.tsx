@@ -493,12 +493,15 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/upgrade"
-                className="block w-full text-center bg-blue-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/25"
+              <button
+                onClick={() => {
+                  localStorage.setItem('pactestim_pending_plan', 'pro');
+                  router.push('/login?view=signup');
+                }}
+                className="block w-full text-center bg-blue-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/25 cursor-pointer"
               >
                 {t.planProCta}
-              </Link>
+              </button>
               <p className="text-center text-[9px] text-gray-400 font-bold mt-3">
                 {t.pricingSecure} · {t.pricingCancel}
               </p>
@@ -546,12 +549,15 @@ export default function LandingPage() {
                     />
                   </div>
                 </div>
-                <Link
-                  href="/upgrade"
-                  className="block w-full text-center bg-amber-400 text-gray-900 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-amber-300 transition-colors"
+                <button
+                  onClick={() => {
+                    localStorage.setItem('pactestim_pending_plan', 'lifetime');
+                    router.push('/login?view=signup');
+                  }}
+                  className="block w-full text-center bg-amber-400 text-gray-900 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-amber-300 transition-colors cursor-pointer"
                 >
                   {t.planLifetimeCta}
-                </Link>
+                </button>
                 <p className="text-center text-[9px] text-gray-500 font-bold mt-3">
                   {t.pricingOneTime}
                 </p>
