@@ -176,6 +176,7 @@ export async function POST(request: Request) {
       client_phone: estimate.client_phone,
       client_address: estimate.client_address,
       client_city: estimate.client_city,
+      client_state: estimate.client_state || null,
       client_zip: estimate.client_zip,
       client_country: estimate.client_country,
 

@@ -93,6 +93,7 @@ function NewEstimateContent() {
     phone: '',
     address: '',
     city: '',
+    state: '',
     zip: '',
     country: ''
   });
@@ -417,6 +418,7 @@ function NewEstimateContent() {
             phone: est.client_phone || '',
             address: est.client_address || '',
             city: est.client_city || '',
+            state: est.client_state || '',
             zip: est.client_zip || '',
             country: est.client_country || ''
           });
@@ -1001,6 +1003,7 @@ function NewEstimateContent() {
       client_phone: client.phone,
       client_address: client.address,
       client_city: client.city,
+      client_state: client.state || null,
       client_zip: client.zip,
       client_country: client.country,
       custom_id: customRef.trim() || null,
@@ -1077,6 +1080,7 @@ function NewEstimateContent() {
                 phone: client.phone,
                 address: client.address,
                 city: client.city,
+                state: client.state || null,
                 zip: client.zip,
                 country: client.country
               }
@@ -1387,6 +1391,7 @@ function NewEstimateContent() {
                         phone: selected.phone || '',
                         address: selected.address || '',
                         city: selected.city || '',
+                        state: selected.state || '',
                         zip: selected.zip || '',
                         country: selected.country || ''
                       });
@@ -1494,6 +1499,7 @@ function NewEstimateContent() {
                         ...client,
                         address: components.address,
                         city: components.city,
+                        state: components.state || '',
                         zip: components.zip,
                         country: components.country
                       })
@@ -1535,6 +1541,28 @@ function NewEstimateContent() {
                   />
                 </div>
               </div>
+
+              {(profile?.country === 'US' || client.country === 'US') && (
+                <div className="group relative">
+                  <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
+                    <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-[10px] tracking-tighter">
+                      {lang.stateShort || 'ST'}
+                    </div>
+                    <input
+                      placeholder={lang.stateLabel || 'State'}
+                      maxLength={50}
+                      className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800 uppercase"
+                      value={client.state}
+                      onChange={(e) =>
+                        setClient({
+                          ...client,
+                          state: e.target.value.toUpperCase()
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="col-span-1 sm:col-span-2 group relative">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
