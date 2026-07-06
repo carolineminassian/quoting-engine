@@ -172,8 +172,53 @@ function UpgradeContent() {
     );
   }
 
+  const handleExitUpgrade = () => {
+    localStorage.removeItem('pactestim_pending_plan');
+    router.push('/dashboard');
+  };
+
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-black font-sans flex items-center justify-center">
+    <main className="min-h-screen bg-gray-50 p-6 sm:p-12 text-black font-sans flex flex-col items-center justify-start">
+      {/* Premium Slim Navigation Header */}
+      <div className="max-w-4xl w-full flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
+        <Link
+          href="/dashboard"
+          onClick={handleExitUpgrade}
+          className="flex items-center gap-2 select-none"
+        >
+          <svg
+            className="w-6 h-6 text-gray-900"
+            viewBox="0 0 32 32"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M16 2L28 9V23L16 30L4 23V9L16 2Z"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M9 20L14 14L19 18L25 10M25 10H20M25 10V15"
+              stroke="#2563eb"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="text-md font-sans font-bold text-gray-900">
+            PactEstim
+          </span>
+        </Link>
+        <button
+          onClick={handleExitUpgrade}
+          className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-900 border border-gray-200 hover:border-gray-300 bg-white px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+        >
+          {lang?.backToDashboard || '← Dashboard'}
+        </button>
+      </div>
+
       <div className="max-w-4xl w-full">
         {/* Feedback Banners */}
         {success && (
@@ -480,9 +525,9 @@ function UpgradeContent() {
           })()}
         </div>
         <div className="text-center mt-12">
-          <LinkButton href="/dashboard" variant="ghost" size="sm">
+          <Button onClick={handleExitUpgrade} variant="ghost" size="sm">
             ← {lang.cancel}
-          </LinkButton>
+          </Button>
         </div>
       </div>
 

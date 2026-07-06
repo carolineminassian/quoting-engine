@@ -204,6 +204,23 @@ function NewEstimateContent() {
         data: { user }
       } = await supabase.auth.getUser();
 
+      // Just-In-Time Guard: If the user signed up via Pro/Lifetime (Funnel A),
+      // we bypassed the business setup page. Now that they are about to create
+      // an estimate, we check if they have a business name. If not, redirect them to /profile.
+      const pendingPlanChoice = localStorage.getItem('pactestim_pending_plan');
+      if (user && pendingPlanChoice) {
+        const { data: checkProf } = await supabase
+          .from('profiles')
+          .select('business_name')
+          .eq('id', user.id)
+          .single();
+
+        if (!checkProf?.business_name) {
+          router.push('/profile');
+          return;
+        }
+      }
+
       const storedLang = localStorage.getItem('public_lang');
       const isFrChoice =
         storedLang === 'FR' ||
@@ -891,6 +908,27 @@ function NewEstimateContent() {
   const { subtotalCents, tax, totalCents } = calculateTotals;
 
   const handleSave = async () => {
+    const {
+      data: { user: currentUser }
+    } = await supabase.auth.getUser();
+
+    // Just-In-Time Guard: If the user signed up via Pro/Lifetime,
+    // they bypassed profile onboarding. Block estimate saving if business name is missing.
+    if (currentUser && !profile?.business_name) {
+      setDialog({
+        type: 'alert',
+        title: lang.profileSetupRequired || 'Profile Setup Required',
+        message:
+          lang.profileSetupRequiredDesc ||
+          'Please configure your business profile details before saving your first estimate.',
+        onConfirm: () => {
+          setDialog(null);
+          router.push('/profile');
+        }
+      });
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[\d\+\-\s\(\)]{7,20}$/;
 
