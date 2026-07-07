@@ -124,26 +124,27 @@ export default function Navbar() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const channel = supabase
-      .channel(`navbar-notifications-${session.user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'estimate_notifications',
-          filter: `user_id=eq.${session.user.id}`
-        },
-        async () => {
-          // Refetch the count whenever any notification row changes
-          const { count } = await supabase
-            .from('estimate_notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', session.user.id);
-          setNotificationCount(count || 0);
-        }
-      )
-      .subscribe();
+    // Use a unique channel instance key each time to prevent remount collision errors
+    const channelName = `navbar-notifications-${session.user.id}-${Math.random().toString(36).substr(2, 9)}`;
+    const channel = supabase.channel(channelName).on(
+      'postgres_changes',
+      {
+        event: '*', // INSERT, UPDATE, DELETE
+        schema: 'public',
+        table: 'estimate_notifications',
+        filter: `user_id=eq.${session.user.id}`
+      },
+      async () => {
+        // Refetch the count whenever any notification row changes
+        const { count } = await supabase
+          .from('estimate_notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', session.user.id);
+        setNotificationCount(count || 0);
+      }
+    );
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
