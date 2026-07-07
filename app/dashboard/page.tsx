@@ -102,7 +102,9 @@ export default function DashboardPage() {
           return;
         }
         setProfile(prof);
-        setLang(prof.country === 'FR' ? translations.FR : translations.US);
+        const resolvedLang =
+          prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
+        setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
       }
 
       const [estsRes, matsRes, billingsRes] = await Promise.all([

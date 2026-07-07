@@ -19,22 +19,23 @@ export default function Footer() {
       if (session) {
         const { data: prof } = await supabase
           .from('profiles')
-          .select('country')
+          .select('default_lang, country')
           .eq('id', session.user.id)
           .single();
 
-        if (prof?.country) {
-          const country = prof.country === 'FR' ? 'FR' : 'US';
-          setLang(country === 'FR' ? translations.FR : translations.US);
-          localStorage.setItem('public_lang', country);
+        if (prof) {
+          const resolvedLang =
+            prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
+          setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
+          localStorage.setItem('public_lang', resolvedLang);
           return;
         }
       }
 
       // Fallback for logged-out users — read stored language preference
       const storedLang = localStorage.getItem('public_lang');
-      const country = storedLang === 'FR' ? 'FR' : 'US';
-      setLang(country === 'FR' ? translations.FR : translations.US);
+      const resolvedLang = storedLang === 'FR' ? 'FR' : 'EN';
+      setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
     };
 
     syncLanguage();

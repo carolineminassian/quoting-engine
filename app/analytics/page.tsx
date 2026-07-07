@@ -77,14 +77,16 @@ export default function AnalyticsPage() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('country, subscription_tier, currency')
+        .select('country, default_lang, subscription_tier, currency')
         .eq('id', user.id)
         .single();
 
       if (prof) {
         const profCountry: 'US' | 'FR' = prof.country === 'FR' ? 'FR' : 'US';
         setCountry(profCountry);
-        setLang(profCountry === 'FR' ? translations.FR : translations.US);
+        const resolvedLang =
+          prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
+        setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
         setTargetCurrency(prof.currency === 'EUR' ? 'EUR' : 'USD');
         if (prof.subscription_tier !== 'pro') {
           setIsPro(false);

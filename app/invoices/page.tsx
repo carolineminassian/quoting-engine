@@ -84,7 +84,9 @@ export default function InvoicesPage() {
 
       if (prof) {
         setProfile(prof);
-        setLang(prof.country === 'FR' ? translations.FR : translations.US);
+        const resolvedLang =
+          prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
+        setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
       }
 
       const [invsRes, cnsRes, matsRes] = await Promise.all([

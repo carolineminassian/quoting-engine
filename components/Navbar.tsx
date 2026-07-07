@@ -81,14 +81,20 @@ export default function Navbar() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('country, business_name')
+        .select('country, default_lang, business_name')
         .eq('id', currentSession.user.id)
         .single();
 
       if (prof) {
         const primaryCountry = prof.country === 'FR' ? 'FR' : 'US';
         setCountry(primaryCountry);
-        setLang(primaryCountry === 'FR' ? translations.FR : translations.US);
+
+        // Decoupled: set UI language strictly based on default_lang column
+        const resolvedLang =
+          prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
+        setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
+        localStorage.setItem('public_lang', resolvedLang);
+
         setHasBusinessProfile(!!prof.business_name);
       }
 

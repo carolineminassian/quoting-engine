@@ -64,6 +64,8 @@ function NewEstimateContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const targetClientId = searchParams.get('clientId');
+  const [estimateLang, setEstimateLang] = useState('EN');
+  const [estimateCurrency, setEstimateCurrency] = useState('USD');
 
   const [profile, setProfile] = useState<any>(null);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -234,6 +236,8 @@ function NewEstimateContent() {
           default_hourly_rate: 50,
           default_tax_rate: 0
         });
+        setEstimateLang(isFrChoice ? 'FR' : 'EN');
+        setEstimateCurrency(isFrChoice ? 'EUR' : 'USD');
         setLang(isFrChoice ? translations.FR : translations.US);
         setMaterials([]);
         setPastClients([]);
@@ -294,7 +298,13 @@ function NewEstimateContent() {
         }
 
         setProfile(prof.data);
-        setLang(resolvedCountry === 'FR' ? translations.FR : translations.US);
+
+        // Decoupled: load estimate language and currency defaults from profile
+        const resolvedLang =
+          prof.data.default_lang || (resolvedCountry === 'FR' ? 'FR' : 'EN');
+        setEstimateLang(resolvedLang);
+        setEstimateCurrency(prof.data.currency || 'USD');
+        setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
 
         if (cachedBusinessName) {
           setBusinessName(cachedBusinessName);
@@ -441,6 +451,8 @@ function NewEstimateContent() {
             country: est.client_country || ''
           });
           setCustomRef(est.custom_id || '');
+          setEstimateLang(est.country_snapshot === 'FR' ? 'FR' : 'EN');
+          setEstimateCurrency(est.currency_snapshot || 'USD');
           setMarginMode(est.margin_mode_snapshot || 'none');
           setGlobalMargin(est.global_margin_snapshot || 0);
           setDepositEnabled(est.deposit_enabled ?? false);
@@ -1052,8 +1064,9 @@ function NewEstimateContent() {
       additional_charges: cleanedCharges,
       is_locked: false,
       business_name_snapshot: businessName || profile.business_name,
-      country_snapshot: profile.country,
-      currency_snapshot: profile.currency,
+      // Force direct reads from the overridden state variables on save
+      country_snapshot: estimateLang === 'FR' ? 'FR' : 'US',
+      currency_snapshot: estimateCurrency,
       margin_mode_snapshot: marginMode,
       global_margin_snapshot: globalMargin,
       deposit_enabled: depositEnabled,
@@ -1408,6 +1421,102 @@ function NewEstimateContent() {
               </div>
             </div>
           )}
+
+          {/* Document Language & Currency Options */}
+          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                {lang.defaultLanguage}
+              </label>
+              <Listbox
+                value={estimateLang}
+                onChange={(newLang) => {
+                  setEstimateLang(newLang);
+                  setLang(newLang === 'FR' ? translations.FR : translations.US);
+                }}
+              >
+                <div className="relative">
+                  <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {estimateLang === 'EN'
+                        ? lang.enLangLabel
+                        : lang.frLangLabel}
+                    </span>
+                    <span className="pointer-events-none text-gray-400">▼</span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                      <ListboxOption
+                        value="EN"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {lang.enLangLabel}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="FR"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {lang.frLangLabel}
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                {lang.defaultCurrency}
+              </label>
+              <Listbox value={estimateCurrency} onChange={setEstimateCurrency}>
+                <div className="relative">
+                  <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                    <span className="block truncate">
+                      {estimateCurrency === 'EUR'
+                        ? lang.eurCurrencyLabel
+                        : lang.usdCurrencyLabel}
+                    </span>
+                    <span className="pointer-events-none text-gray-400">▼</span>
+                  </ListboxButton>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                      <ListboxOption
+                        value="USD"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {lang.usdCurrencyLabel}
+                      </ListboxOption>
+                      <ListboxOption
+                        value="EUR"
+                        className={({ active }) =>
+                          `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                        }
+                      >
+                        {lang.eurCurrencyLabel}
+                      </ListboxOption>
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
+            </div>
+          </div>
+
           {/* Client Contact Section */}
           <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -2363,7 +2472,7 @@ function NewEstimateContent() {
                               createLabel={lang.create}
                               emptyStateLabel={lang.noMaterialsFound}
                               currencySymbol={
-                                profile?.currency === 'EUR' ? '€' : '$'
+                                estimateCurrency === 'EUR' ? '€' : '$'
                               }
                               unitLabels={lang?.units || {}}
                             />
@@ -3057,8 +3166,7 @@ function NewEstimateContent() {
                               <span className="text-xs font-mono font-bold text-blue-900 truncate">
                                 {formatMoney(
                                   getChargePreviewCents(charge),
-                                  profile?.currency,
-                                  profile?.country
+                                  estimateCurrency
                                 )}
                               </span>
                             </div>
@@ -3259,11 +3367,7 @@ function NewEstimateContent() {
                 {lang.subtotal || 'Subtotal'}
               </span>
               <span className="font-mono font-bold text-base text-gray-700">
-                {formatMoney(
-                  subtotalCents,
-                  profile?.currency,
-                  profile?.country
-                )}
+                {formatMoney(subtotalCents, estimateCurrency)}
               </span>
             </div>
 
@@ -3272,7 +3376,7 @@ function NewEstimateContent() {
                 {lang.tax || 'Tax'}
               </span>
               <span className="font-mono font-bold text-base text-gray-500">
-                {formatMoney(tax, profile?.currency, profile?.country)}
+                {formatMoney(tax, estimateCurrency)}
               </span>
             </div>
 
@@ -3281,7 +3385,7 @@ function NewEstimateContent() {
                 {lang.grandTotal || 'Grand Total'}
               </span>
               <span className="font-mono font-black text-xl sm:text-2xl text-gray-950 tracking-tight">
-                {formatMoney(totalCents, profile?.currency, profile?.country)}
+                {formatMoney(totalCents, estimateCurrency)}
               </span>
             </div>
           </div>

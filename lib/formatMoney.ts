@@ -14,7 +14,9 @@ export function formatMoney(
   country?: string | null
 ): string {
   const symbol = currency === 'EUR' ? '€' : '$';
-  const locale = country === 'FR' ? 'fr-FR' : 'en-US';
+  // Decoupled: formatting standard follows the currency, not the country.
+  // EUR always uses French spaces/commas; USD always uses US commas/decimals.
+  const locale = currency === 'EUR' ? 'fr-FR' : 'en-US';
   const formatted = (cents / 100).toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2

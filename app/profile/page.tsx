@@ -36,6 +36,7 @@ export default function ProfilePage() {
 
   // Business Profile State
   const [businessName, setBusinessName] = useState('');
+  const [defaultLang, setDefaultLang] = useState('EN');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [hourlyRate, setHourlyRate] = useState<number>(0);
   const [dailyRate, setDailyRate] = useState<number>(0);
@@ -97,7 +98,9 @@ export default function ProfilePage() {
 
       if (prof) {
         setProfile(prof);
-        setLang(prof.country === 'FR' ? translations.FR : translations.US);
+        // Decoupled: default UI language is strictly governed by default_lang column
+        const resolvedLang = prof.default_lang || 'EN';
+        setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
         const _pending = (() => {
           try {
             const r = localStorage.getItem('pactestim_pending_estimate');
@@ -111,6 +114,7 @@ export default function ProfilePage() {
         setHourlyRate(prof.default_hourly_rate || 0);
         setDailyRate(prof.default_daily_rate || 0);
         setCountry(prof.country || 'US');
+        setDefaultLang(resolvedLang);
         setDepositEnabled(prof.default_deposit_enabled ?? false);
         setDepositPercentage(prof.default_deposit_percentage ?? 20);
         // Notification preferences (default to true if column is null/missing)
@@ -217,9 +221,7 @@ export default function ProfilePage() {
       finalLogoUrl = publicUrlData.publicUrl;
     }
 
-    // Step 2: Update profile fields
-    const currency = country === 'FR' ? 'EUR' : 'USD';
-
+    // Step 2: Update profile fields — country, currency and language are now decoupled
     const { error: profileUpdateError } = await supabase
       .from('profiles')
       .update({
@@ -228,7 +230,8 @@ export default function ProfilePage() {
         default_hourly_rate: hourlyRate,
         default_daily_rate: dailyRate,
         country: country,
-        currency: currency,
+        currency: profile.currency, // dynamically updated via listbox state below
+        default_lang: defaultLang,
         logo_url: finalLogoUrl,
         default_deposit_enabled: depositEnabled,
         default_deposit_percentage: depositPercentage,
@@ -253,7 +256,7 @@ export default function ProfilePage() {
     setProfile((prev: any) => ({
       ...prev,
       country: country,
-      currency: currency,
+      default_lang: defaultLang,
       logo_url: finalLogoUrl,
       business_name: businessName,
       default_tax_rate: taxRate,
@@ -265,8 +268,13 @@ export default function ProfilePage() {
       business_city: businessCity.trim() || null,
       business_zip: businessZip.trim() || null
     }));
-    setLang(country === 'FR' ? translations.FR : translations.US);
-    localStorage.setItem('public_lang', country === 'FR' ? 'FR' : 'US');
+    // Decoupled: set UI language strictly based on defaultLang, independent of country
+    setLang(defaultLang === 'FR' ? translations.FR : translations.US);
+    localStorage.setItem('public_lang', defaultLang); // saves FR or EN
+
+    // Dispatch language change events so the Navbar and Footer refresh immediately
+    window.dispatchEvent(new CustomEvent('profileUpdated'));
+    window.dispatchEvent(new CustomEvent('langChange'));
 
     // Notify navbar (and any other listening component) that the profile changed
     window.dispatchEvent(new CustomEvent('profileUpdated'));
@@ -744,7 +752,7 @@ export default function ProfilePage() {
   if (!lang) return <LoadingDots />;
 
   const isFreePlan = profile.subscription_tier === 'free';
-  const currencySymbol = country === 'FR' ? '€' : '$';
+  const currencySymbol = profile?.currency === 'EUR' ? '€' : '$';
 
   return (
     <main className="min-h-screen bg-gray-50 p-6 sm:p-12 pb-40 text-black font-sans relative">
@@ -785,26 +793,22 @@ export default function ProfilePage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* Dropdown 1: Regional Formats (Controls legal compliance text and address fields) */}
               <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                  {lang.primaryMarket}
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 tracking-widest">
+                  {lang.regionalFormats}
                 </label>
                 <Listbox
                   value={country}
-                  onChange={(newCountry) => {
-                    setCountry(newCountry);
-                    setLang(
-                      newCountry === 'FR' ? translations.FR : translations.US
-                    );
-                  }}
+                  onChange={(newCountry) => setCountry(newCountry)}
                 >
                   <div className="relative">
                     <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
                       <span className="block truncate">
                         {country === 'US'
-                          ? 'United States (USD / English)'
-                          : 'France (EUR / Français)'}
+                          ? lang.usFormatsLabel
+                          : lang.frFormatsLabel}
                       </span>
                       <span className="pointer-events-none text-gray-400">
                         ▼
@@ -820,26 +824,18 @@ export default function ProfilePage() {
                         <ListboxOption
                           value="US"
                           className={({ active }) =>
-                            `cursor-pointer select-none relative p-3 ${
-                              active
-                                ? 'bg-blue-50 text-blue-900'
-                                : 'text-gray-900'
-                            }`
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                           }
                         >
-                          United States (USD / English)
+                          {lang.usFormatsLabel}
                         </ListboxOption>
                         <ListboxOption
                           value="FR"
                           className={({ active }) =>
-                            `cursor-pointer select-none relative p-3 ${
-                              active
-                                ? 'bg-blue-50 text-blue-900'
-                                : 'text-gray-900'
-                            }`
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
                           }
                         >
-                          France (EUR / Français)
+                          {lang.frFormatsLabel}
                         </ListboxOption>
                       </ListboxOptions>
                     </Transition>
@@ -847,6 +843,113 @@ export default function ProfilePage() {
                 </Listbox>
               </div>
 
+              {/* Dropdown 2: Default Language */}
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 tracking-widest">
+                  {lang.defaultLanguage}
+                </label>
+                <Listbox
+                  value={defaultLang}
+                  onChange={(newLang) => {
+                    setDefaultLang(newLang);
+                    setLang(
+                      newLang === 'FR' ? translations.FR : translations.US
+                    );
+                  }}
+                >
+                  <div className="relative">
+                    <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {defaultLang === 'EN'
+                          ? lang.enLangLabel
+                          : lang.frLangLabel}
+                      </span>
+                      <span className="pointer-events-none text-gray-400">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                        <ListboxOption
+                          value="EN"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.enLangLabel}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="FR"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.frLangLabel}
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              </div>
+
+              {/* Dropdown 3: Default Currency */}
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {lang.defaultCurrency}
+                </label>
+                <Listbox
+                  value={profile?.currency || 'USD'}
+                  onChange={(val) =>
+                    setProfile((prev: any) => ({ ...prev, currency: val }))
+                  }
+                >
+                  <div className="relative">
+                    <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {profile?.currency === 'EUR'
+                          ? lang.eurCurrencyLabel
+                          : lang.usdCurrencyLabel}
+                      </span>
+                      <span className="pointer-events-none text-gray-400">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                        <ListboxOption
+                          value="USD"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.usdCurrencyLabel}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="EUR"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.eurCurrencyLabel}
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
                   {lang.defaultTaxRate}
@@ -1029,9 +1132,9 @@ export default function ProfilePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="NY"
+                  placeholder={lang.stateLabel}
                   maxLength={50}
-                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold uppercase transition-colors bg-gray-50/40 shadow-inner"
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors bg-gray-50/40 shadow-inner"
                   value={businessState}
                   onChange={(e) =>
                     setBusinessState(e.target.value.toUpperCase())
