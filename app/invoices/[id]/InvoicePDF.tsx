@@ -789,6 +789,24 @@ export default function InvoicePDF({
           {docData.client_address && (
             <Text style={styles.clientLine}>{docData.client_address}</Text>
           )}
+          {(docData.client_city ||
+            docData.client_state ||
+            docData.client_zip ||
+            docData.client_country) && (
+            <Text style={styles.clientLine}>
+              {docData.client_country === 'FR'
+                ? `${[docData.client_zip, docData.client_city].filter(Boolean).join(' ')}, ${docData.client_country}`
+                : `${[
+                    docData.client_city,
+                    docData.client_country === 'US'
+                      ? docData.client_state
+                      : null,
+                    docData.client_zip
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}, ${docData.client_country}`}
+            </Text>
+          )}
           {docData.client_phone && (
             <Text style={styles.clientLine}>{docData.client_phone}</Text>
           )}

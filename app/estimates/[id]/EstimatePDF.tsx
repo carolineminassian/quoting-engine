@@ -522,6 +522,24 @@ export default function EstimatePDF({
           {estimate.client_address && (
             <Text style={styles.clientLine}>{estimate.client_address}</Text>
           )}
+          {(estimate.client_city ||
+            estimate.client_state ||
+            estimate.client_zip ||
+            estimate.client_country) && (
+            <Text style={styles.clientLine}>
+              {estimate.client_country === 'FR'
+                ? `${[estimate.client_zip, estimate.client_city].filter(Boolean).join(' ')}, ${estimate.client_country}`
+                : `${[
+                    estimate.client_city,
+                    estimate.client_country === 'US'
+                      ? estimate.client_state
+                      : null,
+                    estimate.client_zip
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}, ${estimate.client_country}`}
+            </Text>
+          )}
           {estimate.client_phone && (
             <Text style={styles.clientLine}>{estimate.client_phone}</Text>
           )}

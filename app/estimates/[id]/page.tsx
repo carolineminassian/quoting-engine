@@ -2529,6 +2529,26 @@ export default function EstimateView() {
                         {estimate.client_address}
                       </p>
                     )}
+                    {(estimate.client_city ||
+                      estimate.client_state ||
+                      estimate.client_zip ||
+                      estimate.client_country) && (
+                      <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                        {estimate.client_country === 'FR'
+                          ? // French format: ZIP City, France
+                            `${[estimate.client_zip, estimate.client_city].filter(Boolean).join(' ')}, ${estimate.client_country}`
+                          : // US/Default format: City, State ZIP, Country
+                            `${[
+                              estimate.client_city,
+                              estimate.client_country === 'US'
+                                ? estimate.client_state
+                                : null,
+                              estimate.client_zip
+                            ]
+                              .filter(Boolean)
+                              .join(', ')}, ${estimate.client_country}`}
+                      </p>
+                    )}
                     {(estimate.client_phone || estimate.client_email) && (
                       <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
                         {estimate.client_phone && (
