@@ -759,10 +759,7 @@ export const translations = {
     proLockZipMessage:
       'Bulk PDF downloads are available exclusively on the Pro plan. Upgrade to download all your estimates at once.',
     proLockUpgradeBtn: 'Upgrade to Pro',
-    backToDashboard: '← Dashboard',
-    profileSetupRequired: 'Profile Setup Required',
-    profileSetupRequiredDesc:
-      'Please configure your business profile details before saving your first estimate.',
+
     // Annual plan
     monthlyLabel: 'Monthly',
     annualLabel: 'Annual',
@@ -1465,10 +1462,6 @@ export const translations = {
     lightTheme: 'Clair',
     darkTheme: 'Sombre',
     systemTheme: 'Système',
-    backToDashboard: '← Tableau de bord',
-    profileSetupRequired: 'Configuration du profil requise',
-    profileSetupRequiredDesc:
-      "Veuillez configurer les détails de votre profil professionnel avant d'enregistrer votre premier devis.",
     enLangLabel: 'Anglais (EN)',
     frLangLabel: 'Français (FR)',
     usdCurrencyLabel: 'Dollar américain ($ - USD)',

@@ -2501,6 +2501,26 @@ export default function InvoiceView() {
                       {invoice.client_address}
                     </p>
                   )}
+                  {(invoice.client_city ||
+                    invoice.client_state ||
+                    invoice.client_zip ||
+                    invoice.client_country) && (
+                    <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                      {invoice.client_country === 'FR'
+                        ? // French format: ZIP City, France
+                          `${[invoice.client_zip, invoice.client_city].filter(Boolean).join(' ')}, ${invoice.client_country}`
+                        : // US/Default format: City, State ZIP, Country
+                          `${[
+                            invoice.client_city,
+                            invoice.client_country === 'US'
+                              ? invoice.client_state
+                              : null,
+                            invoice.client_zip
+                          ]
+                            .filter(Boolean)
+                            .join(', ')}, ${invoice.client_country}`}
+                    </p>
+                  )}
                   {(invoice.client_phone || invoice.client_email) && (
                     <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
                       {invoice.client_phone && (
