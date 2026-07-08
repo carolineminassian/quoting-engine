@@ -37,6 +37,9 @@ export default function ProfilePage() {
   // Business Profile State
   const [businessName, setBusinessName] = useState('');
   const [defaultLang, setDefaultLang] = useState('EN');
+  const [themePreference, setThemePreference] = useState<
+    'light' | 'dark' | 'system'
+  >('light');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [hourlyRate, setHourlyRate] = useState<number>(0);
   const [dailyRate, setDailyRate] = useState<number>(0);
@@ -115,6 +118,7 @@ export default function ProfilePage() {
         setDailyRate(prof.default_daily_rate || 0);
         setCountry(prof.country || 'US');
         setDefaultLang(resolvedLang);
+        setThemePreference(prof.theme_preference || 'light');
         setDepositEnabled(prof.default_deposit_enabled ?? false);
         setDepositPercentage(prof.default_deposit_percentage ?? 20);
         // Notification preferences (default to true if column is null/missing)
@@ -232,6 +236,7 @@ export default function ProfilePage() {
         country: country,
         currency: profile.currency, // dynamically updated via listbox state below
         default_lang: defaultLang,
+        theme_preference: themePreference,
         logo_url: finalLogoUrl,
         default_deposit_enabled: depositEnabled,
         default_deposit_percentage: depositPercentage,
@@ -253,10 +258,25 @@ export default function ProfilePage() {
     }
 
     // Step 3: Update local state on success
+    // Update local storage for immediate layout script access
+    localStorage.setItem('pactestim_theme', themePreference);
+    const systemDark = window.matchMedia(
+      '(prefers-color-scheme: dark)'
+    ).matches;
+    if (
+      themePreference === 'dark' ||
+      (themePreference === 'system' && systemDark)
+    ) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
     setProfile((prev: any) => ({
       ...prev,
       country: country,
       default_lang: defaultLang,
+      theme_preference: themePreference,
       logo_url: finalLogoUrl,
       business_name: businessName,
       default_tax_rate: taxRate,
@@ -793,8 +813,8 @@ export default function ProfilePage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {/* Dropdown 1: Regional Formats (Controls legal compliance text and address fields) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Dropdown 1: Regional Formats (Controls legal compliance text and address fields, Locks numeric formatting to US or FR standard) */}
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 tracking-widest">
                   {lang.regionalFormats}
@@ -899,7 +919,7 @@ export default function ProfilePage() {
 
               {/* Dropdown 3: Default Currency */}
               <div>
-                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 tracking-widest">
                   {lang.defaultCurrency}
                 </label>
                 <Listbox
@@ -941,6 +961,80 @@ export default function ProfilePage() {
                           }
                         >
                           {lang.eurCurrencyLabel}
+                        </ListboxOption>
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              </div>
+
+              {/* Dropdown 4: Theme Preference */}
+              <div>
+                <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                  {lang.themePreferenceLabel || 'Theme'}
+                </label>
+                <Listbox
+                  value={themePreference}
+                  onChange={(newTheme) => {
+                    setThemePreference(newTheme);
+
+                    // Instant Visual feedback on change
+                    const systemDark = window.matchMedia(
+                      '(prefers-color-scheme: dark)'
+                    ).matches;
+                    if (
+                      newTheme === 'dark' ||
+                      (newTheme === 'system' && systemDark)
+                    ) {
+                      document.documentElement.classList.add('dark');
+                    } else {
+                      document.documentElement.classList.remove('dark');
+                    }
+                  }}
+                >
+                  <div className="relative">
+                    <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">
+                      <span className="block truncate">
+                        {themePreference === 'light'
+                          ? lang.lightTheme || 'Light'
+                          : themePreference === 'dark'
+                            ? lang.darkTheme || 'Dark'
+                            : lang.systemTheme || 'System'}
+                      </span>
+                      <span className="pointer-events-none text-gray-400">
+                        ▼
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      as={Fragment}
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto focus:outline-none text-[10px] uppercase tracking-widest font-bold">
+                        <ListboxOption
+                          value="light"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.lightTheme || 'Light'}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="dark"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.darkTheme || 'Dark'}
+                        </ListboxOption>
+                        <ListboxOption
+                          value="system"
+                          className={({ active }) =>
+                            `cursor-pointer select-none relative p-3 ${active ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}`
+                          }
+                        >
+                          {lang.systemTheme || 'System'}
                         </ListboxOption>
                       </ListboxOptions>
                     </Transition>

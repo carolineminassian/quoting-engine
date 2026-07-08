@@ -1,8 +1,51 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827;
+}
+
+/* ─── Automated Dark Mode (The CSS Filter Magic) ─── */
+.dark {
+  filter: invert(1) hue-rotate(180deg);
+  background-color: #0b0f19; /* Deeper, richer slate black */
+}
+
+/* ─── Premium Aesthetic High-Contrast Overrides ─── */
+/* Forces all borders, inputs, and container backgrounds to have crisp dark-mode contrast */
+.dark .bg-white {
+  background-color: #f1f5f9; /* High-contrast card backgrounds */
+}
+
+.dark .bg-gray-50,
+.dark .bg-gray-50\/40,
+.dark .bg-gray-50\/50 {
+  background-color: #e2e8f0; /* Clear distinction for input boxes and secondary wells */
+}
+
+.dark .border,
+.dark .border-gray-100,
+.dark .border-gray-200 {
+  border-color: #cbd5e1; /* Sharp, visible subtle borders separating components */
+}
+
+/* Ensures high-contrast readability for labels and placeholders */
+.dark .text-gray-300,
+.dark .text-gray-400 {
+  color: #64748b; /* Lighter slate gray for high contrast */
+}
+
+.dark .text-gray-500 {
+  color: #475569;
+}
+
+/* ─── Smart Asset Protection ─── */
+/* Re-invert images, maps, logos, and avatars so they don't look like negatives! */
+.dark img,
+.dark svg:not(.text-blue-600):not(.text-purple-600),
+.dark iframe,
+.dark [style*='background-image'] {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 @theme inline {
@@ -12,15 +55,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition-property: filter, background-color;
+  transition-duration: 200ms;
 }

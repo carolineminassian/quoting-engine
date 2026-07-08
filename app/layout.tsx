@@ -104,7 +104,7 @@ export default async function RootLayout({
   const isFr = await detectFrench();
 
   return (
-    <html lang={isFr ? 'fr' : 'en'}>
+    <html lang={isFr ? 'fr' : 'en'} suppressHydrationWarning>
       <head>
         <link
           rel="icon"
@@ -124,10 +124,27 @@ export default async function RootLayout({
           hrefLang="x-default"
           href="https://pactestim.com"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+                (function() {
+                  try {
+                    const stored = localStorage.getItem('pactestim_theme');
+                    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    if (stored === 'dark' || (!stored && systemDark)) {
+                      document.documentElement.classList.add('dark');
+                    } else {
+                      document.documentElement.classList.remove('dark');
+                    }
+                  } catch (e) {}
+                })();
+              `
+          }}
+        />
       </head>
       <PHProvider>
         <body
-          className={`${roboto.className} font-sans flex flex-col min-h-screen`}
+          className={`${roboto.className} font-sans flex flex-col min-h-screen bg-white dark:bg-gray-950 text-black dark:text-gray-100 transition-colors duration-200`}
         >
           <ChunkErrorHandler />
           <Navbar />
