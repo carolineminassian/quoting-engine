@@ -2328,7 +2328,7 @@ function NewEstimateContent() {
                   <div className="col-span-1">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 truncate">
                       {sec.laborType === 'daily' ? lang.rateDay : lang.rateHour}{' '}
-                      ({profile?.currency === 'EUR' ? '€' : '$'})
+                      ({estimateCurrency === 'EUR' ? '€' : '$'})
                     </label>
 
                     <input
@@ -2813,7 +2813,7 @@ function NewEstimateContent() {
                                         <span className="text-[9px] font-bold text-gray-400 block truncate normal-case tracking-normal">
                                           {preset.isPercentage
                                             ? `${preset.percentageRate || 0}% · ${lang.basisProject}`
-                                            : `${profile?.currency === 'EUR' ? '€' : '$'}${(
+                                            : `${estimateCurrency === 'EUR' ? '€' : '$'}${(
                                                 (preset.costPerUnitCents || 0) /
                                                 100
                                               ).toFixed(
@@ -2865,7 +2865,7 @@ function NewEstimateContent() {
                             title={lang.chargeFlat}
                             aria-label={lang.chargeFlat}
                           >
-                            {profile?.currency === 'EUR' ? '€' : '$'}
+                            {estimateCurrency === 'EUR' ? '€' : '$'}
                           </button>
                           <button
                             type="button"
