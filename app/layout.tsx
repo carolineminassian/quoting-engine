@@ -127,18 +127,41 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-                (function() {
+              (function() {
+                try {
+                  // Detect active authenticated session markers
+                  let hasAuthSession = false;
                   try {
-                    const stored = localStorage.getItem('pactestim_theme');
-                    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    if (stored === 'dark' || (!stored && systemDark)) {
-                      document.documentElement.classList.add('dark');
-                    } else {
-                      document.documentElement.classList.remove('dark');
+                    // Check cookies (common for SSR/auth)
+                    if (document.cookie.includes('sb-') || document.cookie.includes('supabase-')) {
+                      hasAuthSession = true;
+                    }
+                    // Check localStorage keys (common for client-side supabase-js SDK)
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && (key.startsWith('sb-') || key.includes('supabase.auth.token'))) {
+                        hasAuthSession = true;
+                        break;
+                      }
                     }
                   } catch (e) {}
-                })();
-              `
+
+                  // If they are not logged in, they are a guest client — force Light Mode
+                  if (!hasAuthSession) {
+                    document.documentElement.classList.remove('dark');
+                    return;
+                  }
+
+                  const stored = localStorage.getItem('pactestim_theme');
+                  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  if (stored === 'dark' || (!stored && systemDark)) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `
           }}
         />
       </head>

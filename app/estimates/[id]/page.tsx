@@ -2065,12 +2065,12 @@ export default function EstimateView() {
                       />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
                     <LinkButton
                       href={`/new-estimate?edit=${id}`}
                       variant="soft-primary"
                       size="md"
-                      className="flex-1 sm:flex-none"
+                      className="flex-1 sm:flex-none justify-center"
                     >
                       {lang.edit}
                     </LinkButton>
@@ -2078,7 +2078,7 @@ export default function EstimateView() {
                       variant="soft-danger"
                       size="md"
                       onClick={handleCancelDraft}
-                      className="flex-1 sm:flex-none"
+                      className="flex-1 sm:flex-none justify-center"
                     >
                       {lang.cancel}
                     </Button>
@@ -2086,7 +2086,7 @@ export default function EstimateView() {
                       variant="success"
                       size="md"
                       onClick={handleFinalize}
-                      className="flex-1 sm:flex-none"
+                      className="flex-1 sm:flex-none justify-center min-w-[90px]"
                     >
                       {lang.finalize}
                     </Button>
@@ -2174,24 +2174,54 @@ export default function EstimateView() {
                                     <button
                                       onClick={() => {
                                         setInstallmentMode('equal');
-                                        setInstallmentCount(3);
+                                        setInstallmentCount(
+                                          estimate.deposit_enabled ? 3 : 3
+                                        ); // minimum 3 for deposit (1 deposit + 1 intermediate + 1 balance)
                                         setInstallmentFrequency('monthly');
                                         setInstallmentCustomDays(30);
                                         setInstallmentStartDate(
                                           new Date().toISOString().split('T')[0]
                                         );
-                                        setCustomInstallments([
-                                          {
-                                            amountCents: 0,
-                                            dueDate: '',
-                                            rawAmount: ''
-                                          },
-                                          {
-                                            amountCents: 0,
-                                            dueDate: '',
-                                            rawAmount: ''
-                                          }
-                                        ]);
+
+                                        // Pre-populate custom installments based on deposit rules
+                                        if (estimate.deposit_enabled) {
+                                          const depositAmt = Math.round(
+                                            (remainingForInstallments *
+                                              (estimate.deposit_percentage ||
+                                                20)) /
+                                              100
+                                          );
+                                          const rem =
+                                            remainingForInstallments -
+                                            depositAmt;
+                                          setCustomInstallments([
+                                            {
+                                              amountCents: depositAmt,
+                                              dueDate: '',
+                                              rawAmount: (
+                                                depositAmt / 100
+                                              ).toFixed(2)
+                                            },
+                                            {
+                                              amountCents: rem,
+                                              dueDate: '',
+                                              rawAmount: (rem / 100).toFixed(2)
+                                            }
+                                          ]);
+                                        } else {
+                                          setCustomInstallments([
+                                            {
+                                              amountCents: 0,
+                                              dueDate: '',
+                                              rawAmount: ''
+                                            },
+                                            {
+                                              amountCents: 0,
+                                              dueDate: '',
+                                              rawAmount: ''
+                                            }
+                                          ]);
+                                        }
                                         setShowInstallmentModal(true);
                                       }}
                                       className={`w-full text-left px-4 py-3 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-3 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
@@ -3592,23 +3622,54 @@ export default function EstimateView() {
                             dueDate.setDate(
                               dueDate.getDate() + i * intervalDays
                             );
-                            const base = Math.floor(
-                              remainingForInstallments / installmentCount
-                            );
-                            const amount =
-                              i === installmentCount - 1
-                                ? remainingForInstallments -
-                                  base * (installmentCount - 1)
-                                : base;
+
+                            let amount = 0;
+                            if (estimate.deposit_enabled) {
+                              const depositAmt = Math.round(
+                                (remainingForInstallments *
+                                  (estimate.deposit_percentage || 20)) /
+                                  100
+                              );
+                              if (i === 0) {
+                                amount = depositAmt;
+                              } else {
+                                const remainingAfterDeposit =
+                                  remainingForInstallments - depositAmt;
+                                const remInstallmentsCount =
+                                  installmentCount - 1;
+                                const base = Math.floor(
+                                  remainingAfterDeposit / remInstallmentsCount
+                                );
+                                amount =
+                                  i === installmentCount - 1
+                                    ? remainingAfterDeposit -
+                                      base * (remInstallmentsCount - 1)
+                                    : base;
+                              }
+                            } else {
+                              const base = Math.floor(
+                                remainingForInstallments / installmentCount
+                              );
+                              amount =
+                                i === installmentCount - 1
+                                  ? remainingForInstallments -
+                                    base * (installmentCount - 1)
+                                  : base;
+                            }
+
                             return (
                               <div
                                 key={i}
                                 className="flex justify-between items-center text-xs"
                               >
                                 <span className="text-gray-500">
-                                  {profile.country === 'FR'
-                                    ? `Versement ${i + 1}`
-                                    : `Installment ${i + 1}`}{' '}
+                                  {estimate.deposit_enabled && i === 0
+                                    ? profile.country === 'FR'
+                                      ? 'Acompte'
+                                      : 'Deposit'
+                                    : profile.country === 'FR'
+                                      ? `Versement ${i + 1}`
+                                      : `Installment ${i + 1}`}{' '}
                                   ·{' '}
                                   {dueDate.toLocaleDateString(
                                     profile.country === 'FR'
@@ -3633,63 +3694,71 @@ export default function EstimateView() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {customInstallments.map((inst, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-gray-400 w-6 shrink-0">
-                          {i + 1}
-                        </span>
-                        <div className="relative flex-1">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold pointer-events-none">
-                            {estimate?.currency_snapshot === 'EUR' ? '€' : '$'}
+                    {customInstallments.map((inst, i) => {
+                      const isLockedDepositInput =
+                        estimate.deposit_enabled && i === 0;
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-gray-400 w-6 shrink-0">
+                            {isLockedDepositInput ? 'DEP' : i + 1}
                           </span>
+                          <div className="relative flex-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold pointer-events-none">
+                              {estimate?.currency_snapshot === 'EUR'
+                                ? '€'
+                                : '$'}
+                            </span>
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              placeholder="0.00"
+                              disabled={isLockedDepositInput}
+                              value={inst.rawAmount}
+                              onChange={(e) => {
+                                const updated = [...customInstallments];
+                                updated[i] = {
+                                  ...updated[i],
+                                  rawAmount: e.target.value,
+                                  amountCents: Math.round(
+                                    (parseFloat(e.target.value) || 0) * 100
+                                  )
+                                };
+                                setCustomInstallments(updated);
+                              }}
+                              className="w-full pl-7 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:opacity-60"
+                            />
+                          </div>
                           <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={inst.rawAmount}
+                            type="date"
+                            value={inst.dueDate}
                             onChange={(e) => {
                               const updated = [...customInstallments];
                               updated[i] = {
                                 ...updated[i],
-                                rawAmount: e.target.value,
-                                amountCents: Math.round(
-                                  (parseFloat(e.target.value) || 0) * 100
-                                )
+                                dueDate: e.target.value
                               };
                               setCustomInstallments(updated);
                             }}
-                            className="w-full pl-7 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500"
+                            className="flex-1 p-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500"
                           />
+                          {customInstallments.length > 2 &&
+                            !isLockedDepositInput && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCustomInstallments((prev) =>
+                                    prev.filter((_, idx) => idx !== i)
+                                  )
+                                }
+                                className="text-red-400 hover:text-red-600 text-xl font-bold leading-none cursor-pointer shrink-0"
+                              >
+                                ×
+                              </button>
+                            )}
                         </div>
-                        <input
-                          type="date"
-                          value={inst.dueDate}
-                          onChange={(e) => {
-                            const updated = [...customInstallments];
-                            updated[i] = {
-                              ...updated[i],
-                              dueDate: e.target.value
-                            };
-                            setCustomInstallments(updated);
-                          }}
-                          className="flex-1 p-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-blue-500"
-                        />
-                        {customInstallments.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCustomInstallments((prev) =>
-                                prev.filter((_, idx) => idx !== i)
-                              )
-                            }
-                            className="text-red-400 hover:text-red-600 text-xl font-bold leading-none cursor-pointer shrink-0"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                     <button
                       type="button"
                       onClick={() =>
@@ -3761,20 +3830,48 @@ export default function EstimateView() {
                             : installmentFrequency === 'weekly'
                               ? 7
                               : installmentCustomDays;
-                      const base = Math.floor(
-                        remainingForInstallments / installmentCount
-                      );
+
                       const installments = Array.from(
                         { length: installmentCount },
                         (_, i) => {
                           const d = new Date(installmentStartDate);
                           d.setDate(d.getDate() + i * intervalDays);
-                          return {
-                            amountCents:
+
+                          let amount = 0;
+                          if (estimate.deposit_enabled) {
+                            const depositAmt = Math.round(
+                              (remainingForInstallments *
+                                (estimate.deposit_percentage || 20)) /
+                                100
+                            );
+                            if (i === 0) {
+                              amount = depositAmt;
+                            } else {
+                              const remainingAfterDeposit =
+                                remainingForInstallments - depositAmt;
+                              const remInstallmentsCount = installmentCount - 1;
+                              const base = Math.floor(
+                                remainingAfterDeposit / remInstallmentsCount
+                              );
+                              amount =
+                                i === installmentCount - 1
+                                  ? remainingAfterDeposit -
+                                    base * (remInstallmentsCount - 1)
+                                  : base;
+                            }
+                          } else {
+                            const base = Math.floor(
+                              remainingForInstallments / installmentCount
+                            );
+                            amount =
                               i === installmentCount - 1
                                 ? remainingForInstallments -
                                   base * (installmentCount - 1)
-                                : base,
+                                : base;
+                          }
+
+                          return {
+                            amountCents: amount,
                             dueDate: d.toISOString().split('T')[0]
                           };
                         }
