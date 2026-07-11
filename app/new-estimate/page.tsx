@@ -174,7 +174,20 @@ function NewEstimateContent() {
       if (pendingRaw) {
         try {
           const pending = JSON.parse(pendingRaw);
-          if (pending.client) setClient(pending.client);
+          if (pending.client) {
+            setClient({
+              name: pending.client.name || '',
+              email: pending.client.email || '',
+              phone: pending.client.phone || '',
+              address: pending.client.address || '',
+              city: pending.client.city || '',
+              state: pending.client.state || '',
+              zip: pending.client.zip || '',
+              country: pending.client.country || '',
+              siret: pending.client.siret || '',
+              siren: pending.client.siren || ''
+            });
+          }
           if (pending.sections) setSections(pending.sections);
           if (pending.customRef) setCustomRef(pending.customRef);
           if (pending.marginMode) setMarginMode(pending.marginMode);
@@ -432,7 +445,9 @@ function NewEstimateContent() {
             city: foundClient.city || '',
             state: foundClient.state || '',
             zip: foundClient.zip || '',
-            country: foundClient.country || ''
+            country: foundClient.country || '',
+            siret: foundClient.siret || '',
+            siren: foundClient.siren || ''
           });
         }
       }
