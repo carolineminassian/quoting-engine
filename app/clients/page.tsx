@@ -7,6 +7,7 @@ import { translations } from '@/lib/translations';
 import LoadingDots from '@/components/LoadingDots';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import Button from '@/components/Button';
+import SireneCombobox from '@/components/SireneCombobox';
 
 export default function ClientsPage() {
   const router = useRouter();
@@ -82,7 +83,13 @@ export default function ClientsPage() {
           name: editingClient.name,
           email: editingClient.email,
           phone: editingClient.phone,
-          address: editingClient.address
+          address: editingClient.address,
+          city: editingClient.city || null,
+          state: editingClient.state || null,
+          zip: editingClient.zip || null,
+          country: editingClient.country || 'US',
+          siret: editingClient.siret || null,
+          siren: editingClient.siren || null
         })
         .eq('id', editingClient.id)
         .select()
@@ -108,7 +115,13 @@ export default function ClientsPage() {
             name: editingClient.name,
             email: editingClient.email,
             phone: editingClient.phone,
-            address: editingClient.address
+            address: editingClient.address,
+            city: editingClient.city || null,
+            state: editingClient.state || null,
+            zip: editingClient.zip || null,
+            country: editingClient.country || 'US',
+            siret: editingClient.siret || null,
+            siren: editingClient.siren || null
           }
         ])
         .select()
@@ -209,14 +222,28 @@ export default function ClientsPage() {
                         </p>
                       </div>
                     )}
-                    {c.address && (
+                    {(c.address || c.city || c.zip) && (
                       <div className="pt-4 border-t border-gray-50">
                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 block mb-1">
                           {lang.billingAddress}
                         </span>
-                        <p className="text-xs font-bold text-gray-500 leading-relaxed whitespace-pre-wrap">
-                          {c.address}
-                        </p>
+                        {c.address && (
+                          <p className="text-xs font-bold text-gray-500 leading-relaxed whitespace-pre-wrap mb-1">
+                            {c.address}
+                          </p>
+                        )}
+                        {(c.city || c.zip) && (
+                          <p className="text-xs font-bold text-gray-400 leading-relaxed font-mono uppercase">
+                            {c.country === 'FR'
+                              ? `${[c.zip, c.city].filter(Boolean).join(' ')}, ${c.country}`
+                              : `${[c.city, c.country === 'US' ? c.state : null, c.zip].filter(Boolean).join(', ')}, ${c.country}`}
+                          </p>
+                        )}
+                        {c.siret && (
+                          <p className="text-[10px] text-blue-500 font-mono font-bold mt-1 uppercase">
+                            SIRET: {c.siret}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -281,7 +308,73 @@ export default function ClientsPage() {
             <h3 className="text-2xl font-black uppercase tracking-tighter mb-6">
               {editingClient.id ? lang.editProfile : lang.addNewClient}
             </h3>
-            <form onSubmit={handleSave} className="space-y-4">
+            <form
+              onSubmit={handleSave}
+              className="space-y-4 max-h-[70vh] overflow-y-auto pr-1"
+            >
+              {/* Country Selection */}
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                  {lang.country}
+                </label>
+                <div className="flex border border-gray-200 rounded-xl p-1 bg-gray-50/50 gap-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingClient({
+                        ...editingClient,
+                        country: 'US',
+                        state: '',
+                        siret: null, // clear French siege SIRET
+                        siren: null // clear French SIREN
+                      })
+                    }
+                    className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${editingClient.country === 'US' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    United States
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingClient({
+                        ...editingClient,
+                        country: 'FR',
+                        state: ''
+                      })
+                    }
+                    className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${editingClient.country === 'FR' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    France
+                  </button>
+                </div>
+              </div>
+
+              {/* French Autocomplete */}
+              {editingClient.country === 'FR' && (
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                    {lang.searchSirenePlaceholder || 'Recherche SIRENE'}
+                  </label>
+                  <SireneCombobox
+                    onSelect={(biz) => {
+                      setEditingClient({
+                        ...editingClient,
+                        name: biz.name,
+                        address: biz.address,
+                        city: biz.city,
+                        zip: biz.zip,
+                        country: 'FR',
+                        siret: biz.siret,
+                        siren: biz.siren
+                      });
+                    }}
+                    placeholder={lang?.searchSirenePlaceholder}
+                    noResultsLabel={lang?.noSireneResults}
+                    searchingLabel={lang?.searchingSirene}
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
                   {lang.clientNameLabel}
@@ -334,7 +427,7 @@ export default function ClientsPage() {
                   {lang.billingAddress}
                 </label>
                 <textarea
-                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors h-24 resize-none shadow-inner bg-gray-50/30"
+                  className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors h-20 resize-none shadow-inner bg-gray-50/30"
                   value={editingClient.address || ''}
                   onChange={(e) =>
                     setEditingClient({
@@ -344,6 +437,71 @@ export default function ClientsPage() {
                   }
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                    {lang.zipShort || 'Zip'}
+                  </label>
+                  <input
+                    className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/30"
+                    value={editingClient.zip || ''}
+                    onChange={(e) =>
+                      setEditingClient({
+                        ...editingClient,
+                        zip: e.target.value
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                    {lang.city || 'City'}
+                  </label>
+                  <input
+                    className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/30"
+                    value={editingClient.city || ''}
+                    onChange={(e) =>
+                      setEditingClient({
+                        ...editingClient,
+                        city: e.target.value
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {editingClient.country === 'US' && (
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                    {lang.stateLabel || 'State'}
+                  </label>
+                  <input
+                    className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/30 uppercase"
+                    value={editingClient.state || ''}
+                    maxLength={50}
+                    onChange={(e) =>
+                      setEditingClient({
+                        ...editingClient,
+                        state: e.target.value.toUpperCase()
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {editingClient.siret && (
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">
+                    SIRET (FR)
+                  </label>
+                  <input
+                    disabled
+                    className="w-full p-3 border border-gray-200 rounded-xl outline-none font-mono bg-gray-100 opacity-60 text-gray-500"
+                    value={editingClient.siret}
+                  />
+                </div>
+              )}
 
               <div className="flex gap-3 pt-6 border-t border-gray-100">
                 <Button

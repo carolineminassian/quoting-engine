@@ -17,6 +17,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import Button from '@/components/Button';
 import LinkButton from '@/components/LinkButton';
 import MaterialCombobox from '@/components/MaterialCombobox';
+import SireneCombobox from '@/components/SireneCombobox';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import {
   Listbox,
@@ -1581,6 +1582,42 @@ function NewEstimateContent() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* French SIRENE business autocomplete search */}
+              {client.country === 'FR' && (
+                <div className="col-span-1 sm:col-span-2 group relative">
+                  <SireneCombobox
+                    onSelect={(biz) => {
+                      setClient({
+                        name: biz.name,
+                        email: client.email, // preserve entered contact info
+                        phone: client.phone,
+                        address: biz.address,
+                        city: biz.city,
+                        state: '',
+                        zip: biz.zip,
+                        country: 'FR'
+                      });
+
+                      // Also store the client's official legal SIRET on the estimate
+                      // so we can read it during Factur-X compilation later!
+                      setCustomRef(biz.siret);
+                    }}
+                    placeholder={
+                      lang?.searchSirenePlaceholder ||
+                      'Rechercher une entreprise française (Nom ou SIRET)...'
+                    }
+                    noResultsLabel={
+                      lang?.noSireneResults || 'Aucune entreprise trouvée'
+                    }
+                    searchingLabel={lang?.searchingSirene || 'Recherche...'}
+                  />
+                  <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-wide">
+                    {lang?.sireneHelperDesc ||
+                      "Sélectionner une entreprise pré-remplit le nom, l'adresse légale, et le SIRET."}
+                  </p>
+                </div>
+              )}
+
               <div className="col-span-1 sm:col-span-2 group relative">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                   <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">

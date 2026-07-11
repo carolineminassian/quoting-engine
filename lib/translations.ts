@@ -179,6 +179,11 @@ export const translations = {
     deleteTemplateConfirm: 'Delete template "{name}"? This cannot be undone.',
     rename: 'Rename',
     customerContactDetails: 'Customer Contact Details',
+    searchSirenePlaceholder: 'Search French Business (SIRET or Name)...',
+    noSireneResults: 'No business found',
+    searchingSirene: 'Searching...',
+    sireneHelperDesc:
+      'Selecting a business auto-fills name, legal address, and SIRET.',
     yourBusinessName: 'Your Business Name',
     guestMode: 'Guest Mode',
     guestModeDesc:
@@ -1010,6 +1015,12 @@ export const translations = {
       'Supprimer le modèle "{name}" ? Cette action est irréversible.',
     rename: 'Renommer',
     customerContactDetails: 'Coordonnées du Client',
+    searchSirenePlaceholder:
+      'Rechercher une entreprise française (Nom ou SIRET)...',
+    noSireneResults: 'Aucune entreprise trouvée',
+    searchingSirene: 'Recherche...',
+    sireneHelperDesc:
+      "Sélectionner une entreprise pré-remplit le nom, l'adresse légale, et le SIRET.",
     yourBusinessName: 'Nom de votre entreprise',
     guestMode: 'Mode Invité',
     guestModeDesc:
