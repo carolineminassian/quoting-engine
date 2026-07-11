@@ -1403,29 +1403,226 @@ export default function InvoiceView() {
   };
 
   const finalizeInvoiceNow = async () => {
-    const {
-      data: { session }
-    } = await supabase.auth.getSession();
-    if (!session) return;
+    setLoading(true);
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session) return;
 
-    const res = await fetch('/api/finalize-invoice', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({ invoiceId: id })
-    });
+      const res = await fetch('/api/finalize-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ invoiceId: id })
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setDialog({ type: 'alert', message: data.error || lang.connectionError });
-      return;
+      if (!res.ok) {
+        setDialog({
+          type: 'alert',
+          message: data.error || lang.connectionError
+        });
+        return;
+      }
+
+      let finalizedInvoice = data.invoice;
+
+      // ─── Factur-X Compliance Compilation (French B2B only) ───
+      const isOwnerFr = profile?.country === 'FR';
+      const isClientFr = finalizedInvoice.client_country === 'FR';
+
+      if (isOwnerFr && isClientFr) {
+        // 1. Render standard PDF client-side into blob
+        const { pdf } = await import('@react-pdf/renderer');
+        const InvoicePDF = (await import('./InvoicePDF')).default;
+
+        // Render the document sections
+        const preparedSections = isLineItemInvoice
+          ? []
+          : sections.map((sec: any) => ({
+              title: sec.title || lang.professionalServices,
+              description: getSectionDisplayDescription(sec),
+              total: (() => {
+                let sectionSubtotalCents = 0;
+                if ((sec.laborHours || 0) > 0) {
+                  sectionSubtotalCents += Math.round(
+                    (sec.laborHours || 0) * getInvoiceLaborRateCents(sec)
+                  );
+                }
+                (sec.items || []).forEach((item: any) => {
+                  sectionSubtotalCents += Math.round(
+                    (item.qty || 0) * getInvoiceItemUnitCostCents(sec, item)
+                  );
+                });
+                return sectionSubtotalCents / 100;
+              })(),
+              hasDetails: isShowingDetails,
+              laborHours: sec.laborHours || 0,
+              laborType: sec.laborType,
+              laborRate: getInvoiceLaborRateCents(sec) / 100,
+              laborTaxRate: sec.laborTaxRate ?? profile.tax_rate,
+              items: (sec.items || []).map((item: any) => {
+                const m = materialsById.get(item.materialId);
+                return {
+                  name: item.name || m?.name || lang.itemLabel,
+                  qty: item.qty || 0,
+                  unit:
+                    lang?.units?.[item.unit || m?.unit || ''] ||
+                    item.unit ||
+                    m?.unit ||
+                    '',
+                  cost: getInvoiceItemUnitCostCents(sec, item) / 100,
+                  taxRate: item.taxRate ?? profile.tax_rate
+                };
+              })
+            }));
+
+        const preparedAdditionalCharges = additionalCharges.map(
+          (charge: AdditionalCharge) => ({
+            name: charge.name || lang.additionalCharges,
+            isPercentage: !!charge.isPercentage,
+            percentageRate: charge.percentageRate || 0,
+            qty: charge.qty || 1,
+            unit:
+              (charge.unit && lang?.units?.[charge.unit]) ||
+              charge.unit ||
+              'ea',
+            costPerUnitCents: charge.costPerUnitCents || 0,
+            taxRate: charge.taxRate ?? profile.tax_rate,
+            amountCents: getAdditionalChargeAmountCents(
+              invoiceContext,
+              charge,
+              sections || [],
+              materialsById
+            ),
+            basisLabel: lang.basisProject
+          })
+        );
+
+        const pdfSections =
+          finalizedInvoice.invoice_type === 'deposit' ? [] : preparedSections;
+        const pdfLineItems =
+          finalizedInvoice.invoice_type === 'deposit'
+            ? [
+                {
+                  description:
+                    finalizedInvoice.invoice_description ||
+                    `${lang.depositInvoiceTitle} ${finalizedInvoice.deposit_percentage}%`,
+                  quantity: 1,
+                  unit_price_cents: billedTotals.subtotalCents,
+                  amount_cents: billedTotals.subtotalCents,
+                  tax_rate:
+                    finalizedInvoice.tax_rate_snapshot ?? profile.tax_rate ?? 0
+                }
+              ]
+            : isLineItemInvoice
+              ? lineItems
+              : undefined;
+
+        const depositRefs =
+          finalizedInvoice.deposit_invoice_refs &&
+          finalizedInvoice.deposit_invoice_refs.length > 0
+            ? finalizedInvoice.deposit_invoice_refs
+            : null;
+        const fullProjectSubtotalForPDF =
+          finalizedInvoice.invoice_type === 'balance'
+            ? depositRefs
+              ? (depositRefs.reduce(
+                  (sum: number, d: any) => sum + (d.subtotal_cents || 0),
+                  0
+                ) +
+                  billedTotals.subtotalCents) /
+                100
+              : baseTotals.subtotalCents / 100
+            : 0;
+        const depositSubtotalForPDF =
+          finalizedInvoice.invoice_type === 'balance' && !depositRefs
+            ? Math.max(
+                0,
+                baseTotals.subtotalCents - billedTotals.subtotalCents
+              ) / 100
+            : 0;
+
+        const blob = await pdf(
+          <InvoicePDF
+            invoice={finalizedInvoice}
+            profile={profile}
+            lang={lang}
+            subtotal={billedTotals.subtotalCents / 100}
+            taxGroups={Object.entries(billedTotals.taxGroups) as any}
+            grandTotal={billedTotals.totalCents / 100}
+            sections={pdfSections}
+            lineItems={pdfLineItems}
+            additionalCharges={
+              finalizedInvoice.invoice_type === 'deposit'
+                ? []
+                : preparedAdditionalCharges
+            }
+            isDraft={false}
+            fullProjectSubtotal={fullProjectSubtotalForPDF}
+            depositSubtotal={depositSubtotalForPDF}
+            depositRef={
+              !depositRefs ? depositInvoice?.invoice_number : undefined
+            }
+            depositDate={
+              !depositRefs && depositInvoice?.invoice_date
+                ? new Date(depositInvoice.invoice_date).toLocaleDateString(
+                    profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                    { year: 'numeric', month: 'short', day: 'numeric' }
+                  )
+                : undefined
+            }
+            depositInvoiceRefs={depositRefs ?? undefined}
+          />
+        ).toBlob();
+
+        // 2. Convert PDF blob to base64
+        const reader = new FileReader();
+        const pdfBase64 = await new Promise<string>((resolve) => {
+          reader.onloadend = () => {
+            const base64String = (reader.result as string).split(',')[1];
+            resolve(base64String);
+          };
+          reader.readAsDataURL(blob);
+        });
+
+        // 3. Compile Factur-X XML and attach to PDF on server
+        const compileRes = await fetch('/api/compile-factur-x', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ invoiceId: id, pdfBase64 })
+        });
+
+        const compileData = await compileRes.json();
+        if (!compileRes.ok)
+          throw new Error(compileData.error || 'Factur-X compilation failed.');
+
+        // Re-read finalized/compiled invoice with factur_x_compiled set to true
+        const { data: finalInv } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (finalInv) finalizedInvoice = finalInv;
+      }
+
+      // Replaces the DRAFT-xxxx placeholder with the real number in the UI.
+      setInvoice((prev: any) =>
+        prev ? { ...prev, ...finalizedInvoice } : prev
+      );
+      setDialog({ type: 'alert', message: lang.invoiceFinalizedSuccess });
+    } catch (err: any) {
+      setDialog({ type: 'alert', message: err.message || lang.errorGeneric });
+    } finally {
+      setLoading(false);
     }
-
-    // Replaces the DRAFT-xxxx placeholder with the real number in the UI.
-    setInvoice((prev: any) => (prev ? { ...prev, ...data.invoice } : prev));
   };
 
   const handleFinalize = async () => {

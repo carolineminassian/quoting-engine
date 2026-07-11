@@ -283,120 +283,149 @@ export default function InvoicesPage() {
           country === 'FR' ? translations.FR : translations.US;
         const taxRate = inv.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
 
-        const invProfile = {
-          ...profile,
-          business_name: inv.business_name_snapshot || profile?.business_name,
-          country: inv.country_snapshot || profile?.country,
-          currency: inv.currency_snapshot || profile?.currency,
-          tax_rate: taxRate
-        };
+        let blob: Blob;
 
-        const invContext = {
-          margin_mode_snapshot: inv.margin_mode_snapshot,
-          global_margin_snapshot: inv.global_margin_snapshot,
-          tax_rate_snapshot: inv.tax_rate_snapshot
-        };
+        // ─── Factur-X Fallback Loader (Invoice Listing Page) ───
+        // If the invoice has already been compiled with Factur-X XML,
+        // we pull the certified PDF directly from storage instead of rebuilding it
+        if (inv.factur_x_compiled) {
+          const {
+            data: { session: currentSession }
+          } = await supabase.auth.getSession();
+          if (currentSession) {
+            const { data: fileBlob, error: downloadError } =
+              await supabase.storage
+                .from('invoices')
+                .download(`${currentSession.user.id}/${inv.id}.pdf`);
 
-        const hasSections =
-          Array.isArray(inv.sections) && inv.sections.length > 0;
-        const isLineItemInvoice = !hasSections;
+            if (!downloadError && fileBlob) {
+              blob = fileBlob;
+            } else {
+              console.error(
+                `Failed to download Factur-X PDF for invoice ${inv.invoice_number}, falling back to local render`
+              );
+            }
+          }
+        }
 
-        const preparedSections = hasSections
-          ? inv.sections.map((sec: any) => ({
-              title: sec.title || currentLang.professionalServices,
-              description: sec.description || '',
-              total: (() => {
-                let t = 0;
-                if (sec.laborHours > 0)
-                  t += Math.round(
-                    sec.laborHours * getEffectiveLaborRateCents(invContext, sec)
-                  );
-                (sec.items || []).forEach((it: any) => {
-                  t += Math.round(
-                    (it.qty || 0) *
+        // Fallback: render client-side if not compiled or storage download failed
+        if (!blob) {
+          const invProfile = {
+            ...profile,
+            business_name: inv.business_name_snapshot || profile?.business_name,
+            country: inv.country_snapshot || profile?.country,
+            currency: inv.currency_snapshot || profile?.currency,
+            tax_rate: taxRate
+          };
+
+          const invContext = {
+            margin_mode_snapshot: inv.margin_mode_snapshot,
+            global_margin_snapshot: inv.global_margin_snapshot,
+            tax_rate_snapshot: inv.tax_rate_snapshot
+          };
+
+          const hasSections =
+            Array.isArray(inv.sections) && inv.sections.length > 0;
+          const isLineItemInvoice = !hasSections;
+
+          const preparedSections = hasSections
+            ? inv.sections.map((sec: any) => ({
+                title: sec.title || currentLang.professionalServices,
+                description: sec.description || '',
+                total: (() => {
+                  let total = 0;
+                  if (sec.laborHours > 0)
+                    total += Math.round(
+                      sec.laborHours *
+                        getEffectiveLaborRateCents(invContext, sec)
+                    );
+                  (sec.items || []).forEach((it: any) => {
+                    total += Math.round(
+                      (it.qty || 0) *
+                        getEffectiveItemCostCents(
+                          invContext,
+                          sec,
+                          it,
+                          materialsById
+                        )
+                    );
+                  });
+                  return total / 100;
+                })(),
+                hasDetails: inv.show_details_snapshot === true,
+                laborHours: sec.laborHours || 0,
+                laborType: sec.laborType,
+                laborRate: getEffectiveLaborRateCents(invContext, sec) / 100,
+                laborTaxRate: sec.laborTaxRate ?? taxRate,
+                items: (sec.items || []).map((item: any) => {
+                  const m = materialsById.get(item.materialId);
+                  return {
+                    name: item.name || m?.name || currentLang.itemLabel,
+                    qty: item.qty || 0,
+                    unit:
+                      (currentLang?.units as Record<string, string>)?.[
+                        item.unit || m?.unit || ''
+                      ] ||
+                      item.unit ||
+                      m?.unit ||
+                      '',
+                    cost:
                       getEffectiveItemCostCents(
                         invContext,
                         sec,
-                        it,
+                        item,
                         materialsById
-                      )
-                  );
-                });
-                return t / 100;
-              })(),
-              hasDetails: inv.show_details_snapshot === true,
-              laborHours: sec.laborHours || 0,
-              laborType: sec.laborType,
-              laborRate: getEffectiveLaborRateCents(invContext, sec) / 100,
-              laborTaxRate: sec.laborTaxRate ?? taxRate,
-              items: (sec.items || []).map((item: any) => {
-                const m = materialsById.get(item.materialId);
-                return {
-                  name: item.name || m?.name || currentLang.itemLabel,
-                  qty: item.qty || 0,
-                  unit:
-                    (currentLang?.units as Record<string, string>)?.[
-                      item.unit || m?.unit || ''
-                    ] ||
-                    item.unit ||
-                    m?.unit ||
-                    '',
-                  cost:
-                    getEffectiveItemCostCents(
-                      invContext,
-                      sec,
-                      item,
-                      materialsById
-                    ) / 100,
-                  taxRate: item.taxRate ?? taxRate
-                };
-              })
-            }))
-          : [];
+                      ) / 100,
+                    taxRate: item.taxRate ?? taxRate
+                  };
+                })
+              }))
+            : [];
 
-        const preparedAdditionalCharges = (inv.additional_charges || []).map(
-          (charge: any) => ({
-            name: charge.name || '',
-            isPercentage: !!charge.isPercentage,
-            percentageRate: charge.percentageRate || 0,
-            qty: charge.qty || 1,
-            unit:
-              (currentLang?.units as Record<string, string>)?.[charge.unit] ||
-              charge.unit ||
-              'ea',
-            costPerUnitCents: charge.costPerUnitCents || 0,
-            taxRate: charge.taxRate ?? taxRate,
-            amountCents: getAdditionalChargeAmountCents(
-              invContext,
-              charge,
-              inv.sections || [],
-              materialsById
-            ),
-            basisLabel: currentLang.basisProject
-          })
-        );
+          const preparedAdditionalCharges = (inv.additional_charges || []).map(
+            (charge: any) => ({
+              name: charge.name || '',
+              isPercentage: !!charge.isPercentage,
+              percentageRate: charge.percentageRate || 0,
+              qty: charge.qty || 1,
+              unit:
+                (currentLang?.units as Record<string, string>)?.[charge.unit] ||
+                charge.unit ||
+                'ea',
+              costPerUnitCents: charge.costPerUnitCents || 0,
+              taxRate: charge.taxRate ?? taxRate,
+              amountCents: getAdditionalChargeAmountCents(
+                invContext,
+                charge,
+                inv.sections || [],
+                materialsById
+              ),
+              basisLabel: currentLang.basisProject
+            })
+          );
 
-        const storedSubtotal =
-          inv.subtotal_cents || inv.subtotal_amount_cents || 0;
-        const storedTax = inv.tax_amount_cents || 0;
-        const storedTotal = inv.total_amount_cents || 0;
-        const taxGroups: [number, number][] =
-          storedTax > 0 ? [[taxRate, storedTax / 100]] : [];
+          const storedSubtotal =
+            inv.subtotal_cents || inv.subtotal_amount_cents || 0;
+          const storedTax = inv.tax_amount_cents || 0;
+          const storedTotal = inv.total_amount_cents || 0;
+          const taxGroups: [number, number][] =
+            storedTax > 0 ? [[taxRate, storedTax / 100]] : [];
 
-        const blob = await pdf(
-          <InvoicePDF
-            invoice={inv}
-            profile={invProfile}
-            lang={currentLang}
-            subtotal={storedSubtotal / 100}
-            taxGroups={taxGroups as any}
-            grandTotal={storedTotal / 100}
-            sections={preparedSections}
-            lineItems={isLineItemInvoice ? inv.line_items || [] : undefined}
-            additionalCharges={preparedAdditionalCharges}
-            isDraft={false}
-          />
-        ).toBlob();
+          blob = await pdf(
+            <InvoicePDF
+              invoice={inv}
+              profile={invProfile}
+              lang={currentLang}
+              subtotal={storedSubtotal / 100}
+              taxGroups={taxGroups as any}
+              grandTotal={storedTotal / 100}
+              sections={preparedSections}
+              lineItems={isLineItemInvoice ? inv.line_items || [] : undefined}
+              additionalCharges={preparedAdditionalCharges}
+              isDraft={false}
+            />
+          ).toBlob();
+        }
 
         const filename = `${currentLang.invoiceLabel}-${inv.invoice_number}.pdf`;
         zip.file(filename, blob);

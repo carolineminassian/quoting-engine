@@ -98,7 +98,9 @@ function NewEstimateContent() {
     city: '',
     state: '',
     zip: '',
-    country: ''
+    country: '',
+    siret: '',
+    siren: ''
   });
   const [customRef, setCustomRef] = useState('');
 
@@ -449,7 +451,9 @@ function NewEstimateContent() {
             city: est.client_city || '',
             state: est.client_state || '',
             zip: est.client_zip || '',
-            country: est.client_country || ''
+            country: est.client_country || '',
+            siret: est.client_siret || '',
+            siren: est.client_siren || ''
           });
           setCustomRef(est.custom_id || '');
           setEstimateLang(est.country_snapshot === 'FR' ? 'FR' : 'EN');
@@ -1058,6 +1062,8 @@ function NewEstimateContent() {
       client_state: client.state || null,
       client_zip: client.zip,
       client_country: client.country,
+      client_siret: client.siret || null,
+      client_siren: client.siren || null,
       custom_id: customRef.trim() || null,
       total_amount_cents: totals.totalCents,
       tax_amount_cents: totals.tax,
@@ -1135,7 +1141,9 @@ function NewEstimateContent() {
                 city: client.city,
                 state: client.state || null,
                 zip: client.zip,
-                country: client.country
+                country: client.country,
+                siret: client.siret || null,
+                siren: client.siren || null
               }
             ]);
           if (clientInsertError) {
@@ -1542,7 +1550,9 @@ function NewEstimateContent() {
                         city: selected.city || '',
                         state: selected.state || '',
                         zip: selected.zip || '',
-                        country: selected.country || ''
+                        country: selected.country || '',
+                        siret: selected.siret || '',
+                        siren: selected.siren || ''
                       });
                     }
                   }}
