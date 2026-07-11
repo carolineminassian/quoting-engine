@@ -1620,7 +1620,9 @@ function NewEstimateContent() {
                         city: biz.city,
                         state: '',
                         zip: biz.zip,
-                        country: 'FR'
+                        country: 'FR',
+                        siret: biz.siret || '',
+                        siren: biz.siren || ''
                       });
 
                       // Also store the client's official legal SIRET on the estimate
