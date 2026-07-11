@@ -1142,12 +1142,12 @@ export default function EstimateView() {
           country === 'FR' ? translations.FR : translations.US;
         const taxRate = inv.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
 
-        let blob: Blob;
+        let blob: Blob | null = null;
 
         // ─── Factur-X Fallback Loader ───
         // If the invoice has already been compiled with Factur-X XML,
         // we pull the certified PDF directly from storage instead of rebuilding it
-        if (inv.factur_x_compiled) {
+        if ((inv as any).factur_x_compiled) {
           const { data: fileBlob, error: downloadError } =
             await supabase.storage
               .from('invoices')

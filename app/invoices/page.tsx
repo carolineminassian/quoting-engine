@@ -283,12 +283,12 @@ export default function InvoicesPage() {
           country === 'FR' ? translations.FR : translations.US;
         const taxRate = inv.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
 
-        let blob: Blob;
+        let blob: Blob | null = null;
 
         // ─── Factur-X Fallback Loader (Invoice Listing Page) ───
         // If the invoice has already been compiled with Factur-X XML,
         // we pull the certified PDF directly from storage instead of rebuilding it
-        if (inv.factur_x_compiled) {
+        if ((inv as any).factur_x_compiled) {
           const {
             data: { session: currentSession }
           } = await supabase.auth.getSession();
@@ -426,9 +426,10 @@ export default function InvoicesPage() {
             />
           ).toBlob();
         }
-
         const filename = `${currentLang.invoiceLabel}-${inv.invoice_number}.pdf`;
-        zip.file(filename, blob);
+        if (blob) {
+          zip.file(filename, blob);
+        }
       }
 
       const csvContent = (() => {

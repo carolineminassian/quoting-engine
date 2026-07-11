@@ -1617,9 +1617,15 @@ export default function InvoiceView() {
       setInvoice((prev: any) =>
         prev ? { ...prev, ...finalizedInvoice } : prev
       );
-      setDialog({ type: 'alert', message: lang.invoiceFinalizedSuccess });
+
+      // Explicitly pull fallback successful translation if lang.invoiceFinalizedSuccess is missing
+      const successMessage =
+        lang?.invoiceFinalizedSuccess || 'Invoice finalized successfully.';
+      setDialog({ type: 'alert', message: successMessage });
     } catch (err: any) {
-      setDialog({ type: 'alert', message: err.message || lang.errorGeneric });
+      const errorMessage =
+        err.message || lang?.errorGeneric || 'An unexpected error occurred.';
+      setDialog({ type: 'alert', message: errorMessage });
     } finally {
       setLoading(false);
     }

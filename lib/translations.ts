@@ -358,6 +358,7 @@ export const translations = {
 
     // New keys
     invoiceCreatedSuccess: 'Invoice created successfully!',
+    invoiceFinalizedSuccess: 'Invoice finalized successfully.',
     creating: 'Creating...',
 
     // ===== INVOICING =====
@@ -1196,6 +1197,7 @@ export const translations = {
     discussionTitle: 'Discussion',
 
     invoiceCreatedSuccess: 'Facture créée avec succès !',
+    invoiceFinalizedSuccess: 'Facture finalisée avec succès.',
     creating: 'Création...',
 
     // ===== FACTURATION =====
