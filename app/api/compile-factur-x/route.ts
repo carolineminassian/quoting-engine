@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       afArray = PDFArray.withContext(context);
       catalog.set(PDFName.of('AF'), afArray);
     }
-    afArray.push(fileSpecRef);
+    (afArray as PDFArray).push(fileSpecRef);
 
     // D. Inject XMP Metadata Stream declaring PDF/A-3b and Factur-X conformance
     const xmpMetadataString = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
