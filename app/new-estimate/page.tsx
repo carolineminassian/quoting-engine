@@ -1108,7 +1108,10 @@ function NewEstimateContent() {
       if (currentUser) {
         const { data: estimateNumber } = await supabase.rpc(
           'generate_estimate_number',
-          { p_user_id: currentUser.id, p_country: profile?.country || 'US' }
+          {
+            p_user_id: currentUser.id,
+            p_lang: estimateLang // Now strictly passes the selected document language
+          }
         );
         if (estimateNumber) {
           insertPayload = { ...payload, estimate_number: estimateNumber };
@@ -1607,14 +1610,57 @@ function NewEstimateContent() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* French SIRENE business autocomplete search */}
+              {/* 1. Country Selection first (determines form behavior) */}
+              <div className="col-span-1 sm:col-span-2 group relative">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                  {lang.country}
+                </label>
+                <div className="flex border border-gray-200 rounded-xl p-1 bg-gray-50/50 gap-1 h-[50px]">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setClient({
+                        ...client,
+                        country: 'US',
+                        state: '',
+                        siret: '',
+                        siren: ''
+                      })
+                    }
+                    className={`flex-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${client.country === 'US' || !client.country ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    United States
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setClient({
+                        ...client,
+                        country: 'FR',
+                        state: '',
+                        siret: '',
+                        siren: ''
+                      })
+                    }
+                    className={`flex-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${client.country === 'FR' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    France
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Conditionally Show French SIRENE Autocomplete Search directly below Country */}
               {client.country === 'FR' && (
-                <div className="col-span-1 sm:col-span-2 group relative">
+                <div className="col-span-1 sm:col-span-2 group relative border-b border-gray-100 pb-6 mb-2">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-blue-500 mb-2">
+                    {lang?.searchSirenePlaceholder ||
+                      'Auto-remplir via annuaire SIRENE'}
+                  </label>
                   <SireneCombobox
                     onSelect={(biz) => {
                       setClient({
                         name: biz.name,
-                        email: client.email, // preserve entered contact info
+                        email: client.email, // preserve contact inputs
                         phone: client.phone,
                         address: biz.address,
                         city: biz.city,
@@ -1624,27 +1670,24 @@ function NewEstimateContent() {
                         siret: biz.siret || '',
                         siren: biz.siren || ''
                       });
-
-                      // Also store the client's official legal SIRET on the estimate
-                      // so we can read it during Factur-X compilation later!
-                      setCustomRef(biz.siret);
                     }}
                     placeholder={
                       lang?.searchSirenePlaceholder ||
-                      'Rechercher une entreprise française (Nom ou SIRET)...'
+                      "Saisir le nom de l'entreprise ou son SIRET..."
                     }
                     noResultsLabel={
                       lang?.noSireneResults || 'Aucune entreprise trouvée'
                     }
                     searchingLabel={lang?.searchingSirene || 'Recherche...'}
                   />
-                  <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-wide">
+                  <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-wide leading-relaxed">
                     {lang?.sireneHelperDesc ||
-                      "Sélectionner une entreprise pré-remplit le nom, l'adresse légale, et le SIRET."}
+                      "Sélectionner une entreprise pré-remplit le nom, l'adresse légale et le SIRET de facturation."}
                   </p>
                 </div>
               )}
 
+              {/* 3. Client Name */}
               <div className="col-span-1 sm:col-span-2 group relative">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                   <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
@@ -1703,7 +1746,8 @@ function NewEstimateContent() {
                   </div>
                   <AddressAutocomplete
                     value={client.address || ''}
-                    userCountry={profile?.country || 'US'}
+                    // Decoupled: Search formatting follows the chosen client country, falling back to profile country
+                    userCountry={client.country || profile?.country || 'US'}
                     placeholder={lang.address || 'Street Address'}
                     onChange={(val) => setClient({ ...client, address: val })}
                     onSelect={(components) =>
@@ -1711,9 +1755,16 @@ function NewEstimateContent() {
                         ...client,
                         address: components.address,
                         city: components.city,
-                        state: components.state || '',
+                        state: components.state || '', // preserves state selection for US autocompletes
                         zip: components.zip,
-                        country: components.country
+                        country:
+                          components.country === 'France'
+                            ? 'FR'
+                            : components.country === 'United States'
+                              ? 'US'
+                              : components.country,
+                        siret: client.siret || '',
+                        siren: client.siren || ''
                       })
                     }
                   />
@@ -1754,7 +1805,7 @@ function NewEstimateContent() {
                 </div>
               </div>
 
-              {(profile?.country === 'US' || client.country === 'US') && (
+              {client.country === 'US' && (
                 <div className="group relative">
                   <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
                     <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-[10px] tracking-tighter">
@@ -1776,22 +1827,20 @@ function NewEstimateContent() {
                 </div>
               )}
 
-              <div className="col-span-1 sm:col-span-2 group relative">
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-100/50 border-r border-gray-200 font-black text-gray-400 text-xs">
-                    🌐
+              {client.siret && (
+                <div className="col-span-1 sm:col-span-2 group relative">
+                  <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-gray-100/50">
+                    <div className="w-12 h-12 flex items-center justify-center bg-gray-100/80 border-r border-gray-200 font-black text-gray-400 text-xs select-none">
+                      SIRET
+                    </div>
+                    <input
+                      disabled
+                      className="flex-1 p-4 bg-transparent outline-none font-mono font-bold text-sm text-gray-500 opacity-75 cursor-not-allowed"
+                      value={client.siret}
+                    />
                   </div>
-                  <input
-                    placeholder={lang.country}
-                    maxLength={100}
-                    className="flex-1 p-4 bg-transparent outline-none font-bold text-sm text-gray-800"
-                    value={client.country}
-                    onChange={(e) =>
-                      setClient({ ...client, country: e.target.value })
-                    }
-                  />
                 </div>
-              </div>
+              )}
             </div>
           </div>
           {/* Internal Strategy (Margin) Area */}

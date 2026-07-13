@@ -820,65 +820,43 @@ export default function InvoicePDF({
         ═══════════════════════════════════════════════ */}
         {hasLineItems && !hasSections && (
           <View style={styles.sectionSpacer}>
-            <View style={styles.lineItemsHeader}>
-              <Text style={[styles.lineItemHeaderCell, { flex: 1 }]}>
+            {/* Unified 2-column header */}
+            <View style={styles.servicesHeader}>
+              <Text style={styles.tableHeaderTextServices}>
                 {lang?.description || (isFr ? 'Description' : 'Description')}
               </Text>
-              <Text
-                style={[
-                  styles.lineItemHeaderCell,
-                  { width: 45, textAlign: 'center' }
-                ]}
-              >
-                {lang?.qty || (isFr ? 'Qté' : 'Qty')}
-              </Text>
-              <Text
-                style={[
-                  styles.lineItemHeaderCell,
-                  { width: 65, textAlign: 'right' }
-                ]}
-              >
-                {lang?.unitPrice || (isFr ? 'Prix Unit.' : 'Unit Price')}
-              </Text>
-              <Text
-                style={[
-                  styles.lineItemHeaderCell,
-                  { width: 45, textAlign: 'center' }
-                ]}
-              >
-                {lang?.tax || (isFr ? 'TVA' : 'Tax')}
-              </Text>
-              <Text
-                style={[
-                  styles.lineItemHeaderCell,
-                  { width: 75, textAlign: 'right' }
-                ]}
-              >
-                {lang?.amount || (isFr ? 'Montant' : 'Amount')}
+              <Text style={styles.tableHeaderTextServices}>
+                {lang?.amountHeader || (isFr ? 'Montant' : 'Amount')}
               </Text>
             </View>
 
             {lineItems.map((item, idx) => {
               const isLast = idx === lineItems.length - 1;
+              const hasUnitPriceInfo = (item.unit_price_cents || 0) > 0;
+              const qtyLabel = item.quantity && item.quantity !== 1 ? `${item.quantity} × ` : '';
               return (
                 <View
                   key={idx}
-                  style={isLast ? styles.lineItemRowLast : styles.lineItemRow}
+                  style={isLast ? styles.serviceRowLast : styles.serviceRow}
                   wrap={false}
                 >
-                  <Text style={styles.lineItemDescription}>
-                    {item.description || (isFr ? 'Article' : 'Item')}
-                  </Text>
-                  <Text style={styles.lineItemQty}>{item.quantity}</Text>
-                  <Text style={styles.lineItemUnitPrice}>
-                    {formatCents(item.unit_price_cents)}
-                  </Text>
-                  <Text style={styles.lineItemTax}>
-                    {item.tax_rate > 0 ? `${item.tax_rate}%` : '-'}
-                  </Text>
-                  <Text style={styles.lineItemAmount}>
-                    {formatCents(item.amount_cents)}
-                  </Text>
+                  <View style={styles.serviceTopLine}>
+                    <Text style={styles.serviceTitle}>
+                      {item.description || (isFr ? 'Article' : 'Item')}
+                    </Text>
+                    <Text style={styles.serviceAmount}>
+                      {formatCents(item.amount_cents)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.serviceContentBlock}>
+                    {hasUnitPriceInfo && (
+                      <Text style={styles.serviceDescription}>
+                        {qtyLabel}{formatCents(item.unit_price_cents)}
+                        {item.tax_rate > 0 && ` (${isFr ? 'TVA' : 'Tax'} ${item.tax_rate}%)`}
+                      </Text>
+                    )}
+                  </View>
                 </View>
               );
             })}

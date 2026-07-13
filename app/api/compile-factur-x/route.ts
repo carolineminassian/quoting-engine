@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString, PDFDict, PDFArray, PDFRawStream } from 'pdf-lib';
 import { generateFacturXXML } from '@/lib/facturXGenerator';
 
 const supabaseAdmin = createClient(
@@ -15,10 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const token = authHeader.split(' ')[1];
-    const {
-      data: { user },
-      error: authError
-    } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -26,13 +23,10 @@ export async function POST(request: Request) {
     const { invoiceId, pdfBase64 } = await request.json();
 
     if (!invoiceId || !pdfBase64) {
-      return NextResponse.json(
-        { error: 'Missing invoiceId or PDF data' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing invoiceId or PDF data' }, { status: 400 });
     }
 
-    // 1. Fetch full invoice + owner's profile details
+    // 1. Fetch invoice + owner's profile details
     const { data: invoice } = await supabaseAdmin
       .from('invoices')
       .select('*')
@@ -41,10 +35,7 @@ export async function POST(request: Request) {
       .single();
 
     if (!invoice) {
-      return NextResponse.json(
-        { error: 'Invoice not found.' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Invoice not found.' }, { status: 404 });
     }
 
     const { data: profile } = await supabaseAdmin
@@ -54,10 +45,7 @@ export async function POST(request: Request) {
       .single();
 
     if (!profile) {
-      return NextResponse.json(
-        { error: 'Profile not found.' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
     }
 
     // 2. Generate compliant XML string
@@ -66,22 +54,93 @@ export async function POST(request: Request) {
     // 3. Load PDF into pdf-lib
     const pdfBuffer = Buffer.from(pdfBase64, 'base64');
     const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const context = pdfDoc.context;
 
-    // 4. Attach the factur-x.xml file to the PDF
-    await pdfDoc.attach(Buffer.from(xmlString), 'factur-x.xml', {
-      mimeType: 'text/xml',
-      description: 'Factur-X Machine Readable Billing Metadata',
-      creationDate: new Date(),
-      modificationDate: new Date()
+    // ─── PDF/A-3 & Factur-X Low-Level Catalog Compilation ───
+    
+    // A. Embed the XML file stream
+    const xmlBuffer = Buffer.from(xmlString, 'utf-8');
+    const xmlStream = context.stream(xmlBuffer, {
+      Type: 'EmbeddedFile',
+      Subtype: 'text/xml',
+      Params: context.obj({
+        Size: xmlBuffer.length,
+        CreationDate: PDFString.fromDate(new Date()),
+        ModDate: PDFString.fromDate(new Date())
+      })
     });
+    const xmlStreamRef = context.register(xmlStream);
 
-    // 5. Save the updated PDF
+    // B. Create the File Specification Dictionary
+    const fileSpecDict = context.obj({
+      Type: 'Filespec',
+      F: PDFString.of('factur-x.xml'),
+      UF: PDFString.of('factur-x.xml'),
+      EF: context.obj({ F: xmlStreamRef }),
+      AFRelationship: PDFName.of('Alternative') // MUST be Alternative for Factur-X
+    });
+    const fileSpecRef = context.register(fileSpecDict);
+
+    // C. Create the Names Tree and attach /EmbeddedFiles to the Catalog
+    const embeddedFilesNamesDict = context.obj({
+      Names: PDFArray.withContext(context),
+    });
+    embeddedFilesNamesDict.Names.push(PDFString.of('factur-x.xml'));
+    embeddedFilesNamesDict.Names.push(fileSpecRef);
+    const embeddedFilesNamesRef = context.register(embeddedFilesNamesDict);
+
+    const catalog = pdfDoc.catalog;
+    
+    // Set /Names in Catalog
+    let namesDict = catalog.get(PDFName.of('Names'));
+    if (!namesDict || !(namesDict instanceof PDFDict)) {
+      namesDict = context.obj({});
+      catalog.set(PDFName.of('Names'), namesDict);
+    }
+    (namesDict as PDFDict).set(PDFName.of('EmbeddedFiles'), embeddedFilesNamesRef);
+
+    // Set /AF in Catalog (Associated Files)
+    let afArray = catalog.get(PDFName.of('AF'));
+    if (!afArray || !(afArray instanceof PDFArray)) {
+      afArray = PDFArray.withContext(context);
+      catalog.set(PDFName.of('AF'), afArray);
+    }
+    afArray.push(fileSpecRef);
+
+    // D. Inject XMP Metadata Stream declaring PDF/A-3b and Factur-X conformance
+    const xmpMetadataString = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <!-- PDF/A Conformance identification -->
+  <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">
+   <pdfaid:part>3</pdfaid:part>
+   <pdfaid:conformance>B</pdfaid:conformance>
+  </rdf:Description>
+  <!-- Factur-X schema metadata -->
+  <rdf:Description rdf:about="" xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">
+   <fx:DocumentType>INVOICE</fx:DocumentType>
+   <fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>
+   <fx:Version>1.0</fx:Version>
+   <fx:Profile>BASIC</fx:Profile>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+
+    const xmpStream = context.stream(Buffer.from(xmpMetadataString, 'utf-8'), {
+      Type: 'Metadata',
+      Subtype: 'XML'
+    });
+    const xmpStreamRef = context.register(xmpStream);
+    catalog.set(PDFName.of('Metadata'), xmpStreamRef);
+
+    // E. Save the fully updated PDF/A-3 b document
     const modifiedPdfBytes = await pdfDoc.save();
     const modifiedBase64 = Buffer.from(modifiedPdfBytes).toString('base64');
 
     // 6. Upload compiled PDF to Supabase storage bucket
     const bucketName = 'invoices';
-    const filePath = `${user.id}/${invoice.id}.pdf`;
+    const filePath   = `${user.id}/${invoice.id}.pdf`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from(bucketName)
@@ -105,11 +164,9 @@ export async function POST(request: Request) {
       pdfBase64: modifiedBase64,
       filePath: filePath
     });
+
   } catch (err: any) {
     console.error('Factur-X compilation failed:', err);
-    return NextResponse.json(
-      { error: err.message || 'Internal Server Error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
