@@ -5,8 +5,21 @@ import {
   Text,
   View,
   StyleSheet,
-  Image
+  Image,
+  Font
 } from '@react-pdf/renderer';
+
+// Register and fully embed Google's Arimo font (Helvetica alternative)
+// to satisfy strict PDF/A-3 font embedding compliance rules.
+Font.register({
+  family: 'Arimo',
+  fonts: [
+    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u7_FhU5G5G.ttf', fontWeight: 'normal' },
+    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u79FhU5G5G.ttf', fontWeight: 'bold' },
+    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u771hU5G5G.ttf', fontStyle: 'italic' },
+    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u78FhU5G5G.ttf', fontWeight: 'bold', fontStyle: 'italic' }
+  ]
+});
 
 // ============================================================
 // TYPES
@@ -87,7 +100,7 @@ const styles = StyleSheet.create({
     paddingBottom: 130, // Increased slightly from 90 to accommodate bank details footer
     paddingHorizontal: 45,
     fontSize: 10,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Arimo',
     color: '#111827',
     backgroundColor: '#ffffff',
     position: 'relative'

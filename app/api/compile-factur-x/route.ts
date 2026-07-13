@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { PDFDocument, PDFName, PDFString, PDFDict, PDFArray, PDFRawStream } from 'pdf-lib';
+import {
+  PDFDocument,
+  PDFName,
+  PDFString,
+  PDFDict,
+  PDFArray,
+  PDFRawStream
+} from 'pdf-lib';
 import { generateFacturXXML } from '@/lib/facturXGenerator';
 
 const supabaseAdmin = createClient(
@@ -15,7 +22,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const token = authHeader.split(' ')[1];
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const {
+      data: { user },
+      error: authError
+    } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -23,7 +33,10 @@ export async function POST(request: Request) {
     const { invoiceId, pdfBase64 } = await request.json();
 
     if (!invoiceId || !pdfBase64) {
-      return NextResponse.json({ error: 'Missing invoiceId or PDF data' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing invoiceId or PDF data' },
+        { status: 400 }
+      );
     }
 
     // 1. Fetch invoice + owner's profile details
@@ -35,7 +48,10 @@ export async function POST(request: Request) {
       .single();
 
     if (!invoice) {
-      return NextResponse.json({ error: 'Invoice not found.' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Invoice not found.' },
+        { status: 404 }
+      );
     }
 
     const { data: profile } = await supabaseAdmin
@@ -45,7 +61,10 @@ export async function POST(request: Request) {
       .single();
 
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Profile not found.' },
+        { status: 404 }
+      );
     }
 
     // 2. Generate compliant XML string
@@ -57,7 +76,7 @@ export async function POST(request: Request) {
     const context = pdfDoc.context;
 
     // ─── PDF/A-3 & Factur-X Low-Level Catalog Compilation ───
-    
+
     // A. Embed the XML file stream
     const xmlBuffer = Buffer.from(xmlString, 'utf-8');
     const xmlStream = context.stream(xmlBuffer, {
@@ -82,22 +101,27 @@ export async function POST(request: Request) {
     const fileSpecRef = context.register(fileSpecDict);
 
     // C. Create the Names Tree and attach /EmbeddedFiles to the Catalog
+    const namesArray = PDFArray.withContext(context);
+    namesArray.push(PDFString.of('factur-x.xml'));
+    namesArray.push(fileSpecRef);
+
     const embeddedFilesNamesDict = context.obj({
-      Names: PDFArray.withContext(context),
+      Names: namesArray
     });
-    embeddedFilesNamesDict.Names.push(PDFString.of('factur-x.xml'));
-    embeddedFilesNamesDict.Names.push(fileSpecRef);
     const embeddedFilesNamesRef = context.register(embeddedFilesNamesDict);
 
     const catalog = pdfDoc.catalog;
-    
+
     // Set /Names in Catalog
     let namesDict = catalog.get(PDFName.of('Names'));
     if (!namesDict || !(namesDict instanceof PDFDict)) {
       namesDict = context.obj({});
       catalog.set(PDFName.of('Names'), namesDict);
     }
-    (namesDict as PDFDict).set(PDFName.of('EmbeddedFiles'), embeddedFilesNamesRef);
+    (namesDict as PDFDict).set(
+      PDFName.of('EmbeddedFiles'),
+      embeddedFilesNamesRef
+    );
 
     // Set /AF in Catalog (Associated Files)
     let afArray = catalog.get(PDFName.of('AF'));
@@ -140,7 +164,7 @@ export async function POST(request: Request) {
 
     // 6. Upload compiled PDF to Supabase storage bucket
     const bucketName = 'invoices';
-    const filePath   = `${user.id}/${invoice.id}.pdf`;
+    const filePath = `${user.id}/${invoice.id}.pdf`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from(bucketName)
@@ -164,9 +188,11 @@ export async function POST(request: Request) {
       pdfBase64: modifiedBase64,
       filePath: filePath
     });
-
   } catch (err: any) {
     console.error('Factur-X compilation failed:', err);
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
