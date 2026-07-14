@@ -78,8 +78,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const estCountry = estimate.country_snapshot || profile?.country || 'US';
-    const isFr = estCountry === 'FR';
+    // Decoupled: set installment description text strictly based on estimate language snapshot
+    const isFr = estimate.lang_snapshot === 'FR';
 
     // ── Calculate remaining balance ───────────────────────────────────────────
     const { data: existingInvoices } = await supabaseAdmin
