@@ -63,7 +63,8 @@ export async function POST(request: Request) {
       });
     }
 
-    const isFr = profile.country === 'FR';
+    // Decoupled: set email template language strictly based on estimate snapshot
+    const isFr = estimate.country_snapshot === 'FR';
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pactestim.com';
 
     // Logos

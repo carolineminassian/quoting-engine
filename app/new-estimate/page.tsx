@@ -1086,8 +1086,15 @@ function NewEstimateContent() {
       additional_charges: cleanedCharges,
       is_locked: false,
       business_name_snapshot: businessName || profile.business_name,
+      business_address_snapshot: profile.business_address || null,
+      business_city_snapshot: profile.business_city || null,
+      business_state_snapshot: profile.business_state || null,
+      business_zip_snapshot: profile.business_zip || null,
+      business_vat_snapshot: profile.vat_number || null,
+      business_reg_snapshot: profile.company_reg_number || null,
       // Force direct reads from the overridden state variables on save
-      country_snapshot: estimateLang === 'FR' ? 'FR' : 'US',
+      country_snapshot: profile.country || 'US',
+      lang_snapshot: estimateLang,
       currency_snapshot: estimateCurrency,
       margin_mode_snapshot: marginMode,
       global_margin_snapshot: globalMargin,
@@ -1750,23 +1757,26 @@ function NewEstimateContent() {
                     userCountry={client.country || profile?.country || 'US'}
                     placeholder={lang.address || 'Street Address'}
                     onChange={(val) => setClient({ ...client, address: val })}
-                    onSelect={(components) =>
+                    onSelect={(components) => {
+                      const normalizedCountry =
+                        components.country === 'France' ||
+                        components.country === 'FR'
+                          ? 'FR'
+                          : 'US';
                       setClient({
                         ...client,
                         address: components.address,
                         city: components.city,
-                        state: components.state || '', // preserves state selection for US autocompletes
+                        state:
+                          normalizedCountry === 'US'
+                            ? components.state || ''
+                            : '',
                         zip: components.zip,
-                        country:
-                          components.country === 'France'
-                            ? 'FR'
-                            : components.country === 'United States'
-                              ? 'US'
-                              : components.country,
+                        country: normalizedCountry,
                         siret: client.siret || '',
                         siren: client.siren || ''
-                      })
-                    }
+                      });
+                    }}
                   />
                 </div>
               </div>

@@ -459,15 +459,16 @@ export default function InvoiceView() {
               ? supabase
                   .from('invoices')
                   .select(
-                    'id, invoice_number, invoice_date, invoice_type, total_amount_cents, subtotal_cents, subtotal_amount_cents, credited_amount_cents, is_locked, is_cancelled'
+                    'id, invoice_number, invoice_date, invoice_type, total_amount_cents, subtotal_cents, subtotal_amount_cents, credited_amount_cents, is_locked, is_cancelled, client_siret, client_siren'
                   )
                   .eq('estimate_id', inv.estimate_id)
                   .eq('user_id', inv.user_id)
               : Promise.resolve({ data: [], error: null })
           ]);
         const profileData = profRes.data;
-        const country = inv.country_snapshot || profileData?.country || 'US';
-        const pageLang = country === 'FR' ? translations.FR : translations.US;
+        const docLang =
+          inv.lang_snapshot || (inv.country_snapshot === 'FR' ? 'FR' : 'EN');
+        const pageLang = docLang === 'FR' ? translations.FR : translations.US;
 
         setLang(pageLang);
         const ownerCheck = !!user && user.id === inv.user_id;
@@ -486,6 +487,16 @@ export default function InvoiceView() {
           ...profileData,
           business_name:
             inv.business_name_snapshot || profileData?.business_name,
+          business_address:
+            inv.business_address_snapshot || profileData?.business_address,
+          business_city:
+            inv.business_city_snapshot || profileData?.business_city,
+          business_state:
+            inv.business_state_snapshot || profileData?.business_state,
+          business_zip: inv.business_zip_snapshot || profileData?.business_zip,
+          vat_number: inv.business_vat_snapshot || profileData?.vat_number,
+          company_reg_number:
+            inv.business_reg_snapshot || profileData?.company_reg_number,
           country: inv.country_snapshot || profileData?.country,
           currency: inv.currency_snapshot || profileData?.currency,
           tax_rate: inv.tax_rate_snapshot ?? profileData?.default_tax_rate ?? 0
@@ -1432,8 +1443,11 @@ export default function InvoiceView() {
       let finalizedInvoice = data.invoice;
 
       // ─── Factur-X Compliance Compilation (French B2B only) ───
-      const isOwnerFr = profile?.country === 'FR';
-      const isClientFr = finalizedInvoice.client_country === 'FR';
+      const isOwnerFr =
+        profile?.country === 'FR' || profile?.country === 'France';
+      const isClientFr =
+        finalizedInvoice.client_country === 'FR' ||
+        finalizedInvoice.client_country === 'France';
 
       if (isOwnerFr && isClientFr) {
         // 1. Render standard PDF client-side into blob
@@ -1757,6 +1771,30 @@ export default function InvoiceView() {
     setLoading(true);
 
     try {
+      // ─── Factur-X Compiled Downloader ───
+      // If the invoice is finalized and compiled, download the official certified PDF from storage
+      if (invoice.is_locked && (invoice as any).factur_x_compiled) {
+        const { data: fileBlob, error: downloadError } = await supabase.storage
+          .from('invoices')
+          .download(`${invoice.user_id}/${invoice.id}.pdf`);
+
+        if (!downloadError && fileBlob) {
+          const url = URL.createObjectURL(fileBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${lang.invoiceLabel}-${invoice.invoice_number}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          setLoading(false);
+          return;
+        }
+        console.error(
+          'Failed to download compiled Factur-X PDF, falling back to local render'
+        );
+      }
+
       const { pdf } = await import('@react-pdf/renderer');
       const InvoicePDF = (await import('./InvoicePDF')).default;
 
@@ -1764,7 +1802,7 @@ export default function InvoiceView() {
         ? []
         : sections.map((sec: any) => ({
             title: sec.title || lang.professionalServices,
-            description: getSectionDisplayDescription(sec),
+            description: sec.description || getSectionDisplayDescription(sec),
             total: (() => {
               let sectionSubtotalCents = 0;
 
@@ -2589,11 +2627,23 @@ export default function InvoiceView() {
                           profile.business_state ||
                           profile.business_zip) && (
                           <p>
-                            {profile.country === 'US'
+                            {invoice.country_snapshot === 'US'
                               ? `${profile.business_city || ''}${profile.business_state ? `, ${profile.business_state}` : ''} ${profile.business_zip || ''}`.trim()
-                              : [profile.business_zip, profile.business_city]
-                                  .filter(Boolean)
-                                  .join(' ')}
+                              : `${[profile.business_zip, profile.business_city].filter(Boolean).join(' ')}`}
+                          </p>
+                        )}
+                        {profile.vat_number && (
+                          <p>
+                            {profile.country === 'FR'
+                              ? `N° TVA : ${profile.vat_number}`
+                              : `VAT: ${profile.vat_number}`}
+                          </p>
+                        )}
+                        {profile.company_reg_number && (
+                          <p>
+                            {profile.country === 'FR'
+                              ? `SIRET : ${profile.company_reg_number}`
+                              : `Reg: ${profile.company_reg_number}`}
                           </p>
                         )}
                       </div>
@@ -2708,24 +2758,28 @@ export default function InvoiceView() {
                     invoice.client_state ||
                     invoice.client_zip ||
                     invoice.client_country) && (
-                    <p className="text-sm text-gray-600 leading-relaxed font-medium">
-                      {invoice.client_country === 'FR'
-                        ? // French format: ZIP City, France
-                          `${[invoice.client_zip, invoice.client_city].filter(Boolean).join(' ')}, ${invoice.client_country}`
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {invoice.client_country === 'FR' ||
+                      invoice.client_country === 'France'
+                        ? // French format: ZIP City, France (strictly excludes state field)
+                          `${[invoice.client_zip, invoice.client_city].filter(Boolean).join(' ')}, FR`
                         : // US/Default format: City, State ZIP, Country
                           `${[
                             invoice.client_city,
-                            invoice.client_country === 'US'
-                              ? invoice.client_state
-                              : null,
+                            invoice.client_state,
                             invoice.client_zip
                           ]
                             .filter(Boolean)
-                            .join(', ')}, ${invoice.client_country}`}
+                            .join(', ')}, US`}
+                    </p>
+                  )}
+                  {(invoice.client_siret || estimate?.client_siret) && (
+                    <p className="text-sm text-gray-600 font-mono mt-1">
+                      SIRET: {invoice.client_siret || estimate.client_siret}
                     </p>
                   )}
                   {(invoice.client_phone || invoice.client_email) && (
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                    <div className="flex flex-col gap-1 pt-2">
                       {invoice.client_phone && (
                         <p className="text-sm text-gray-500">
                           {invoice.client_phone}
@@ -2824,7 +2878,7 @@ export default function InvoiceView() {
                               </span>
                             </div>
 
-                            <div className="pl-0 sm:pl-4 mb-6">
+                            <div className="pl-0 sm:pl-4 mb-6 max-w-[75%] sm:pr-12">
                               {!invoice.is_locked ? (
                                 <textarea
                                   value={getSectionDisplayDescription(sec)}

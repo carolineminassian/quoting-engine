@@ -821,7 +821,12 @@ export default function ProfilePage() {
                 </label>
                 <Listbox
                   value={country}
-                  onChange={(newCountry) => setCountry(newCountry)}
+                  onChange={(newCountry) => {
+                    setCountry(newCountry);
+                    if (newCountry === 'FR') {
+                      setBusinessState(''); // Clear State on FR selection to prevent dirty database saves
+                    }
+                  }}
                 >
                   <div className="relative">
                     <ListboxButton className="w-full p-3.5 border border-gray-200 rounded-xl text-left outline-none focus:border-blue-500 font-bold bg-gray-50/40 transition-colors shadow-inner text-[10px] uppercase tracking-widest text-gray-700 flex justify-between items-center cursor-pointer">

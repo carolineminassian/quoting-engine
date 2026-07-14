@@ -14,13 +14,49 @@ import {
 Font.register({
   family: 'Arimo',
   fonts: [
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u7_FhU5G5G.ttf', fontWeight: 'normal' },
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u79FhU5G5G.ttf', fontWeight: 'bold' },
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u771hU5G5G.ttf', fontStyle: 'italic' },
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u78FhU5G5G.ttf', fontWeight: 'bold', fontStyle: 'italic' }
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-400-normal.ttf',
+      fontWeight: 'normal'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-700-normal.ttf',
+      fontWeight: 'bold'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-400-italic.ttf',
+      fontStyle: 'italic'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-700-italic.ttf',
+      fontWeight: 'bold',
+      fontStyle: 'italic'
+    }
   ]
 });
 
+// Register and embed Courier Prime to satisfy monospace font-embedding compliance
+Font.register({
+  family: 'CourierPrime',
+  fonts: [
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-400-normal.ttf',
+      fontWeight: 'normal'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-700-normal.ttf',
+      fontWeight: 'bold'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-400-italic.ttf',
+      fontStyle: 'italic'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-700-italic.ttf',
+      fontWeight: 'bold',
+      fontStyle: 'italic'
+    }
+  ]
+});
 // ============================================================
 // TYPES
 // ============================================================
@@ -464,7 +500,9 @@ export default function EstimatePDF({
   sections,
   additionalCharges = []
 }: EstimatePDFProps) {
-  const isFr = profile.country === 'FR';
+  const isFr =
+    estimate.lang_snapshot === 'FR' ||
+    (estimate.lang_snapshot !== 'EN' && profile.country === 'FR');
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
   const locale = isFr ? 'fr-FR' : 'en-US';
 
@@ -551,6 +589,16 @@ export default function EstimatePDF({
                   ]
                     .filter(Boolean)
                     .join(', ')}, ${estimate.client_country}`}
+            </Text>
+          )}
+          {estimate.client_siret && (
+            <Text
+              style={[
+                styles.clientLine,
+                { fontFamily: 'Arimo', fontWeight: 'bold', marginTop: 2 }
+              ]}
+            >
+              SIRET: {estimate.client_siret}
             </Text>
           )}
           {estimate.client_phone && (

@@ -454,8 +454,9 @@ export default function EstimateView() {
           .order('created_at', { ascending: true })
       ]);
 
-      const country = est.country_snapshot || prof.data?.country || 'US';
-      setLang(country === 'FR' ? translations.FR : translations.US);
+      const docLang =
+        est.lang_snapshot || (est.country_snapshot === 'FR' ? 'FR' : 'EN');
+      setLang(docLang === 'FR' ? translations.FR : translations.US);
 
       const displayBusinessName =
         est.business_name_snapshot || prof.data?.business_name;
@@ -2549,6 +2550,36 @@ export default function EstimateView() {
                       <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight break-words leading-tight">
                         {profile.business_name}
                       </h1>
+                      {(profile.business_address || profile.business_city) && (
+                        <div className="mt-1 text-xs text-gray-500 font-medium leading-relaxed">
+                          {profile.business_address && (
+                            <p>{profile.business_address}</p>
+                          )}
+                          {(profile.business_city ||
+                            profile.business_state ||
+                            profile.business_zip) && (
+                            <p>
+                              {estimate.country_snapshot === 'US'
+                                ? `${profile.business_city || ''}${profile.business_state ? `, ${profile.business_state}` : ''} ${profile.business_zip || ''}`.trim()
+                                : `${[profile.business_zip, profile.business_city].filter(Boolean).join(' ')}`}
+                            </p>
+                          )}
+                          {profile.vat_number && (
+                            <p>
+                              {profile.country === 'FR'
+                                ? `N° TVA : ${profile.vat_number}`
+                                : `VAT: ${profile.vat_number}`}
+                            </p>
+                          )}
+                          {profile.company_reg_number && (
+                            <p>
+                              {profile.country === 'FR'
+                                ? `SIRET : ${profile.company_reg_number}`
+                                : `Reg: ${profile.company_reg_number}`}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2589,24 +2620,28 @@ export default function EstimateView() {
                       estimate.client_state ||
                       estimate.client_zip ||
                       estimate.client_country) && (
-                      <p className="text-sm text-gray-600 leading-relaxed font-medium">
-                        {estimate.client_country === 'FR'
-                          ? // French format: ZIP City, France
-                            `${[estimate.client_zip, estimate.client_city].filter(Boolean).join(' ')}, ${estimate.client_country}`
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        {estimate.client_country === 'FR' ||
+                        estimate.client_country === 'France'
+                          ? // French format: ZIP City, France (strictly excludes state field)
+                            `${[estimate.client_zip, estimate.client_city].filter(Boolean).join(' ')}, FR`
                           : // US/Default format: City, State ZIP, Country
                             `${[
                               estimate.client_city,
-                              estimate.client_country === 'US'
-                                ? estimate.client_state
-                                : null,
+                              estimate.client_state,
                               estimate.client_zip
                             ]
                               .filter(Boolean)
-                              .join(', ')}, ${estimate.client_country}`}
+                              .join(', ')}, US`}
+                      </p>
+                    )}
+                    {estimate.client_siret && (
+                      <p className="text-sm text-gray-500 font-mono mt-1">
+                        SIRET: {estimate.client_siret}
                       </p>
                     )}
                     {(estimate.client_phone || estimate.client_email) && (
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                      <div className="flex flex-col gap-1 pt-2">
                         {estimate.client_phone && (
                           <p className="text-sm text-gray-500">
                             {estimate.client_phone}

@@ -14,10 +14,47 @@ import {
 Font.register({
   family: 'Arimo',
   fonts: [
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u7_FhU5G5G.ttf', fontWeight: 'normal' },
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u79FhU5G5G.ttf', fontWeight: 'bold' },
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u771hU5G5G.ttf', fontStyle: 'italic' },
-    { src: 'https://fonts.gstatic.com/s/arimo/v28/P0udFzOb0tS6u7u78FhU5G5G.ttf', fontWeight: 'bold', fontStyle: 'italic' }
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-400-normal.ttf',
+      fontWeight: 'normal'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-700-normal.ttf',
+      fontWeight: 'bold'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-400-italic.ttf',
+      fontStyle: 'italic'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/arimo@latest/latin-700-italic.ttf',
+      fontWeight: 'bold',
+      fontStyle: 'italic'
+    }
+  ]
+});
+
+// Register and embed Courier Prime to satisfy monospace font-embedding compliance
+Font.register({
+  family: 'CourierPrime',
+  fonts: [
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-400-normal.ttf',
+      fontWeight: 'normal'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-700-normal.ttf',
+      fontWeight: 'bold'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-400-italic.ttf',
+      fontStyle: 'italic'
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/fontsource/fonts/courier-prime@latest/latin-700-italic.ttf',
+      fontWeight: 'bold',
+      fontStyle: 'italic'
+    }
   ]
 });
 
@@ -600,7 +637,9 @@ export default function InvoicePDF({
     subtotal_cents: number;
   }[]
 }: InvoicePDFProps) {
-  const isFr = profile.country === 'FR';
+  const isFr =
+    invoice.lang_snapshot === 'FR' ||
+    (invoice.lang_snapshot !== 'EN' && profile.country === 'FR');
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
   const locale = isFr ? 'fr-FR' : 'en-US';
 
@@ -628,7 +667,9 @@ export default function InvoicePDF({
   const docNumber = isCredit
     ? docData.credit_note_number
     : docData.invoice_number;
-  const docDate = isCredit ? docData.credit_note_date : docData.invoice_date;
+  const docDate = isCredit
+    ? docData.credit_note_date
+    : invoice?.invoice_date || docData?.invoice_date;
 
   const formatPrice = (value: number): string => {
     const formatted = value.toLocaleString(locale, {
@@ -820,6 +861,21 @@ export default function InvoicePDF({
                     .join(', ')}, ${docData.client_country}`}
             </Text>
           )}
+          {(docData.client_siret ||
+            invoice?.client_siret ||
+            (invoice as any)?.estimates?.client_siret) && (
+            <Text
+              style={[
+                styles.clientLine,
+                { fontFamily: 'Arimo', fontWeight: 'bold', marginTop: 2 }
+              ]}
+            >
+              SIRET:{' '}
+              {docData.client_siret ||
+                invoice?.client_siret ||
+                (invoice as any)?.estimates?.client_siret}
+            </Text>
+          )}
           {docData.client_phone && (
             <Text style={styles.clientLine}>{docData.client_phone}</Text>
           )}
@@ -846,7 +902,10 @@ export default function InvoicePDF({
             {lineItems.map((item, idx) => {
               const isLast = idx === lineItems.length - 1;
               const hasUnitPriceInfo = (item.unit_price_cents || 0) > 0;
-              const qtyLabel = item.quantity && item.quantity !== 1 ? `${item.quantity} × ` : '';
+              const qtyLabel =
+                item.quantity && item.quantity !== 1
+                  ? `${item.quantity} × `
+                  : '';
               return (
                 <View
                   key={idx}
@@ -865,8 +924,10 @@ export default function InvoicePDF({
                   <View style={styles.serviceContentBlock}>
                     {hasUnitPriceInfo && (
                       <Text style={styles.serviceDescription}>
-                        {qtyLabel}{formatCents(item.unit_price_cents)}
-                        {item.tax_rate > 0 && ` (${isFr ? 'TVA' : 'Tax'} ${item.tax_rate}%)`}
+                        {qtyLabel}
+                        {formatCents(item.unit_price_cents)}
+                        {item.tax_rate > 0 &&
+                          ` (${isFr ? 'TVA' : 'Tax'} ${item.tax_rate}%)`}
                       </Text>
                     )}
                   </View>
@@ -1087,7 +1148,7 @@ export default function InvoicePDF({
                   <Text
                     style={[
                       styles.footerText,
-                      { flex: 1, color: '#374151', fontFamily: 'Courier' }
+                      { flex: 1, color: '#374151', fontFamily: 'CourierPrime' }
                     ]}
                   >
                     {profile.bank_account_number}
@@ -1113,7 +1174,7 @@ export default function InvoicePDF({
                   <Text
                     style={[
                       styles.footerText,
-                      { flex: 1, color: '#374151', fontFamily: 'Courier' }
+                      { flex: 1, color: '#374151', fontFamily: 'CourierPrime' }
                     ]}
                   >
                     {profile.bank_routing_number}
