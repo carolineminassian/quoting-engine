@@ -26,7 +26,9 @@ export async function POST(request: Request) {
       .from('estimates')
       .update({ client_status: status })
       .eq('id', estimateId)
-      .select('user_id, client_name, client_email, custom_id, estimate_number')
+      .select(
+        'user_id, client_name, client_email, custom_id, estimate_number, country_snapshot'
+      )
       .single();
 
     if (updateError) throw updateError;
