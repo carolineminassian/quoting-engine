@@ -3246,10 +3246,10 @@ export default function EstimateView() {
                                   doc.invoice_type !== 'balance' && (
                                     <p className="text-[10px] text-indigo-600 font-bold mt-0.5 uppercase tracking-wider">
                                       {doc.invoice_type === 'deposit'
-                                        ? profile.country === 'FR'
+                                        ? estimate.lang_snapshot === 'FR'
                                           ? `Acompte ${doc.installment_number}/${doc.installment_total - 1}`
                                           : `Deposit ${doc.installment_number} of ${doc.installment_total - 1}`
-                                        : profile.country === 'FR'
+                                        : estimate.lang_snapshot === 'FR'
                                           ? `Versement ${doc.installment_number} sur ${doc.installment_total}`
                                           : `Installment ${doc.installment_number} of ${doc.installment_total}`}
                                     </p>

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const { data: invoice, error: invError } = await supabaseAdmin
       .from('invoices')
       .select(
-        'user_id, is_locked, country_snapshot, invoice_type, installment_total, estimate_id'
+        'user_id, is_locked, country_snapshot, lang_snapshot, invoice_type, installment_total, estimate_id'
       )
       .eq('id', invoiceId)
       .single();
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       'generate_invoice_number',
       {
         p_user_id: user.id,
-        p_country: invoice.country_snapshot || 'US'
+        p_lang: invoice.lang_snapshot || 'EN' // strictly passes document language choice
       }
     );
 
