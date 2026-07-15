@@ -2517,7 +2517,7 @@ export default function InvoiceView() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                   {lang.dueDate}:{' '}
                   {new Date(invoice.due_date).toLocaleDateString(
-                    profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                    invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
                     {
                       year: 'numeric',
                       month: 'short',
@@ -2706,7 +2706,7 @@ export default function InvoiceView() {
                       <p className="text-xs text-gray-500 font-medium">
                         {lang.invoiceDate}:{' '}
                         {new Date(invoice.invoice_date).toLocaleDateString(
-                          profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                          invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
                           {
                             year: 'numeric',
                             month: 'short',
@@ -2722,7 +2722,7 @@ export default function InvoiceView() {
                         >
                           {lang.dueDate}:{' '}
                           {new Date(invoice.due_date).toLocaleDateString(
-                            profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                            invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
                             {
                               year: 'numeric',
                               month: 'short',

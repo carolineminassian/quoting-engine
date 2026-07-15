@@ -51,13 +51,18 @@ export async function POST(request: Request) {
       'generate_invoice_number',
       {
         p_user_id: user.id,
-        p_lang: invoice.lang_snapshot || 'EN' // strictly passes document language choice
+        p_lang: invoice.lang_snapshot || 'EN'
       }
     );
 
     if (seqError || !invoiceNumber) {
+      // PRINT THE EXACT ERROR IN SERVER TERMINAL
+      console.error(
+        '[DATABASE_CRASH_LOG] generate_invoice_number failed:',
+        seqError
+      );
       return NextResponse.json(
-        { error: 'Failed to generate invoice number' },
+        { error: seqError?.message || 'Failed to generate invoice number' },
         { status: 500 }
       );
     }

@@ -3229,7 +3229,7 @@ export default function EstimateView() {
                                     {new Date(
                                       doc.created_at
                                     ).toLocaleDateString(
-                                      profile.country === 'FR'
+                                      doc.lang_snapshot === 'FR'
                                         ? 'fr-FR'
                                         : 'en-US',
                                       {
