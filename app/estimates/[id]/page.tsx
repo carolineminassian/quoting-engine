@@ -2201,9 +2201,18 @@ export default function EstimateView() {
                                     <button
                                       onClick={() => {
                                         setInstallmentMode('equal');
-                                        setInstallmentCount(
-                                          estimate.deposit_enabled ? 3 : 3
-                                        ); // minimum 3 for deposit (1 deposit + 1 intermediate + 1 balance)
+
+                                        // Detect if a finalized deposit invoice already exists on the client side
+                                        const hasFinalizedDeposit =
+                                          allBillingDocs.some(
+                                            (doc) =>
+                                              doc.docType === 'invoice' &&
+                                              doc.invoice_type === 'deposit' &&
+                                              doc.is_locked &&
+                                              !doc.is_cancelled
+                                          );
+
+                                        setInstallmentCount(3);
                                         setInstallmentFrequency('monthly');
                                         setInstallmentCustomDays(30);
                                         setInstallmentStartDate(
@@ -2211,7 +2220,10 @@ export default function EstimateView() {
                                         );
 
                                         // Pre-populate custom installments based on deposit rules
-                                        if (estimate.deposit_enabled) {
+                                        if (
+                                          estimate.deposit_enabled &&
+                                          !hasFinalizedDeposit
+                                        ) {
                                           const depositAmt = Math.round(
                                             (remainingForInstallments *
                                               (estimate.deposit_percentage ||
@@ -2236,6 +2248,7 @@ export default function EstimateView() {
                                             }
                                           ]);
                                         } else {
+                                          // If deposit is disabled OR already finalized, start clean with empty slots (no pre-locked deposit)
                                           setCustomInstallments([
                                             {
                                               amountCents: 0,
@@ -3203,61 +3216,63 @@ export default function EstimateView() {
                         return (
                           <div
                             key={`${doc.docType}-${doc.id}`}
-                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border bg-white transition-all ${
+                            className={`grid grid-cols-1 sm:grid-cols-[130px_1fr_auto_auto] items-center gap-4 p-4 rounded-xl border bg-white transition-all ${
                               doc.is_cancelled
                                 ? 'border-gray-100 opacity-50'
                                 : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                             }`}
                           >
-                            <div className="flex items-center gap-4 mb-3 sm:mb-0">
+                            {/* Column 1: Status Badge */}
+                            <div className="flex items-center shrink-0">
                               <StatusBadge
                                 status={docStatus}
                                 label={statusLabel}
                               />
-                              <div>
-                                <p
-                                  className={`font-mono text-sm font-bold ${
-                                    !isInv ? 'text-purple-600' : 'text-gray-900'
-                                  }`}
-                                >
-                                  {isInv
-                                    ? doc.invoice_number
-                                    : doc.credit_note_number}
-                                </p>
-                                {doc.is_locked && (
-                                  <p className="text-[10px] text-gray-400 mt-0.5">
-                                    {new Date(
-                                      doc.created_at
-                                    ).toLocaleDateString(
-                                      doc.lang_snapshot === 'FR'
-                                        ? 'fr-FR'
-                                        : 'en-US',
-                                      {
-                                        year: 'numeric',
-                                        month: 'short',
-                                        day: 'numeric'
-                                      }
-                                    )}
-                                  </p>
-                                )}
-                                {isInv &&
-                                  doc.installment_number &&
-                                  doc.installment_total &&
-                                  doc.invoice_type !== 'balance' && (
-                                    <p className="text-[10px] text-indigo-600 font-bold mt-0.5 uppercase tracking-wider">
-                                      {doc.invoice_type === 'deposit'
-                                        ? estimate.lang_snapshot === 'FR'
-                                          ? `Acompte ${doc.installment_number}/${doc.installment_total - 1}`
-                                          : `Deposit ${doc.installment_number} of ${doc.installment_total - 1}`
-                                        : estimate.lang_snapshot === 'FR'
-                                          ? `Versement ${doc.installment_number} sur ${doc.installment_total}`
-                                          : `Installment ${doc.installment_number} of ${doc.installment_total}`}
-                                    </p>
-                                  )}
-                              </div>
                             </div>
 
-                            <div className="flex items-center justify-between sm:justify-end gap-4">
+                            {/* Column 2: Document Number & Meta Details */}
+                            <div className="min-w-0 pr-4">
+                              <p
+                                className={`font-mono text-sm font-bold ${
+                                  !isInv ? 'text-purple-600' : 'text-gray-900'
+                                }`}
+                              >
+                                {isInv
+                                  ? doc.invoice_number
+                                  : doc.credit_note_number}
+                              </p>
+                              {doc.is_locked && (
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  {new Date(doc.created_at).toLocaleDateString(
+                                    doc.lang_snapshot === 'FR'
+                                      ? 'fr-FR'
+                                      : 'en-US',
+                                    {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    }
+                                  )}
+                                </p>
+                              )}
+                              {isInv &&
+                                doc.installment_number &&
+                                doc.installment_total &&
+                                doc.invoice_type !== 'balance' && (
+                                  <p className="text-[10px] text-indigo-600 font-bold mt-0.5 uppercase tracking-wider">
+                                    {doc.invoice_type === 'deposit'
+                                      ? estimate.lang_snapshot === 'FR'
+                                        ? `Acompte ${doc.installment_number}/${doc.installment_total - 1}`
+                                        : `Deposit ${doc.installment_number} of ${doc.installment_total - 1}`
+                                      : estimate.lang_snapshot === 'FR'
+                                        ? `Versement ${doc.installment_number} sur ${doc.installment_total}`
+                                        : `Installment ${doc.installment_number} of ${doc.installment_total}`}
+                                  </p>
+                                )}
+                            </div>
+
+                            {/* Column 3: Grand Total */}
+                            <div className="flex sm:justify-end text-left sm:text-right pr-4 min-w-[120px]">
                               <span
                                 className={`font-mono text-base font-bold tabular-nums ${
                                   !isInv ? 'text-purple-600' : 'text-gray-800'
@@ -3270,34 +3285,36 @@ export default function EstimateView() {
                                   doc.country_snapshot === 'FR' ? 'FR' : 'US'
                                 )}
                               </span>
-                              <div className="flex items-center gap-2">
-                                <LinkButton
-                                  href={`/${isInv ? 'invoices' : 'credit-notes'}/${doc.id}`}
-                                  variant="ghost"
-                                  size="sm"
+                            </div>
+
+                            {/* Column 4: Document Action Buttons */}
+                            <div className="flex items-center justify-start sm:justify-end gap-2 shrink-0">
+                              <LinkButton
+                                href={`/${isInv ? 'invoices' : 'credit-notes'}/${doc.id}`}
+                                variant="ghost"
+                                size="sm"
+                              >
+                                {doc.is_locked
+                                  ? isInv
+                                    ? lang.viewInvoice || 'View'
+                                    : lang.viewCreditNote || 'View'
+                                  : isInv
+                                    ? lang.reviseInvoice || 'Edit'
+                                    : lang.editCreditNote || 'Edit'}
+                              </LinkButton>
+                              {!doc.is_locked && (
+                                <button
+                                  onClick={() =>
+                                    handleDeleteDraftDoc(doc.id, doc.docType)
+                                  }
+                                  disabled={deletingDocId === doc.id}
+                                  className="text-[10px] font-bold uppercase tracking-wider text-red-400 hover:text-red-600 hover:bg-red-50 px-2.5 py-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
                                 >
-                                  {doc.is_locked
-                                    ? isInv
-                                      ? lang.viewInvoice || 'View'
-                                      : lang.viewCreditNote || 'View'
-                                    : isInv
-                                      ? lang.reviseInvoice || 'Edit'
-                                      : lang.editCreditNote || 'Edit'}
-                                </LinkButton>
-                                {!doc.is_locked && (
-                                  <button
-                                    onClick={() =>
-                                      handleDeleteDraftDoc(doc.id, doc.docType)
-                                    }
-                                    disabled={deletingDocId === doc.id}
-                                    className="text-[10px] font-bold uppercase tracking-wider text-red-400 hover:text-red-600 hover:bg-red-50 px-2.5 py-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
-                                  >
-                                    {deletingDocId === doc.id
-                                      ? '...'
-                                      : lang.delete || 'Delete'}
-                                  </button>
-                                )}
-                              </div>
+                                  {deletingDocId === doc.id
+                                    ? '...'
+                                    : lang.delete || 'Delete'}
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -3684,8 +3701,19 @@ export default function EstimateView() {
                               dueDate.getDate() + i * intervalDays
                             );
 
+                            const hasFinalizedDeposit = allBillingDocs.some(
+                              (doc) =>
+                                doc.docType === 'invoice' &&
+                                doc.invoice_type === 'deposit' &&
+                                doc.is_locked &&
+                                !doc.is_cancelled
+                            );
+
                             let amount = 0;
-                            if (estimate.deposit_enabled) {
+                            if (
+                              estimate.deposit_enabled &&
+                              !hasFinalizedDeposit
+                            ) {
                               const depositAmt = Math.round(
                                 (remainingForInstallments *
                                   (estimate.deposit_percentage || 20)) /
@@ -3756,8 +3784,17 @@ export default function EstimateView() {
                 ) : (
                   <div className="space-y-4">
                     {customInstallments.map((inst, i) => {
+                      const hasFinalizedDeposit = allBillingDocs.some(
+                        (doc) =>
+                          doc.docType === 'invoice' &&
+                          doc.invoice_type === 'deposit' &&
+                          doc.is_locked &&
+                          !doc.is_cancelled
+                      );
                       const isLockedDepositInput =
-                        estimate.deposit_enabled && i === 0;
+                        estimate.deposit_enabled &&
+                        !hasFinalizedDeposit &&
+                        i === 0;
                       return (
                         <div key={i} className="flex items-center gap-2">
                           <span className="text-[10px] font-black text-gray-400 w-6 shrink-0">
@@ -3892,6 +3929,14 @@ export default function EstimateView() {
                               ? 7
                               : installmentCustomDays;
 
+                      const hasFinalizedDeposit = allBillingDocs.some(
+                        (doc) =>
+                          doc.docType === 'invoice' &&
+                          doc.invoice_type === 'deposit' &&
+                          doc.is_locked &&
+                          !doc.is_cancelled
+                      );
+
                       const installments = Array.from(
                         { length: installmentCount },
                         (_, i) => {
@@ -3899,7 +3944,10 @@ export default function EstimateView() {
                           d.setDate(d.getDate() + i * intervalDays);
 
                           let amount = 0;
-                          if (estimate.deposit_enabled) {
+                          if (
+                            estimate.deposit_enabled &&
+                            !hasFinalizedDeposit
+                          ) {
                             const depositAmt = Math.round(
                               (remainingForInstallments *
                                 (estimate.deposit_percentage || 20)) /

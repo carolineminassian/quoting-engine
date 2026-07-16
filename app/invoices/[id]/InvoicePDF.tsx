@@ -901,11 +901,6 @@ export default function InvoicePDF({
 
             {lineItems.map((item, idx) => {
               const isLast = idx === lineItems.length - 1;
-              const hasUnitPriceInfo = (item.unit_price_cents || 0) > 0;
-              const qtyLabel =
-                item.quantity && item.quantity !== 1
-                  ? `${item.quantity} × `
-                  : '';
               return (
                 <View
                   key={idx}
@@ -919,17 +914,6 @@ export default function InvoicePDF({
                     <Text style={styles.serviceAmount}>
                       {formatCents(item.amount_cents)}
                     </Text>
-                  </View>
-
-                  <View style={styles.serviceContentBlock}>
-                    {hasUnitPriceInfo && (
-                      <Text style={styles.serviceDescription}>
-                        {qtyLabel}
-                        {formatCents(item.unit_price_cents)}
-                        {item.tax_rate > 0 &&
-                          ` (${isFr ? 'TVA' : 'Tax'} ${item.tax_rate}%)`}
-                      </Text>
-                    )}
                   </View>
                 </View>
               );
