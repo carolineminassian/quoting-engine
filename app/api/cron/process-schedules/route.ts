@@ -160,7 +160,7 @@ export async function GET(request: Request) {
           const { data: invoiceNumber, error: seqError } =
             await supabaseAdmin.rpc('generate_invoice_number', {
               p_user_id: schedule.user_id,
-              p_country: estCountry
+              p_lang: estimate?.lang_snapshot || 'EN' // passes the snapshotted language of the estimate
             });
 
           if (seqError || !invoiceNumber)
