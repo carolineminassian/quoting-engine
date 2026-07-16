@@ -3746,13 +3746,17 @@ export default function EstimateView() {
                                   : base;
                             }
 
+                            const isRealDepositRow =
+                              estimate.deposit_enabled &&
+                              !hasFinalizedDeposit &&
+                              i === 0;
                             return (
                               <div
                                 key={i}
                                 className="flex justify-between items-center text-xs"
                               >
                                 <span className="text-gray-500">
-                                  {estimate.deposit_enabled && i === 0
+                                  {isRealDepositRow
                                     ? profile.country === 'FR'
                                       ? 'Acompte'
                                       : 'Deposit'
