@@ -3216,7 +3216,7 @@ export default function EstimateView() {
                         return (
                           <div
                             key={`${doc.docType}-${doc.id}`}
-                            className={`grid grid-cols-1 sm:grid-cols-[130px_1fr_auto_auto] items-center gap-4 p-4 rounded-xl border bg-white transition-all ${
+                            className={`grid grid-cols-1 sm:grid-cols-[130px_180px_1fr_auto] items-center gap-4 p-4 rounded-xl border bg-white transition-all ${
                               doc.is_cancelled
                                 ? 'border-gray-100 opacity-50'
                                 : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'

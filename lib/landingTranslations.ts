@@ -43,8 +43,8 @@ export const landingTranslations = {
         desc: 'Clients review and approve via a secure link — no account, no app, no friction.'
       },
       {
-        title: 'Integrated Invoicing',
-        desc: 'One click generates an invoice from an approved estimate. Deposits, balances, and credit notes included.'
+        title: 'Integrated Invoicing & Factur-X',
+        desc: 'One click generates an invoice from an approved estimate. Includes deposits, balances, credit notes, and automatic 2026 Factur-X e-invoicing compliance.'
       },
       {
         title: 'Analytics Dashboard',
@@ -53,10 +53,6 @@ export const landingTranslations = {
       {
         title: 'Reusable Templates',
         desc: 'Save your best estimate structures and reuse them on new projects in one click.'
-      },
-      {
-        title: 'Bilingual FR / EN',
-        desc: 'Built natively for French and US markets. Documents switch language automatically.'
       }
     ],
 
@@ -116,6 +112,10 @@ export const landingTranslations = {
       {
         q: 'Is this available in French and English?',
         a: 'Yes. The platform is fully bilingual. Documents switch language based on your market setting.'
+      },
+      {
+        q: 'Is PactEstim compliant with the 2026 French e-Invoicing mandate?',
+        a: 'Yes. PactEstim automatically generates certified Factur-X files (combining a visual PDF and machine-readable XML). You can export compliant zip archives in one click to upload to your PPF account. Direct, automated API transmission to the state portal is fully included in the Pro plan and will launch as soon as the government opens the PPF API gateways.'
       },
       {
         q: "What's included in the free plan?",
@@ -221,8 +221,8 @@ export const landingTranslations = {
         desc: 'Le client consulte et approuve via un lien sécurisé — sans compte, sans application.'
       },
       {
-        title: 'Facturation Intégrée',
-        desc: 'Un clic génère une facture depuis le devis approuvé. Acomptes, soldes et avoirs inclus.'
+        title: 'Facturation & Factur-X Intégrés',
+        desc: 'Générez vos factures (acomptes, soldes, avoirs) en 1 clic depuis vos devis approuvés. Prise en charge automatique du format obligatoire Factur-X pour 2026.'
       },
       {
         title: 'Tableau de Bord Analytique',
@@ -231,10 +231,6 @@ export const landingTranslations = {
       {
         title: 'Modèles Réutilisables',
         desc: 'Enregistrez vos meilleures structures et réutilisez-les sur de nouveaux projets en un clic.'
-      },
-      {
-        title: 'Bilingue FR / EN',
-        desc: 'Conçu nativement pour les marchés français et américain. Les documents changent de langue automatiquement.'
       }
     ],
 
@@ -295,6 +291,10 @@ export const landingTranslations = {
       {
         q: 'Est-ce disponible en français et en anglais ?',
         a: 'Oui. La plateforme est entièrement bilingue. Les documents changent de langue selon votre marché.'
+      },
+      {
+        q: 'PactEstim est-il prêt pour la réforme de la facture électronique 2026 ?',
+        a: "Oui. PactEstim génère automatiquement vos factures au format Factur-X (PDF avec XML embarqué). Vous pouvez exporter vos archives conformes en 1 clic pour les déposer sur le Portail Public de Facturation (PPF). L'envoi automatique et direct via API au portail de l'État est inclus dans l'offre Pro et s'activera dès l'ouverture des passerelles gouvernementales."
       },
       {
         q: "Qu'est-ce qui est inclus dans le plan gratuit ?",
