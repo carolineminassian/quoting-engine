@@ -42,8 +42,8 @@ export async function GET(request: Request) {
           continue;
         }
 
-        const estCountry = estimate.country_snapshot || profile.country || 'US';
-        const isFr = estCountry === 'FR';
+        // Decoupled: email templates strictly follow the document's language snapshot
+        const isFr = estimate.lang_snapshot === 'FR';
 
         // Check remaining balance
         const { data: existingInvoices } = await supabaseAdmin

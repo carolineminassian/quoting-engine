@@ -2378,155 +2378,161 @@ export default function InvoiceView() {
               </Button>
             </div>
           )}
-          {/* STATUS BANNER */}
-          <div
-            className={`mb-6 px-5 py-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden ${
-              invoice.is_cancelled
-                ? 'bg-gray-50 border-gray-200'
-                : invoice.payment_status === 'paid'
-                  ? 'bg-green-50/50 border-green-200'
-                  : isOverdue
-                    ? 'bg-red-50/50 border-red-200'
-                    : !invoice.is_locked
-                      ? 'bg-amber-50/50 border-amber-200'
-                      : 'bg-gray-50 border-gray-200'
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              {!invoice.is_locked && (
-                <>
-                  <span className="text-amber-600 text-lg">✏</span>
-                  <span className="text-amber-700 font-semibold text-sm">
-                    {lang.invoiceDraft}
-                  </span>
-                  <span
-                    className={`text-xs ml-2 font-medium transition-colors duration-300 ${
-                      savingEdit
-                        ? 'text-amber-500'
+          {/* STATUS BANNER — only visible to owners; hidden for guests to maintain a clean document look */}
+          {isOwner && (
+            <div
+              className={`mb-6 px-5 py-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden ${
+                invoice.is_cancelled
+                  ? 'bg-gray-50 border-gray-200'
+                  : invoice.payment_status === 'paid'
+                    ? 'bg-green-50/50 border-green-200'
+                    : isOverdue
+                      ? 'bg-red-50/50 border-red-200'
+                      : !invoice.is_locked
+                        ? 'bg-amber-50/50 border-amber-200'
+                        : 'bg-gray-50 border-gray-200'
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                {!invoice.is_locked && (
+                  <>
+                    <span className="text-amber-600 text-lg">✏</span>
+                    <span className="text-amber-700 font-semibold text-sm">
+                      {lang.invoiceDraft}
+                    </span>
+                    <span
+                      className={`text-xs ml-2 font-medium transition-colors duration-300 ${
+                        savingEdit
+                          ? 'text-amber-500'
+                          : isDirty
+                            ? 'text-amber-400'
+                            : 'text-emerald-500'
+                      }`}
+                    >
+                      {savingEdit
+                        ? lang.saving
                         : isDirty
-                          ? 'text-amber-400'
-                          : 'text-emerald-500'
-                    }`}
-                  >
-                    {savingEdit
-                      ? lang.saving
-                      : isDirty
-                        ? lang.waitingToSave
-                        : lang.saved}
-                  </span>
+                          ? lang.waitingToSave
+                          : lang.saved}
+                    </span>
 
-                  {estimate &&
-                    (() => {
-                      const remaining = Math.max(
-                        0,
-                        (estimate.total_amount_cents || 0) -
-                          finalizedNetOtherInvoicesCents
-                      );
-                      const current = billedTotals.totalCents;
-                      const over = current - remaining;
-                      const alreadyMatches = Math.abs(current - remaining) <= 1;
-                      const showAdjustBtn =
-                        isStructurallyEditable &&
-                        !isLineItemInvoice &&
-                        !alreadyMatches &&
-                        remaining > 0 &&
-                        baseTotals.totalCents > 0 &&
-                        finalizedNetOtherInvoicesCents > 0;
+                    {estimate &&
+                      (() => {
+                        const remaining = Math.max(
+                          0,
+                          (estimate.total_amount_cents || 0) -
+                            finalizedNetOtherInvoicesCents
+                        );
+                        const current = billedTotals.totalCents;
+                        const over = current - remaining;
+                        const alreadyMatches =
+                          Math.abs(current - remaining) <= 1;
+                        const showAdjustBtn =
+                          isStructurallyEditable &&
+                          !isLineItemInvoice &&
+                          !alreadyMatches &&
+                          remaining > 0 &&
+                          baseTotals.totalCents > 0 &&
+                          finalizedNetOtherInvoicesCents > 0;
 
-                      return (
-                        <span className="w-full flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-600 font-medium sm:ml-3 sm:w-auto sm:pl-3 sm:border-l sm:border-amber-200">
-                          {over > 0 ? (
-                            <span className="text-red-500 font-bold">
-                              ⚠ {fmt(over)}{' '}
-                              {lang.overBudget || 'over remaining'}
-                            </span>
-                          ) : (
-                            <>
-                              {lang.remainingOnEstimate ||
-                                'Remaining on estimate'}
-                              :{' '}
-                              <span className="font-bold text-amber-800">
-                                {fmt(remaining)}
+                        return (
+                          <span className="w-full flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-600 font-medium sm:ml-3 sm:w-auto sm:pl-3 sm:border-l sm:border-amber-200">
+                            {over > 0 ? (
+                              <span className="text-red-500 font-bold">
+                                ⚠ {fmt(over)}{' '}
+                                {lang.overBudget || 'over remaining'}
                               </span>
-                              {current > 0 && (
-                                <span className="text-amber-500">
-                                  ({lang.thisInvoice || 'this invoice'}:{' '}
-                                  {fmt(current)})
+                            ) : (
+                              <>
+                                {lang.remainingOnEstimate ||
+                                  'Remaining on estimate'}
+                                :{' '}
+                                <span className="font-bold text-amber-800">
+                                  {fmt(remaining)}
                                 </span>
-                              )}
-                            </>
-                          )}
-                          {showAdjustBtn && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleScaleToRemaining}
-                              className="!text-amber-700 !border !border-amber-300 hover:!bg-amber-100 !py-0.5 !px-2 !text-[10px] !font-bold !uppercase !tracking-wider !h-auto"
-                            >
-                              {lang.adjustToRemaining || 'Adjust to remaining'}
-                            </Button>
-                          )}
-                        </span>
-                      );
-                    })()}
-                </>
-              )}
+                                {current > 0 && (
+                                  <span className="text-amber-500">
+                                    ({lang.thisInvoice || 'this invoice'}:{' '}
+                                    {fmt(current)})
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {showAdjustBtn && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleScaleToRemaining}
+                                className="!text-amber-700 !border !border-amber-300 hover:!bg-amber-100 !py-0.5 !px-2 !text-[10px] !font-bold !uppercase !tracking-wider !h-auto"
+                              >
+                                {lang.adjustToRemaining ||
+                                  'Adjust to remaining'}
+                              </Button>
+                            )}
+                          </span>
+                        );
+                      })()}
+                  </>
+                )}
 
-              {invoice.is_locked && (
-                <>
-                  {invoice.is_cancelled && (
-                    <span className="text-gray-500 text-lg">⊘</span>
-                  )}
-                  {invoice.payment_status === 'paid' && (
-                    <span className="text-green-600 text-lg">✓</span>
-                  )}
-                  {isOverdue && <span className="text-red-600 text-lg">⚠</span>}
-                  <span className="text-gray-700 font-semibold text-sm">
-                    {invoice.is_cancelled
-                      ? lang.invoiceCancelledLabel
-                      : invoice.payment_status === 'paid'
-                        ? lang.invoicePaid
-                        : isOverdue
-                          ? lang.invoiceOverdue
-                          : invoice.last_email_sent_at
-                            ? lang.invoiceSent
-                            : lang.invoiceUnpaid}
-                  </span>
-                  {invoice.installment_number &&
-                    invoice.installment_total &&
-                    invoice.invoice_type !== 'balance' && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 ml-2">
-                        {invoice.invoice_type === 'deposit'
-                          ? profile.country === 'FR'
-                            ? `Acompte ${invoice.installment_number}/${invoice.installment_total - 1}`
-                            : `Deposit ${invoice.installment_number} of ${invoice.installment_total - 1}`
-                          : profile.country === 'FR'
-                            ? `Versement ${invoice.installment_number} sur ${invoice.installment_total}`
-                            : `Installment ${invoice.installment_number} of ${invoice.installment_total}`}
-                      </span>
+                {invoice.is_locked && (
+                  <>
+                    {invoice.is_cancelled && (
+                      <span className="text-gray-500 text-lg">⊘</span>
                     )}
-                </>
-              )}
-            </div>
+                    {invoice.payment_status === 'paid' && (
+                      <span className="text-green-600 text-lg">✓</span>
+                    )}
+                    {isOverdue && (
+                      <span className="text-red-600 text-lg">⚠</span>
+                    )}
+                    <span className="text-gray-700 font-semibold text-sm">
+                      {invoice.is_cancelled
+                        ? lang.invoiceCancelledLabel
+                        : invoice.payment_status === 'paid'
+                          ? lang.invoicePaid
+                          : isOverdue
+                            ? lang.invoiceOverdue
+                            : invoice.last_email_sent_at
+                              ? lang.invoiceSent
+                              : lang.invoiceUnpaid}
+                    </span>
+                    {invoice.installment_number &&
+                      invoice.installment_total &&
+                      invoice.invoice_type !== 'balance' && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 ml-2">
+                          {invoice.invoice_type === 'deposit'
+                            ? profile.country === 'FR'
+                              ? `Acompte ${invoice.installment_number}/${invoice.installment_total - 1}`
+                              : `Deposit ${invoice.installment_number} of ${invoice.installment_total - 1}`
+                            : profile.country === 'FR'
+                              ? `Versement ${invoice.installment_number} sur ${invoice.installment_total}`
+                              : `Installment ${invoice.installment_number} of ${invoice.installment_total}`}
+                        </span>
+                      )}
+                  </>
+                )}
+              </div>
 
-            {!invoice.is_cancelled &&
-              invoice.payment_status !== 'paid' &&
-              invoice.is_locked &&
-              invoice.due_date && (
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  {lang.dueDate}:{' '}
-                  {new Date(invoice.due_date).toLocaleDateString(
-                    invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
-                    {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    }
-                  )}
-                </span>
-              )}
-          </div>
+              {!invoice.is_cancelled &&
+                invoice.payment_status !== 'paid' &&
+                invoice.is_locked &&
+                invoice.due_date && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    {lang.dueDate}:{' '}
+                    {new Date(invoice.due_date).toLocaleDateString(
+                      invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
+                      {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      }
+                    )}
+                  </span>
+                )}
+            </div>
+          )}
           {/* Upgrade prompt — shown to owner of a draft invoice who is no longer Pro */}
           {isOwner && !invoice.is_locked && !isPro && (
             <div className="mb-6 px-5 py-4 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden">

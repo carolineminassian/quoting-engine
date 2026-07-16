@@ -698,7 +698,7 @@ export default function InvoicePDF({
   const formattedDueDate = docData?.due_date
     ? new Date(docData.due_date).toLocaleDateString(locale, {
         year: 'numeric',
-        month: 'short',
+        month: 'long', // unified with invoice date (long month name)
         day: 'numeric'
       })
     : '';

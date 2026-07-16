@@ -135,6 +135,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Smart Deposit Detection: Check if a locked/finalized deposit invoice already exists
+    const hasFinalizedDeposit = activeInvoices.some(
+      (inv) => (inv as any).invoice_type === 'deposit' && inv.is_locked
+    );
+
     // ── Validate installments ─────────────────────────────────────────────────
     for (const inst of installments) {
       if (!inst.amountCents || inst.amountCents <= 0) {
@@ -245,22 +250,40 @@ export async function POST(request: Request) {
       invoiceDate.setDate(invoiceDate.getDate() - paymentDays);
 
       const isLast = i === installments.length - 1;
-      const invoiceType = estimate.deposit_enabled
-        ? isLast
-          ? 'balance'
-          : 'deposit'
-        : 'full';
+
+      // Smart Deposit mapping: if a deposit invoice already exists,
+      // intermediate installments are 'installment' (or regular full types) and final is 'balance'.
+      let invoiceType: string;
+      if (estimate.deposit_enabled) {
+        if (hasFinalizedDeposit) {
+          invoiceType = isLast ? 'balance' : 'full'; // remaining are full installments, last is balance
+        } else {
+          invoiceType = isLast ? 'balance' : 'deposit'; // first is deposit, rest intermediate, last balance
+        }
+      } else {
+        invoiceType = 'full';
+      }
 
       let description: string;
       if (estimate.deposit_enabled) {
-        const depositCount = totalCount - 1;
-        description = isLast
-          ? isFr
-            ? `Solde final — Devis #${estimateRef}`
-            : `Final Balance — Estimate #${estimateRef}`
-          : isFr
-            ? `Acompte ${i + 1}/${depositCount} — Devis #${estimateRef}`
-            : `Deposit ${i + 1} of ${depositCount} — Estimate #${estimateRef}`;
+        if (hasFinalizedDeposit) {
+          description = isLast
+            ? isFr
+              ? `Solde final — Devis #${estimateRef}`
+              : `Final Balance — Estimate #${estimateRef}`
+            : isFr
+              ? `Échéance ${i + 1}/${totalCount - 1} — Devis #${estimateRef}`
+              : `Installment ${i + 1} of ${totalCount - 1} — Estimate #${estimateRef}`;
+        } else {
+          const depositCount = totalCount - 1;
+          description = isLast
+            ? isFr
+              ? `Solde final — Devis #${estimateRef}`
+              : `Final Balance — Estimate #${estimateRef}`
+            : isFr
+              ? `Acompte ${i + 1}/${depositCount} — Devis #${estimateRef}`
+              : `Deposit ${i + 1} of ${depositCount} — Estimate #${estimateRef}`;
+        }
       } else {
         description = isFr
           ? `Versement ${i + 1} sur ${totalCount} — Devis #${estimateRef}`
