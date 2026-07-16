@@ -1897,15 +1897,14 @@ export default function InvoiceView() {
       const fullProjectSubtotalForPDF =
         invoice.invoice_type === 'balance'
           ? depositRefs
-            ? (depositRefs.reduce(
-                (sum: number, d: any) => sum + (d.subtotal_cents || 0),
-                0
-              ) +
-                billedTotals.subtotalCents) /
-              100
-            : baseTotals.subtotalCents / 100
+            ? Math.round(
+                depositRefs.reduce(
+                  (sum: number, d: any) => sum + (d.subtotal_cents || 0),
+                  0
+                ) + billedTotals.subtotalCents
+              ) / 100
+            : Math.round(baseTotals.subtotalCents) / 100
           : 0;
-
       const depositSubtotalForPDF =
         invoice.invoice_type === 'balance' && !depositRefs
           ? Math.max(0, baseTotals.subtotalCents - billedTotals.subtotalCents) /
@@ -3540,13 +3539,15 @@ export default function InvoiceView() {
                           invoice.deposit_invoice_refs?.length > 0
                             ? invoice.deposit_invoice_refs
                             : null;
-                        const fullSubtotalCents = multiDepositRefs
-                          ? multiDepositRefs.reduce(
-                              (sum: number, d: any) =>
-                                sum + (d.subtotal_cents || 0),
-                              0
-                            ) + billedTotals.subtotalCents
-                          : baseTotals.subtotalCents;
+                        const fullSubtotalCents = Math.round(
+                          multiDepositRefs
+                            ? multiDepositRefs.reduce(
+                                (sum: number, d: any) =>
+                                  sum + (d.subtotal_cents || 0),
+                                0
+                              ) + billedTotals.subtotalCents
+                            : baseTotals.subtotalCents
+                        );
                         return (
                           <div className="flex justify-between items-baseline text-sm">
                             <span className="text-gray-500">
@@ -3586,7 +3587,7 @@ export default function InvoiceView() {
                                         ? new Date(
                                             dep.invoice_date
                                           ).toLocaleDateString(
-                                            profile?.country === 'FR'
+                                            invoice.lang_snapshot === 'FR'
                                               ? 'fr-FR'
                                               : 'en-US',
                                             {
@@ -3631,7 +3632,7 @@ export default function InvoiceView() {
                                         ? new Date(
                                             dep.invoice_date
                                           ).toLocaleDateString(
-                                            profile?.country === 'FR'
+                                            invoice.lang_snapshot === 'FR'
                                               ? 'fr-FR'
                                               : 'en-US',
                                             {
