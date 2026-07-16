@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const { data: invoices, error: fetchError } = await supabaseAdmin
       .from('invoices')
       .select(
-        'id, invoice_number, client_name, client_email, total_amount_cents, currency_snapshot, country_snapshot, payment_status, is_locked, is_cancelled, due_date, last_email_sent_at, last_followup_sent_at'
+        'id, invoice_number, client_name, client_email, total_amount_cents, currency_snapshot, lang_snapshot, country_snapshot, payment_status, is_locked, is_cancelled, due_date, last_email_sent_at, last_followup_sent_at'
       )
       .in('id', invoiceIds)
       .eq('user_id', user.id)
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const country = inv.country_snapshot || profile.country || 'US';
+      const country = inv.lang_snapshot || profile.country || 'US';
       const isFr = country === 'FR';
       const currency = inv.currency_snapshot || (isFr ? 'EUR' : 'USD');
       const amount = (inv.total_amount_cents / 100).toFixed(2);

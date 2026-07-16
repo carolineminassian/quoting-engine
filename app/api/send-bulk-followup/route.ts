@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const { data: estimates, error: fetchError } = await supabaseAdmin
       .from('estimates')
       .select(
-        'id, custom_id, client_name, client_email, client_status, cancelled_at, superseded_at, last_followup_sent_at, country_snapshot'
+        'id, custom_id, client_name, client_email, client_status, cancelled_at, superseded_at, last_followup_sent_at, lang_snapshot, country_snapshot'
       )
       .in('id', estimateIds)
       .eq('user_id', user.id)
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const estCountry = est.country_snapshot || profile.country || 'US';
+      const estCountry = est.lang_snapshot || profile.country || 'US';
       const isFr = estCountry === 'FR';
       const customId = est.custom_id || est.id.slice(0, 8);
       const estimateUrl = `${baseUrl || 'https://pactestim.com'}/estimates/${est.id}`;
