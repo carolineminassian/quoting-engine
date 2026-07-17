@@ -251,16 +251,69 @@ export async function POST(request: Request) {
       throw new Error(`Storage upload failed: ${uploadError.message}`);
     }
 
-    // 7. Update database record to announce successful Factur-X compilation
+    // Extract or compute the 9-digit SIREN for both parties from snapshots (needed for French PPF envelope schema)
+    // Fallback: If SIREN is blank but SIRET is present, slice the first 9 digits.
+    const rawSellerSiret = invoice.business_reg_snapshot || ''; // Often stores the French SIRET
+    const sellerSiren =
+      invoice.business_siren ||
+      (rawSellerSiret.replace(/\s+/g, '').length >= 9
+        ? rawSellerSiret.replace(/\s+/g, '').substring(0, 9)
+        : '');
+
+    const rawBuyerSiret = invoice.client_siret || '';
+    const buyerSiren =
+      invoice.client_siren ||
+      (rawBuyerSiret.replace(/\s+/g, '').length >= 9
+        ? rawBuyerSiret.replace(/\s+/g, '').substring(0, 9)
+        : '');
+
+    // 7. Auto-Route to French State Portal (PPF Sandbox) if API credentials are configured
+    let ppfReceiptId = null;
+    let ppfStatus = null;
+
+    if (process.env.PPF_CLIENT_ID && process.env.PPF_CLIENT_SECRET) {
+      const { transmitInvoiceToPPF } = await import('@/lib/ppfRouter');
+
+      if (!sellerSiren || !buyerSiren) {
+        console.warn(
+          `PPF Submission skipped for invoice ${invoice.invoice_number}: Missing required SIREN identifiers. Seller: ${sellerSiren}, Buyer: ${buyerSiren}`
+        );
+      } else {
+        const ppfResult = await transmitInvoiceToPPF({
+          pdfBuffer: Buffer.from(modifiedPdfBytes),
+          invoiceNumber: invoice.invoice_number,
+          sellerSiren,
+          buyerSiren
+        });
+
+        if (ppfResult.success) {
+          ppfReceiptId = ppfResult.ppfRegistryId;
+          ppfStatus = ppfResult.status;
+        } else {
+          console.error(
+            `PPF Submission failed for invoice ${invoice.invoice_number}:`,
+            ppfResult.error
+          );
+        }
+      }
+    }
+
+    // 8. Update database record to announce successful Factur-X compilation
     await supabaseAdmin
       .from('invoices')
-      .update({ factur_x_compiled: true })
+      .update({
+        factur_x_compiled: true,
+        // Save the state portal registration receipts in the database
+        ppf_receipt_id: ppfReceiptId || null,
+        ppf_status: ppfStatus || null
+      })
       .eq('id', invoiceId);
 
     return NextResponse.json({
       success: true,
       pdfBase64: modifiedBase64,
-      filePath: filePath
+      filePath: filePath,
+      ppfReceiptId
     });
   } catch (err: any) {
     console.error('Factur-X compilation failed:', err);
