@@ -358,6 +358,7 @@ export default function DashboardPage() {
       for (const est of processedEstimates) {
         const currentLang =
           est.lang_snapshot === 'FR' ? translations.FR : translations.US;
+        const estCountry = est.country_snapshot || profile?.country || 'US';
 
         // 1. Hydrate items with material data (name/cost/unit) where missing
         const hydratedSections = hydrateSections(
@@ -492,7 +493,7 @@ export default function DashboardPage() {
             }}
             profile={{
               ...profile,
-              country,
+              country: estCountry,
               currency: est.currency_snapshot || profile?.currency
             }}
             lang={currentLang}
