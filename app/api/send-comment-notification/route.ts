@@ -20,7 +20,8 @@ export async function POST(request: Request) {
       ownerId,
       estimateUrl,
       country,
-      lang_snapshot // Decoupled language snapshot
+      lang_snapshot,
+      langSnapshot // Support both conventions in the destructured request body
     } = body;
 
     if (!ownerId) {
