@@ -48,11 +48,13 @@ export default function CreateCreditNotePage() {
         // Fetch the user's profile to set their preferred language for the error screen
         const { data: prof } = await supabase
           .from('profiles')
-          .select('country')
+          .select('country, default_lang')
           .eq('id', user.id)
           .single();
 
-        setLang(prof?.country === 'FR' ? translations.FR : translations.US);
+        const activeLang =
+          prof?.default_lang || (prof?.country === 'FR' ? 'FR' : 'EN');
+        setLang(activeLang === 'FR' ? translations.FR : translations.US);
         setLoading(false);
         return;
       }
@@ -70,10 +72,11 @@ export default function CreateCreditNotePage() {
 
       // ALWAYS use the invoice's snapshots for language and currency,
       // so a FR invoice stays FR even if the user later moved to the US.
+      const invoiceLang = inv.lang_snapshot || 'EN';
       const invoiceCountry = inv.country_snapshot || prof?.country || 'US';
       const invoiceCurrency = inv.currency_snapshot || prof?.currency || 'USD';
 
-      setLang(invoiceCountry === 'FR' ? translations.FR : translations.US);
+      setLang(invoiceLang === 'FR' ? translations.FR : translations.US);
 
       setPoNumber(inv.po_number || '');
 
@@ -104,30 +107,20 @@ export default function CreateCreditNotePage() {
     } else {
       const parsed = parseFloat(partialAmount);
       if (!parsed || parsed <= 0) {
-        setError(
-          profile?.country === 'FR'
-            ? 'Veuillez saisir un montant valide.'
-            : 'Please enter a valid amount.'
-        );
+        setError(lang.invalidAmountEntered);
         return;
       }
       amountCents = Math.round(parsed * 100);
       if (amountCents > remainingCreditableCents) {
         setError(
-          profile?.country === 'FR'
-            ? `Le montant ne peut pas dépasser ${fmt(remainingCreditableCents)}.`
-            : `Amount cannot exceed ${fmt(remainingCreditableCents)}.`
+          t(lang.amountExceedsLimit, { limit: fmt(remainingCreditableCents) })
         );
         return;
       }
     }
 
     if (!reason.trim()) {
-      setError(
-        profile?.country === 'FR'
-          ? 'Veuillez indiquer un motif.'
-          : 'Please provide a reason.'
-      );
+      setError(lang.pleaseProvideReason);
       return;
     }
 
@@ -218,9 +211,10 @@ export default function CreateCreditNotePage() {
           {(invoice.credited_amount_cents || 0) > 0 && (
             <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-xs font-bold text-amber-700">
-                {profile?.country === 'FR'
-                  ? `${fmt(invoice.credited_amount_cents)} déjà crédité. Crédit restant : ${fmt(remainingCreditableCents)}`
-                  : `${fmt(invoice.credited_amount_cents)} already credited. Remaining creditable: ${fmt(remainingCreditableCents)}`}
+                {t(lang.alreadyCreditedWarning, {
+                  credited: fmt(invoice.credited_amount_cents),
+                  remaining: fmt(remainingCreditableCents)
+                })}
               </p>
             </div>
           )}
@@ -228,7 +222,7 @@ export default function CreateCreditNotePage() {
           {/* Credit type selection */}
           <div className="mb-6">
             <label className="block text-[10px] font-black uppercase tracking-widests text-gray-400 mb-3">
-              {profile?.country === 'FR' ? "Type d'avoir" : 'Credit Type'}
+              {lang.creditTypeSelectorLabel}
             </label>
             <div className="flex border border-gray-200 rounded-xl p-1 bg-gray-50/50 gap-1">
               <button
@@ -310,8 +304,7 @@ export default function CreateCreditNotePage() {
                 />
               </div>
               <p className="text-[10px] text-gray-400 mt-1.5">
-                {profile?.country === 'FR' ? 'Max :' : 'Max:'}{' '}
-                {fmt(remainingCreditableCents)}
+                {lang.maxLabel} : {fmt(remainingCreditableCents)}
               </p>
             </div>
           )}

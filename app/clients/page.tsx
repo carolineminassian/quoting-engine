@@ -31,11 +31,13 @@ export default function ClientsPage() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('country')
+        .select('country, default_lang')
         .eq('id', session.user.id)
         .single();
 
-      setLang(prof?.country === 'FR' ? translations.FR : translations.US);
+      const clientLang =
+        prof?.default_lang || (prof?.country === 'FR' ? 'FR' : 'EN');
+      setLang(clientLang === 'FR' ? translations.FR : translations.US);
 
       const { data: clientData } = await supabase
         .from('clients')

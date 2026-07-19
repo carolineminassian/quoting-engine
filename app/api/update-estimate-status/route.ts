@@ -21,13 +21,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid data' }, { status: 400 });
     }
 
-    // 1. Update status and fetch estimate data in one go
+    // 1. Update status and fetch estimate data in one go (include lang_snapshot)
     const { data: estimate, error: updateError } = await supabaseAdmin
       .from('estimates')
       .update({ client_status: status })
       .eq('id', estimateId)
       .select(
-        'user_id, client_name, client_email, custom_id, estimate_number, country_snapshot'
+        'user_id, client_name, client_email, custom_id, estimate_number, country_snapshot, lang_snapshot'
       )
       .single();
 
@@ -65,8 +65,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Decoupled: set email template language strictly based on estimate snapshot
-    const isFr = estimate.country_snapshot === 'FR';
+    // Decoupled: set email template language strictly based on estimate snapshot lang_snapshot parameter
+    const isFr = estimate.lang_snapshot
+      ? estimate.lang_snapshot === 'FR'
+      : estimate.country_snapshot === 'FR';
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pactestim.com';
 
     // Logos

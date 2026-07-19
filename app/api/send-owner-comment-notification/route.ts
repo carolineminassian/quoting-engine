@@ -19,7 +19,8 @@ export async function POST(request: Request) {
       ownerId,
       clientEmail,
       estimateUrl,
-      country
+      country,
+      lang_snapshot // Decoupled language snapshot from document creation
     } = body;
 
     if (!clientEmail) {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     const ownerEmail = user.email;
-    const isFr = country === 'FR';
+    const isFr = lang_snapshot ? lang_snapshot === 'FR' : country === 'FR';
 
     // Reference the country-specific PactEstim logo
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pactestim.com';

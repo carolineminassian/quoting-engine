@@ -84,6 +84,7 @@ export default function AnalyticsPage() {
       if (prof) {
         const profCountry: 'US' | 'FR' = prof.country === 'FR' ? 'FR' : 'US';
         setCountry(profCountry);
+        // Prioritize explicit profile language preference
         const resolvedLang =
           prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
         setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
@@ -142,8 +143,9 @@ export default function AnalyticsPage() {
   // We use Intl directly with no fraction digits.
   const formatMoney = (cents: number) => {
     const symbol = targetCurrency === 'EUR' ? '€' : '$';
+    // Format numeric separators based on target currency locale rules to ensure decoupled formatting
     const formattedValue = Math.round(cents / 100).toLocaleString(
-      country === 'FR' ? 'fr-FR' : 'en-US'
+      targetCurrency === 'EUR' ? 'fr-FR' : 'en-US'
     );
     return `${symbol}${formattedValue}`;
   };
@@ -350,9 +352,12 @@ export default function AnalyticsPage() {
     d.setMonth(d.getMonth() - (5 - i));
     const m = d.getMonth();
     const y = d.getFullYear();
-    const label = d.toLocaleString(country === 'FR' ? 'fr-FR' : 'en-US', {
-      month: 'short'
-    });
+    const label = d.toLocaleString(
+      prof?.default_lang === 'FR' ? 'fr-FR' : 'en-US',
+      {
+        month: 'short'
+      }
+    );
 
     const val = rawEstimates
       .filter((e) => {
@@ -469,9 +474,12 @@ export default function AnalyticsPage() {
     d.setMonth(d.getMonth() - (5 - i));
     const m = d.getMonth();
     const y = d.getFullYear();
-    const label = d.toLocaleString(country === 'FR' ? 'fr-FR' : 'en-US', {
-      month: 'short'
-    });
+    const label = d.toLocaleString(
+      prof?.default_lang === 'FR' ? 'fr-FR' : 'en-US',
+      {
+        month: 'short'
+      }
+    );
     const invoiced = rawInvoices
       .filter((inv) => {
         const ed = new Date(inv.created_at);

@@ -454,8 +454,7 @@ export default function EstimateView() {
           .order('created_at', { ascending: true })
       ]);
 
-      const docLang =
-        est.lang_snapshot || (est.country_snapshot === 'FR' ? 'FR' : 'EN');
+      const docLang = est.lang_snapshot || 'EN';
       setLang(docLang === 'FR' ? translations.FR : translations.US);
 
       const displayBusinessName =
@@ -730,7 +729,8 @@ export default function EstimateView() {
           businessName: profile.business_name,
           ownerEmail,
           logoUrl: profile.logo_url,
-          country: profile.country
+          country: profile.country,
+          lang_snapshot: estimate.lang_snapshot || 'EN'
         })
       });
 
@@ -997,7 +997,8 @@ export default function EstimateView() {
             businessName: profile.business_name,
             userEmail: currentUserEmail,
             logoUrl: profile.logo_url,
-            country: profile.country
+            country: profile.country,
+            lang_snapshot: estimate.lang_snapshot || 'EN'
           }
         : {
             phone: estimate.client_phone,
@@ -1123,7 +1124,7 @@ export default function EstimateView() {
       const { data: fullInvoices, error: fetchErr } = await supabase
         .from('invoices')
         .select(
-          'id, invoice_number, invoice_type, invoice_description, total_amount_cents, subtotal_cents, tax_amount_cents, payment_status, is_locked, is_cancelled, due_date, currency_snapshot, country_snapshot, created_at, client_name, client_email, client_address, business_name_snapshot, sections, line_items, additional_charges, margin_mode_snapshot, global_margin_snapshot, tax_rate_snapshot, show_details_snapshot'
+          'id, invoice_number, invoice_type, invoice_description, total_amount_cents, subtotal_cents, tax_amount_cents, payment_status, is_locked, is_cancelled, due_date, currency_snapshot, lang_snapshot, country_snapshot, created_at, client_name, client_email, client_address, business_name_snapshot, sections, line_items, additional_charges, margin_mode_snapshot, global_margin_snapshot, tax_rate_snapshot, show_details_snapshot'
         )
         .in(
           'id',
@@ -1138,9 +1139,8 @@ export default function EstimateView() {
         .default;
       const zip = new JSZip();
       for (const inv of fullInvoices) {
-        const country = inv.country_snapshot || profile?.country || 'US';
         const currentLang =
-          country === 'FR' ? translations.FR : translations.US;
+          inv.lang_snapshot === 'FR' ? translations.FR : translations.US;
         const taxRate = inv.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
 
         let blob: Blob | null = null;
@@ -1932,7 +1932,9 @@ export default function EstimateView() {
                         if (followUpState.mode === 'cooldown') {
                           const dateStr =
                             followUpState.cooldownUntil!.toLocaleDateString(
-                              profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                              estimate.lang_snapshot === 'FR'
+                                ? 'fr-FR'
+                                : 'en-US',
                               {
                                 year: 'numeric',
                                 month: 'short',
@@ -2466,7 +2468,9 @@ export default function EstimateView() {
                             date: new Date(
                               estimate.cancelled_at
                             ).toLocaleDateString(
-                              profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                              estimate.lang_snapshot === 'FR'
+                                ? 'fr-FR'
+                                : 'en-US',
                               {
                                 year: 'numeric',
                                 month: 'short',
@@ -2579,16 +2583,14 @@ export default function EstimateView() {
                           )}
                           {profile.vat_number && (
                             <p>
-                              {profile.country === 'FR'
-                                ? `N° TVA : ${profile.vat_number}`
-                                : `VAT: ${profile.vat_number}`}
+                              {t(lang.vatLabel, { vat: profile.vat_number })}
                             </p>
                           )}
                           {profile.company_reg_number && (
                             <p>
-                              {profile.country === 'FR'
-                                ? `SIRET : ${profile.company_reg_number}`
-                                : `Reg: ${profile.company_reg_number}`}
+                              {t(lang.companyRegLabel, {
+                                reg: profile.company_reg_number
+                              })}
                             </p>
                           )}
                         </div>
@@ -2608,7 +2610,7 @@ export default function EstimateView() {
                     </p>
                     <p className="text-xs text-gray-500 mt-1 font-medium">
                       {new Date(estimate.created_at).toLocaleDateString(
-                        profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                        estimate.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
                         { year: 'numeric', month: 'short', day: 'numeric' }
                       )}
                     </p>
@@ -3024,7 +3026,9 @@ export default function EstimateView() {
                             </span>
                             <span className="text-[9px] text-gray-400 font-mono">
                               {new Date(comm.created_at).toLocaleString(
-                                profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                                profile?.default_lang === 'FR'
+                                  ? 'fr-FR'
+                                  : 'en-US',
                                 {
                                   month: 'short',
                                   day: 'numeric',
@@ -3282,7 +3286,7 @@ export default function EstimateView() {
                                 {formatMoney(
                                   doc.total_amount_cents,
                                   doc.currency_snapshot,
-                                  doc.country_snapshot === 'FR' ? 'FR' : 'US'
+                                  doc.currency_snapshot === 'EUR' ? 'FR' : 'US'
                                 )}
                               </span>
                             </div>
@@ -3378,7 +3382,7 @@ export default function EstimateView() {
                                   {new Date(
                                     schedule.next_run_date
                                   ).toLocaleDateString(
-                                    profile.country === 'FR'
+                                    estimate.lang_snapshot === 'FR'
                                       ? 'fr-FR'
                                       : 'en-US',
                                     {
@@ -3565,10 +3569,7 @@ export default function EstimateView() {
                     'Split the remaining balance into a series of scheduled payments. Each installment becomes its own invoice.'}
                 </p>
                 <p className="text-xs text-gray-400 font-bold mt-2">
-                  {profile.country === 'FR'
-                    ? 'Solde restant'
-                    : 'Remaining balance'}
-                  :{' '}
+                  {lang.remainingBalanceLabel} :{' '}
                   <span className="text-gray-700">
                     {fmt(remainingForInstallments)}
                   </span>
@@ -3757,15 +3758,13 @@ export default function EstimateView() {
                               >
                                 <span className="text-gray-500">
                                   {isRealDepositRow
-                                    ? profile.country === 'FR'
-                                      ? 'Acompte'
-                                      : 'Deposit'
-                                    : profile.country === 'FR'
-                                      ? `Versement ${i + 1}`
-                                      : `Installment ${i + 1}`}{' '}
+                                    ? lang.depositRowLabel
+                                    : t(lang.installmentRowLabel, {
+                                        number: i + 1
+                                      })}{' '}
                                   ·{' '}
                                   {dueDate.toLocaleDateString(
-                                    profile.country === 'FR'
+                                    estimate.lang_snapshot === 'FR'
                                       ? 'fr-FR'
                                       : 'en-US',
                                     {
@@ -3887,11 +3886,12 @@ export default function EstimateView() {
                           {ok
                             ? '✓ '
                             : diff > 0
-                              ? `⚠ ${profile.country === 'FR' ? 'Dépassement de' : 'Over by'} ${fmt(diff)} — `
-                              : `⚠ ${fmt(-diff)} ${profile.country === 'FR' ? 'restant — ' : 'remaining — '}`}
-                          {profile.country === 'FR'
-                            ? `Total : ${fmt(total)} / ${fmt(remainingForInstallments)}`
-                            : `Total: ${fmt(total)} / ${fmt(remainingForInstallments)}`}
+                              ? `⚠ ${t(lang.overByLabel, { amount: fmt(diff) })}`
+                              : `⚠ ${t(lang.remainingLabel, { amount: fmt(-diff) })}`}
+                          {t(lang.totalComparison, {
+                            total: fmt(total),
+                            target: fmt(remainingForInstallments)
+                          })}
                         </div>
                       );
                     })()}
@@ -4188,11 +4188,11 @@ export default function EstimateView() {
                         <div
                           className={`mt-2 p-2 rounded-lg border text-xs font-bold ${exceeds ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-200 text-gray-600'}`}
                         >
-                          {profile.country === 'FR'
-                            ? `Total : ${fmt(totalCents)} / ${fmt(remainingForInstallments)}`
-                            : `Total: ${fmt(totalCents)} / ${fmt(remainingForInstallments)}`}
-                          {exceeds &&
-                            ` ⚠ ${profile.country === 'FR' ? 'Dépasse le solde restant' : 'Exceeds remaining balance'}`}
+                          {t(lang.totalComparison, {
+                            total: fmt(totalCents),
+                            target: fmt(remainingForInstallments)
+                          })}
+                          {exceeds && lang.exceedsRemainingWarning}
                         </div>
                       );
                     })()}

@@ -52,7 +52,9 @@ function UpgradeContent() {
 
       if (prof) {
         setProfile(prof);
-        setLang(prof.country === 'FR' ? translations.FR : translations.US);
+        const activeLang =
+          prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
+        setLang(activeLang === 'FR' ? translations.FR : translations.US);
       }
 
       // Count lifetime users to show spots remaining

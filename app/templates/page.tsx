@@ -29,7 +29,7 @@ export default function TemplatesPage() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('country, subscription_tier')
+        .select('country, subscription_tier, default_lang') // Explicitly select default_lang column
         .eq('id', user.id)
         .single();
 
@@ -39,7 +39,9 @@ export default function TemplatesPage() {
       }
 
       setProfile(prof);
-      setLang(prof.country === 'FR' ? translations.FR : translations.US);
+      const activeLang =
+        prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
+      setLang(activeLang === 'FR' ? translations.FR : translations.US);
 
       const { data } = await supabase
         .from('estimate_templates')
@@ -97,7 +99,7 @@ export default function TemplatesPage() {
 
   if (loading || !lang) return <LoadingDots />;
 
-  const isFR = profile?.country === 'FR';
+  const isFR = profile?.default_lang === 'FR';
 
   return (
     <main className="min-h-screen bg-gray-50 p-6 sm:p-8 pb-40 font-sans text-black">

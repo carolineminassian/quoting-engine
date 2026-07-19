@@ -299,13 +299,11 @@ export default function DashboardPage() {
             setDialog({
               type: 'alert',
               message:
-                profile?.country === 'FR'
-                  ? 'Session expirée. Veuillez vous reconnecter.'
-                  : 'Session expired. Please log in again.'
+                lang.sessionExpiredError ||
+                'Session expired. Please log in again.'
             });
             return;
           }
-
           const res = await fetch('/api/send-bulk-followup', {
             method: 'POST',
             headers: {
@@ -358,9 +356,8 @@ export default function DashboardPage() {
       const materialsById = buildMaterialsMap(materials);
 
       for (const est of processedEstimates) {
-        const country = est.country_snapshot || profile?.country || 'US';
         const currentLang =
-          country === 'FR' ? translations.FR : translations.US;
+          est.lang_snapshot === 'FR' ? translations.FR : translations.US;
 
         // 1. Hydrate items with material data (name/cost/unit) where missing
         const hydratedSections = hydrateSections(
@@ -726,7 +723,7 @@ export default function DashboardPage() {
 
   const handleExportCSV = (type: 'summary' | 'detailed') => {
     let csv = '';
-    const isFr = profile?.country === 'FR';
+    const isFr = profile?.default_lang === 'FR';
 
     // CSV Escape Helper: Wraps text in quotes and escapes internal quotes
     const escapeCsv = (str: string) =>
@@ -761,21 +758,16 @@ export default function DashboardPage() {
         const cEmail = escapeCsv(e.client_email);
         const cPhone = escapeCsv(e.client_phone);
         const cAddr = escapeCsv(e.client_address);
-        const statusText = isFr
-          ? e.is_locked
-            ? e.client_status === 'approved'
-              ? 'Approuvé'
-              : e.client_status === 'rejected'
-                ? 'Refusé'
-                : 'En Attente'
-            : 'Brouillon'
-          : e.is_locked
-            ? e.client_status === 'approved'
-              ? 'Approved'
-              : e.client_status === 'rejected'
-                ? 'Rejected'
-                : 'Pending'
-            : 'Draft';
+
+        // Decoupled Status Strings using Translations Dictionary
+        const statusText = e.is_locked
+          ? e.client_status === 'approved'
+            ? lang.csvStatusApproved
+            : e.client_status === 'rejected'
+              ? lang.csvStatusRejected
+              : lang.csvStatusPending
+          : lang.csvStatusDraft;
+
         const status = escapeCsv(statusText);
         const marginMode = escapeCsv(e.margin_mode_snapshot || 'none');
         const globalMargin = formatPct(e.global_margin_snapshot || 0);
@@ -787,11 +779,7 @@ export default function DashboardPage() {
         csv += `${escapeCsv(e.custom_id || e.id)},${date},${cName},${cEmail},${cPhone},${cAddr},${status},${marginMode},${globalMargin},${currency},${grandTotal}\n`;
       });
     } else {
-      const headers = isFr
-        ? "ID Devis,Date,Nom du Client,Email du Client,Téléphone du Client,Adresse du Client,Statut,Catégorie de Service,Description du Service,Catégorie de Coût,Nom de l'Article/Main d'œuvre,Quantité,Unité,Coût de Base,Montant de Base,% Marge,Montant Marge,Prix Client (HT),% TVA,Montant TVA,Prix Client (TTC),Devise\n"
-        : 'Estimate ID,Date,Client Name,Client Email,Client Phone,Client Address,Status,Service Category,Service Description,Cost Category,Item/Labor Name,Quantity,Unit,Base Cost,Base Amount,Margin %,Margin Amount,Client Price (Before Tax),Tax %,Tax Amount,Client Price (Including Tax),Currency\n';
-
-      csv = headers;
+      csv = lang.csvDetailedHeaders;
 
       processedEstimates.forEach((e) => {
         const date = escapeCsv(
@@ -801,21 +789,15 @@ export default function DashboardPage() {
         const cEmail = escapeCsv(e.client_email);
         const cPhone = escapeCsv(e.client_phone);
         const cAddr = escapeCsv(e.client_address);
-        const statusText = isFr
-          ? e.is_locked
-            ? e.client_status === 'approved'
-              ? 'Approuvé'
-              : e.client_status === 'rejected'
-                ? 'Refusé'
-                : 'En Attente'
-            : 'Brouillon'
-          : e.is_locked
-            ? e.client_status === 'approved'
-              ? 'Approved'
-              : e.client_status === 'rejected'
-                ? 'Rejected'
-                : 'Pending'
-            : 'Draft';
+
+        const statusText = e.is_locked
+          ? e.client_status === 'approved'
+            ? lang.csvStatusApproved
+            : e.client_status === 'rejected'
+              ? lang.csvStatusRejected
+              : lang.csvStatusPending
+          : lang.csvStatusDraft;
+
         const status = escapeCsv(statusText);
         const currency = escapeCsv(
           e.currency_snapshot || (isFr ? 'EUR' : 'USD')
@@ -825,7 +807,7 @@ export default function DashboardPage() {
 
         (e.sections || []).forEach((sec: any) => {
           const serviceTitle = escapeCsv(
-            sec.title || (isFr ? 'Service' : 'Service')
+            sec.title || lang.csvDefaultServiceTitle
           );
           const serviceDesc = escapeCsv(sec.description || '');
 
@@ -845,22 +827,12 @@ export default function DashboardPage() {
             const clientPriceInclTax = clientPriceBeforeTax + taxAmount;
 
             const unit =
-              sec.laborType === 'daily'
-                ? isFr
-                  ? 'Jours'
-                  : 'Days'
-                : isFr
-                  ? 'Heures'
-                  : 'Hours';
+              sec.laborType === 'daily' ? lang.csvUnitDays : lang.csvUnitHours;
             const laborName =
               sec.laborType === 'daily'
-                ? isFr
-                  ? "Main-d'œuvre (Jour)"
-                  : 'Daily Labor'
-                : isFr
-                  ? "Main-d'œuvre (Heure)"
-                  : 'Hourly Labor';
-            const costCategory = isFr ? '"Main-d\'œuvre"' : '"Labor"';
+                ? lang.csvLaborDailyName
+                : lang.csvLaborHourlyName;
+            const costCategory = lang.csvCostCategoryLabor;
 
             csv += `${baseInfo},${serviceTitle},${serviceDesc},${costCategory},${escapeCsv(laborName)},${formatQty(qty)},${escapeCsv(unit)},${formatNum(baseCost)},${formatNum(baseAmount)},${formatPct(marginPct)},${formatNum(marginAmount)},${formatNum(clientPriceBeforeTax)},${formatPct(taxRate)},${formatNum(taxAmount)},${formatNum(clientPriceInclTax)},${currency}\n`;
           }
@@ -958,7 +930,7 @@ export default function DashboardPage() {
   };
 
   const formatDate = (dateString: string) => {
-    const locale = profile?.country === 'FR' ? 'fr-FR' : 'en-US';
+    const locale = profile?.default_lang === 'FR' ? 'fr-FR' : 'en-US';
     return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'long',
@@ -1081,7 +1053,7 @@ export default function DashboardPage() {
                         setShowClientDropdown(false);
                       }}
                       className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
-                      aria-label="Clear filter"
+                      aria-label={lang.clearFilter}
                     >
                       ✕
                     </button>
@@ -1095,7 +1067,7 @@ export default function DashboardPage() {
                         setShowClientDropdown((prev) => !prev);
                       }}
                       className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 rounded-md text-[10px] transition-colors cursor-pointer"
-                      aria-label="Toggle client list"
+                      aria-label={lang.toggleClientList}
                     >
                       ▼
                     </button>
@@ -1689,8 +1661,8 @@ export default function DashboardPage() {
                       {estimatesWithNotifications.has(est.id) && (
                         <span
                           className="inline-block w-2.5 h-2.5 bg-red-500 rounded-full shadow-sm shadow-red-500/40 animate-pulse"
-                          title="New activity"
-                          aria-label="New activity"
+                          title={lang.newActivity}
+                          aria-label={lang.newActivity}
                         />
                       )}
                       <span
@@ -1839,8 +1811,8 @@ export default function DashboardPage() {
                           handleDelete(est.id);
                         }}
                         className="text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg p-2 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
-                        title="Delete Draft"
-                        aria-label="Delete Draft"
+                        title={lang.deleteDraft}
+                        aria-label={lang.deleteDraft}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"

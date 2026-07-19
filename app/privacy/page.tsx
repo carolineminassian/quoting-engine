@@ -19,12 +19,13 @@ export default function PrivacyPolicy() {
         setIsLoggedIn(true);
         const { data: prof } = await supabase
           .from('profiles')
-          .select('country')
+          .select('country, default_lang') // Explicitly select both columns to satisfy ORM typing
           .eq('id', session.user.id)
           .single();
 
-        if (prof?.country) {
-          const dbLang = prof.country === 'FR' ? 'FR' : 'EN';
+        if (prof) {
+          const dbLang =
+            prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
           setTimeout(() => setLang(dbLang), 0);
           localStorage.setItem('public_lang', dbLang);
           setAuthLoading(false);

@@ -5,6 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
+    const payload = await req.json();
     const {
       email,
       clientName,
@@ -12,8 +13,10 @@ export async function POST(req: Request) {
       businessName,
       userEmail,
       logoUrl,
-      country
-    } = await req.json();
+      country,
+      lang_snapshot,
+      langSnapshot // Safely capture both camelCase and snake_case formats
+    } = payload;
 
     if (!email || !businessName || !userEmail) {
       return NextResponse.json(
@@ -22,7 +25,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const isFr = country === 'FR';
+    // Enforce English ('EN') as the absolute fallback if no language snap is passed
+    const activeLang = langSnapshot || lang_snapshot || 'EN';
+    const isFr = activeLang === 'FR';
 
     console.log(
       `[send-email] Sending to ${email} (lang: ${isFr ? 'FR' : 'EN'}), reply-to: ${userEmail}`

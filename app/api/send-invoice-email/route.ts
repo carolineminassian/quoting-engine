@@ -25,6 +25,8 @@ export async function POST(request: Request) {
       grandTotal,
       currency,
       dueDate,
+      lang_snapshot,
+      langSnapshot,
       // Structured bank fields (replaces bankWireInstructions blob)
       bankName,
       bankAccountNumber,
@@ -40,7 +42,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const isFr = country === 'FR';
+    // Server-Side Source of Truth Lookup:
+    // Query the database directly using the verified invoiceId to get the true lang_snapshot
+    const { data: dbInvoice } = await supabaseAdmin
+      .from('invoices')
+      .select('lang_snapshot, country_snapshot')
+      .eq('id', invoiceId)
+      .single();
+
+    // Prioritize the database value first, then payload parameter, then fallback to country snapshot
+    const activeLang =
+      dbInvoice?.lang_snapshot || langSnapshot || lang_snapshot;
+    const activeCountry = dbInvoice?.country_snapshot || country;
+
+    const isFr = activeLang ? activeLang === 'FR' : activeCountry === 'FR';
     const currencySymbol = currency === 'EUR' ? '€' : '$';
 
     const logoHtml = logoUrl

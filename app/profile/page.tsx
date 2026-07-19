@@ -443,7 +443,7 @@ export default function ProfilePage() {
           // Format the period-end date for the user's locale
           const formattedDate = cancelAt
             ? new Date(cancelAt).toLocaleDateString(
-                country === 'FR' ? 'fr-FR' : 'en-US',
+                defaultLang === 'FR' ? 'fr-FR' : 'en-US',
                 { year: 'numeric', month: 'long', day: 'numeric' }
               )
             : '';
@@ -518,7 +518,7 @@ export default function ProfilePage() {
           // Format the period-end date for the user's locale
           const formattedDate = cancelAt
             ? new Date(cancelAt).toLocaleDateString(
-                country === 'FR' ? 'fr-FR' : 'en-US',
+                defaultLang === 'FR' ? 'fr-FR' : 'en-US',
                 { year: 'numeric', month: 'long', day: 'numeric' }
               )
             : '';
@@ -1364,10 +1364,7 @@ export default function ProfilePage() {
             {/* Payment link */}
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                {lang.paymentLinkLabel ||
-                  (country === 'FR'
-                    ? 'Lien de paiement en ligne'
-                    : 'Online payment link')}
+                {lang.paymentLinkLabel}
               </label>
               <p className="text-[10px] text-gray-400 mb-2 font-medium leading-relaxed">
                 {lang.paymentLinkUrlDesc}
@@ -1391,11 +1388,7 @@ export default function ProfilePage() {
               </p>
               <input
                 type="email"
-                placeholder={
-                  country === 'FR'
-                    ? 'contact@votreentreprise.fr'
-                    : 'contact@yourbusiness.com'
-                }
+                placeholder={lang.contactEmailFieldPlaceholder}
                 className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-bold transition-colors bg-gray-50/40 shadow-inner"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
@@ -1406,16 +1399,11 @@ export default function ProfilePage() {
               {/* VAT number */}
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
-                  {lang.vatNumber ||
-                    (country === 'FR'
-                      ? 'N° TVA intracommunautaire'
-                      : 'VAT number')}
+                  {lang.vatNumber}
                 </label>
                 <input
                   type="text"
-                  placeholder={
-                    country === 'FR' ? 'FR00000000000' : 'GB123456789'
-                  }
+                  placeholder={lang.vatPlaceholder}
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors bg-gray-50/40 shadow-inner"
                   value={vatNumber}
                   onChange={(e) => setVatNumber(e.target.value)}
@@ -1425,14 +1413,11 @@ export default function ProfilePage() {
               {/* Company reg number */}
               <div>
                 <label className="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widests">
-                  {lang.companyRegNumber ||
-                    (country === 'FR' ? 'SIRET' : 'Company reg. number')}
+                  {lang.companyRegNumber}
                 </label>
                 <input
                   type="text"
-                  placeholder={
-                    country === 'FR' ? '000 000 000 00000' : '12345678'
-                  }
+                  placeholder={lang.companyRegPlaceholder}
                   className="w-full p-3.5 border border-gray-200 rounded-xl outline-none focus:border-blue-500 font-mono font-bold transition-colors bg-gray-50/40 shadow-inner"
                   value={companyRegNumber}
                   onChange={(e) => setCompanyRegNumber(e.target.value)}
@@ -1651,7 +1636,7 @@ export default function ProfilePage() {
                         date: new Date(
                           profile.subscription_cancel_at
                         ).toLocaleDateString(
-                          country === 'FR' ? 'fr-FR' : 'en-US',
+                          defaultLang === 'FR' ? 'fr-FR' : 'en-US',
                           { year: 'numeric', month: 'long', day: 'numeric' }
                         )
                       })}

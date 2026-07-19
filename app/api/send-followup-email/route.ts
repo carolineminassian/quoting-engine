@@ -21,7 +21,9 @@ export async function POST(request: Request) {
       businessName,
       ownerEmail,
       logoUrl,
-      country
+      country,
+      lang_snapshot,
+      langSnapshot // Handle both conventions
     } = body;
 
     if (!estimateId || !clientEmail) {
@@ -31,10 +33,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Server-side cooldown check — prevents abuse even if client bypasses UI
+    // Server-side cooldown and language lookup - pulls directly from the database row
     const { data: existing } = await supabaseAdmin
       .from('estimates')
-      .select('last_followup_sent_at')
+      .select('last_followup_sent_at, lang_snapshot, country_snapshot')
       .eq('id', estimateId)
       .single();
 
@@ -49,7 +51,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const isFr = country === 'FR';
+    // Fetch language settings securely from database snapshot, falling back to payload values
+    const activeLang = existing?.lang_snapshot || langSnapshot || lang_snapshot;
+    const activeCountry = existing?.country_snapshot || country;
+    const isFr = activeLang ? activeLang === 'FR' : activeCountry === 'FR';
 
     const logoHtml = logoUrl
       ? `<img src="${logoUrl}" alt="${businessName}" style="max-height: 50px; margin-bottom: 24px; display: block;" />`

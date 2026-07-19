@@ -19,7 +19,8 @@ export async function POST(request: Request) {
       commentContent,
       ownerId,
       estimateUrl,
-      country
+      country,
+      lang_snapshot // Decoupled language snapshot
     } = body;
 
     if (!ownerId) {
@@ -71,7 +72,11 @@ export async function POST(request: Request) {
     }
 
     const ownerEmail = user.email;
-    const isFr = country === 'FR';
+    const isFr = langSnapshot
+      ? langSnapshot === 'FR'
+      : lang_snapshot
+        ? lang_snapshot === 'FR'
+        : country === 'FR';
 
     // Reference your hosted PNG dynamically based on the user's country
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pactestim.com';

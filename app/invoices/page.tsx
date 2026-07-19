@@ -117,7 +117,7 @@ export default function InvoicesPage() {
 
   if (loading || !lang) return <LoadingDots />;
 
-  const isFr = profile?.country === 'FR';
+  const isFr = profile?.default_lang === 'FR';
 
   const isOverdue = (inv: any) =>
     inv.is_locked &&
@@ -278,9 +278,8 @@ export default function InvoicesPage() {
       const zip = new JSZip();
 
       for (const inv of exportable) {
-        const country = inv.country_snapshot || profile?.country || 'US';
         const currentLang =
-          country === 'FR' ? translations.FR : translations.US;
+          inv.lang_snapshot === 'FR' ? translations.FR : translations.US;
         const taxRate = inv.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
 
         let blob: Blob | null = null;
@@ -749,7 +748,7 @@ export default function InvoicesPage() {
                         setShowClientDropdown(false);
                       }}
                       className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
-                      aria-label="Clear filter"
+                      aria-label={lang.clearFilter}
                     >
                       ✕
                     </button>
@@ -763,7 +762,7 @@ export default function InvoicesPage() {
                         setShowClientDropdown((prev) => !prev);
                       }}
                       className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 rounded-md text-[10px] transition-colors cursor-pointer"
-                      aria-label="Toggle client list"
+                      aria-label={lang.toggleClientList}
                     >
                       ▼
                     </button>

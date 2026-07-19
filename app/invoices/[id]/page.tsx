@@ -426,10 +426,12 @@ export default function InvoiceView() {
           if (user) {
             const { data: prof } = await supabase
               .from('profiles')
-              .select('country')
+              .select('country, default_lang')
               .eq('id', user.id)
               .single();
-            setLang(prof?.country === 'FR' ? translations.FR : translations.US);
+            const activeLang =
+              prof?.default_lang || (prof?.country === 'FR' ? 'FR' : 'EN');
+            setLang(activeLang === 'FR' ? translations.FR : translations.US);
           } else {
             setLang(translations.US);
           }
@@ -466,8 +468,7 @@ export default function InvoiceView() {
               : Promise.resolve({ data: [], error: null })
           ]);
         const profileData = profRes.data;
-        const docLang =
-          inv.lang_snapshot || (inv.country_snapshot === 'FR' ? 'FR' : 'EN');
+        const docLang = inv.lang_snapshot || 'EN';
         const pageLang = docLang === 'FR' ? translations.FR : translations.US;
 
         setLang(pageLang);
@@ -1278,7 +1279,7 @@ export default function InvoiceView() {
     try {
       const dueFormatted = invoice.due_date
         ? new Date(invoice.due_date).toLocaleDateString(
-            profile.country === 'FR' ? 'fr-FR' : 'en-US',
+            invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
             { year: 'numeric', month: 'short', day: 'numeric' }
           )
         : null;
@@ -1358,7 +1359,7 @@ export default function InvoiceView() {
     try {
       const dueFormatted = invoice.due_date
         ? new Date(invoice.due_date).toLocaleDateString(
-            profile.country === 'FR' ? 'fr-FR' : 'en-US',
+            invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
             { year: 'numeric', month: 'short', day: 'numeric' }
           )
         : null;
@@ -1585,7 +1586,7 @@ export default function InvoiceView() {
             depositDate={
               !depositRefs && depositInvoice?.invoice_date
                 ? new Date(depositInvoice.invoice_date).toLocaleDateString(
-                    profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                    invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
                     { year: 'numeric', month: 'short', day: 'numeric' }
                   )
                 : undefined
@@ -1931,7 +1932,7 @@ export default function InvoiceView() {
           depositDate={
             !depositRefs && depositInvoice?.invoice_date
               ? new Date(depositInvoice.invoice_date).toLocaleDateString(
-                  profile?.country === 'FR' ? 'fr-FR' : 'en-US',
+                  invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US',
                   { year: 'numeric', month: 'short', day: 'numeric' }
                 )
               : undefined
@@ -2221,7 +2222,9 @@ export default function InvoiceView() {
                               className="flex-1 sm:flex-none opacity-60"
                               title={t(lang.followUpCooldown, {
                                 date: followUpState.cooldownUntil!.toLocaleDateString(
-                                  profile.country === 'FR' ? 'fr-FR' : 'en-US',
+                                  invoice.lang_snapshot === 'FR'
+                                    ? 'fr-FR'
+                                    : 'en-US',
                                   {
                                     month: 'short',
                                     day: 'numeric',
@@ -2497,19 +2500,6 @@ export default function InvoiceView() {
                               ? lang.invoiceSent
                               : lang.invoiceUnpaid}
                     </span>
-                    {invoice.installment_number &&
-                      invoice.installment_total &&
-                      invoice.invoice_type !== 'balance' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 ml-2">
-                          {invoice.invoice_type === 'deposit'
-                            ? profile.country === 'FR'
-                              ? `Acompte ${invoice.installment_number}/${invoice.installment_total - 1}`
-                              : `Deposit ${invoice.installment_number} of ${invoice.installment_total - 1}`
-                            : profile.country === 'FR'
-                              ? `Versement ${invoice.installment_number} sur ${invoice.installment_total}`
-                              : `Installment ${invoice.installment_number} of ${invoice.installment_total}`}
-                        </span>
-                      )}
                   </>
                 )}
               </div>
@@ -2536,10 +2526,7 @@ export default function InvoiceView() {
           {isOwner && !invoice.is_locked && !isPro && (
             <div className="mb-6 px-5 py-4 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden">
               <p className="text-sm text-blue-700 font-semibold">
-                {lang.proRequiredToFinalize ||
-                  (profile?.country === 'FR'
-                    ? 'Passez à Pro pour modifier et finaliser cette facture.'
-                    : 'Upgrade to Pro to edit and finalize this invoice.')}
+                {lang.proRequiredToFinalize}
               </p>
               <LinkButton
                 href="/upgrade"
@@ -2569,7 +2556,7 @@ export default function InvoiceView() {
                       </span>
                       <span className="text-xs text-gray-500">
                         {new Date(cn.credit_note_date).toLocaleDateString(
-                          profile?.country === 'FR' ? 'fr-FR' : 'en-US'
+                          invoice.lang_snapshot === 'FR' ? 'fr-FR' : 'en-US'
                         )}
                       </span>
                     </div>
@@ -2638,17 +2625,13 @@ export default function InvoiceView() {
                           </p>
                         )}
                         {profile.vat_number && (
-                          <p>
-                            {profile.country === 'FR'
-                              ? `N° TVA : ${profile.vat_number}`
-                              : `VAT: ${profile.vat_number}`}
-                          </p>
+                          <p>{t(lang.vatLabel, { vat: profile.vat_number })}</p>
                         )}
                         {profile.company_reg_number && (
                           <p>
-                            {profile.country === 'FR'
-                              ? `SIRET : ${profile.company_reg_number}`
-                              : `Reg: ${profile.company_reg_number}`}
+                            {t(lang.companyRegLabel, {
+                              reg: profile.company_reg_number
+                            })}
                           </p>
                         )}
                       </div>
@@ -3575,10 +3558,7 @@ export default function InvoiceView() {
                               >
                                 <div>
                                   <span className="text-gray-500">
-                                    {lang.lessDepositPaid ||
-                                      (profile?.country === 'FR'
-                                        ? 'Moins : acompte versé'
-                                        : 'Less: deposit paid')}
+                                    {lang.lessDepositPaid}
                                   </span>
                                   <p className="text-[10px] text-gray-400 mt-0.5">
                                     {[
@@ -3620,10 +3600,7 @@ export default function InvoiceView() {
                               >
                                 <div>
                                   <span className="text-gray-500">
-                                    {lang.lessDepositPaid ||
-                                      (profile?.country === 'FR'
-                                        ? 'Moins : acompte versé'
-                                        : 'Less: deposit paid')}
+                                    {lang.lessDepositPaid}
                                   </span>
                                   <p className="text-[10px] text-gray-400 mt-0.5">
                                     {[
@@ -3669,7 +3646,7 @@ export default function InvoiceView() {
                                       ? ` · ${new Date(
                                           depositInvoice.invoice_date
                                         ).toLocaleDateString(
-                                          profile?.country === 'FR'
+                                          invoice.lang_snapshot === 'FR'
                                             ? 'fr-FR'
                                             : 'en-US',
                                           {
@@ -3685,10 +3662,7 @@ export default function InvoiceView() {
                                 <div className="flex justify-between items-start text-sm pb-3 border-b border-dashed border-gray-200">
                                   <div>
                                     <span className="text-gray-500">
-                                      {lang.lessDepositPaid ||
-                                        (profile?.country === 'FR'
-                                          ? 'Moins : acompte versé'
-                                          : 'Less: deposit paid')}
+                                      {lang.lessDepositPaid}
                                     </span>
                                     {depRef && (
                                       <p className="text-[10px] text-gray-400 mt-0.5">
@@ -3705,10 +3679,7 @@ export default function InvoiceView() {
                       {/* Balance subtotal */}
                       <div className="flex justify-between items-baseline text-sm">
                         <span className="text-gray-700 font-bold">
-                          {lang.balanceSubtotal ||
-                            (profile?.country === 'FR'
-                              ? 'Sous-total solde'
-                              : 'Balance subtotal')}
+                          {lang.balanceSubtotal}
                         </span>
                         <span className="font-mono font-bold text-gray-900 tabular-nums">
                           {fmt(billedTotals.subtotalCents)}

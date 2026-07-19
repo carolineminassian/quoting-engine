@@ -106,8 +106,9 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const country = inv.lang_snapshot || profile.country || 'US';
-      const isFr = country === 'FR';
+      const isFr = inv.lang_snapshot
+        ? inv.lang_snapshot === 'FR'
+        : profile.country === 'FR';
       const currency = inv.currency_snapshot || (isFr ? 'EUR' : 'USD');
       const amount = (inv.total_amount_cents / 100).toFixed(2);
       const currencySymbol = currency === 'EUR' ? '€' : '$';

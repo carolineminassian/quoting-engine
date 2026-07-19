@@ -19,12 +19,13 @@ export default function TermsOfService() {
         setIsLoggedIn(true);
         const { data: prof } = await supabase
           .from('profiles')
-          .select('country')
+          .select('country, default_lang') // Explicitly select default_lang to satisfy the type compiler
           .eq('id', session.user.id)
           .single();
 
-        if (prof?.country) {
-          const dbLang = prof.country === 'FR' ? 'FR' : 'EN';
+        if (prof) {
+          const dbLang =
+            prof.default_lang || (prof.country === 'FR' ? 'FR' : 'EN');
           setTimeout(() => setLang(dbLang), 0);
           localStorage.setItem('public_lang', dbLang);
           setAuthLoading(false);

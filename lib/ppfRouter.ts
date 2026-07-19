@@ -10,12 +10,24 @@ export async function transmitInvoiceToPPF({
   buyerSiren: string;
 }) {
   try {
-    // 1. Authenticate with AIFE PISTE OAuth2 Gateway
-    const authHeader = Buffer.from(
-      `${process.env.PPF_CLIENT_ID}:${process.env.PPF_CLIENT_SECRET}`
-    ).toString('base64');
+    const clientId = process.env.PPF_CLIENT_ID;
+    const clientSecret = process.env.PPF_CLIENT_SECRET;
+    const authUrl = process.env.PPF_AUTH_URL;
+    const apiUrl = process.env.PPF_API_URL;
 
-    const tokenRes = await fetch(process.env.PPF_AUTH_URL!, {
+    // Secure verification guard to check for missing environment variables
+    if (!clientId || !clientSecret || !authUrl || !apiUrl) {
+      throw new Error(
+        `Missing required PPF credentials inside server environment. Resolved: [Client ID: ${clientId ? 'Present' : 'MISSING'}, Secret: ${clientSecret ? 'Present' : 'MISSING'}, Auth URL: ${authUrl ? 'Present' : 'MISSING'}, API URL: ${apiUrl ? 'Present' : 'MISSING'}]`
+      );
+    }
+
+    // 1. Authenticate with AIFE PISTE OAuth2 Gateway
+    const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString(
+      'base64'
+    );
+
+    const tokenRes = await fetch(authUrl, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${authHeader}`,
@@ -31,43 +43,29 @@ export async function transmitInvoiceToPPF({
     const tokenData = (await tokenRes.json()) as { access_token: string };
     const accessToken = tokenData.access_token;
 
-    // 2. Build the multi-part form payload required by the PPF API
-    const formData = new FormData();
+    // 2. Base64 encode the uncompressed Factur-X PDF directly
+    const base64Pdf = pdfBuffer.toString('base64');
+    const safeFileName = `${invoiceNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
 
-    // Conforms to the standard French State Portals envelope schema
-    const metadata = {
-      emetteurSiren: sellerSiren,
-      destinataireSiren: buyerSiren,
-      numeroFacture: invoiceNumber,
-      format: 'FACTUR_X',
-      profil: 'BASIC'
+    // Assemble the clean single-document deposit schema for the G2B Sandbox
+    // Note: 'idUtilisateurCourant' is set to a standard mock/sandbox identifier (0 or 12345) to link with PISTE developer context
+    const payload = {
+      idUtilisateurCourant: 0,
+      fichierFacture: base64Pdf,
+      nomFichier: safeFileName,
+      formatDepot: 'PDF_NON_SIGNE'
     };
 
-    // Safely append metadata as a File-like Blob to satisfy JSON Content-Type headers in web FormData
-    const metadataBlob = new Blob([JSON.stringify(metadata)], {
-      type: 'application/json'
-    });
-    formData.append('metadata', metadataBlob, 'metadata.json');
-
-    // Convert Node.js Buffer explicitly to a Uint8Array and cast to any to eliminate the TypeScript ArrayBufferLike mismatch with standard Web BlobParts
-    const uint8Array = new Uint8Array(
-      pdfBuffer.buffer,
-      pdfBuffer.byteOffset,
-      pdfBuffer.byteLength
-    );
-    const pdfBlob = new Blob([uint8Array as any], { type: 'application/pdf' });
-
-    // Attach the actual compiled Factur-X PDF
-    formData.append('fichier', pdfBlob, `${invoiceNumber}.pdf`);
-
-    // 3. Post to the official PPF Invoice Intake endpoint
-    const response = await fetch(process.env.PPF_API_URL!, {
+    // 3. Post to the official G2B single invoice submission endpoint
+    // Logs are kept completely clean (no Base64 pollution)
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
         Accept: 'application/json'
       },
-      body: formData
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
@@ -78,14 +76,25 @@ export async function transmitInvoiceToPPF({
     }
 
     const result = (await response.json()) as {
+      uidFlux?: string;
       numeroEnregistrement?: string;
       id?: string;
       statut?: string;
+      pieceJointeId?: number;
+      identifiantFacture?: string;
     };
+
+    // Log clean, non-polluted success metadata to console
+    console.log(
+      `[PPF Sandbox] Successful submission receipt. Item ID: ${result.pieceJointeId || 'N/A'}`
+    );
+
     return {
       success: true,
-      ppfRegistryId: result.numeroEnregistrement || result.id || 'N/A', // State receipt reference
-      status: result.statut || 'DEPOT_RECU'
+      ppfRegistryId: result.pieceJointeId
+        ? String(result.pieceJointeId)
+        : result.identifiantFacture || result.uidFlux || 'N/A',
+      status: result.statut || 'INTERPRETEE_OCR'
     };
   } catch (err: any) {
     console.error('PPF Transmission Exception:', err);

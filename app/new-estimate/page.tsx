@@ -471,7 +471,7 @@ function NewEstimateContent() {
             siren: est.client_siren || ''
           });
           setCustomRef(est.custom_id || '');
-          setEstimateLang(est.country_snapshot === 'FR' ? 'FR' : 'EN');
+          setEstimateLang(est.lang_snapshot || 'EN');
           setEstimateCurrency(est.currency_snapshot || 'USD');
           setMarginMode(est.margin_mode_snapshot || 'none');
           setGlobalMargin(est.global_margin_snapshot || 0);
@@ -1359,9 +1359,7 @@ function NewEstimateContent() {
                                     {new Date(
                                       tmpl.created_at
                                     ).toLocaleDateString(
-                                      profile?.country === 'FR'
-                                        ? 'fr-FR'
-                                        : 'en-US',
+                                      estimateLang === 'FR' ? 'fr-FR' : 'en-US',
                                       {
                                         month: 'short',
                                         day: 'numeric',
@@ -1956,7 +1954,7 @@ function NewEstimateContent() {
                       setSections(sections.filter((_, i) => i !== sIdx))
                     }
                     className="absolute right-4 top-4 w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all duration-200 font-black opacity-100 sm:opacity-0 sm:group-hover/section:opacity-100 cursor-pointer hover:scale-110 active:scale-95"
-                    aria-label="Delete section"
+                    aria-label={lang.deleteSection}
                   >
                     ×
                   </button>
@@ -1998,7 +1996,7 @@ function NewEstimateContent() {
                           )
                         }
                         className="absolute right-1 bottom-3 text-gray-400 hover:text-black hover:bg-gray-50 transition-all duration-200 text-[10px] p-1.5 rounded cursor-pointer"
-                        aria-label="Toggle category list"
+                        aria-label={lang.toggleCategoryList}
                       >
                         ▼
                       </button>
@@ -2269,7 +2267,7 @@ function NewEstimateContent() {
                                   )
                                 }
                                 className="shrink-0 w-9 text-gray-400 hover:text-black hover:bg-gray-100/70 transition-all duration-200 text-[10px] cursor-pointer flex items-center justify-center"
-                                aria-label="Show description suggestions"
+                                aria-label={lang.showDescSuggestions}
                               >
                                 ▼
                               </button>
@@ -2779,7 +2777,7 @@ function NewEstimateContent() {
                               setSections(n);
                             }}
                             className="text-gray-300 hover:text-red-500 hover:bg-red-50 w-8 h-[34px] flex items-center justify-center font-bold transition-all duration-200 shrink-0 bg-white border border-gray-100 rounded sm:border-none sm:bg-transparent cursor-pointer hover:scale-110 active:scale-95"
-                            aria-label="Delete item"
+                            aria-label={lang.deleteItem}
                           >
                             ×
                           </button>
@@ -2900,7 +2898,7 @@ function NewEstimateContent() {
                                 )
                               }
                               className="shrink-0 w-8 self-stretch text-gray-400 hover:text-black hover:bg-gray-100/70 transition-all duration-200 text-[10px] cursor-pointer flex items-center justify-center"
-                              aria-label="Show preset suggestions"
+                              aria-label={lang.showPresetSuggestions}
                             >
                               ▼
                             </button>

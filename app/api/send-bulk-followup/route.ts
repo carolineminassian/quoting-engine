@@ -96,8 +96,9 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const estCountry = est.lang_snapshot || profile.country || 'US';
-      const isFr = estCountry === 'FR';
+      const isFr = est.lang_snapshot
+        ? est.lang_snapshot === 'FR'
+        : profile.country === 'FR';
       const customId = est.custom_id || est.id.slice(0, 8);
       const estimateUrl = `${baseUrl || 'https://pactestim.com'}/estimates/${est.id}`;
 

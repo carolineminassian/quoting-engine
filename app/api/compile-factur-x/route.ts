@@ -234,7 +234,6 @@ export async function POST(request: Request) {
 
     // F. Save the fully updated PDF/A-3b document
     const modifiedPdfBytes = await pdfDoc.save();
-    const modifiedBase64 = Buffer.from(modifiedPdfBytes).toString('base64');
 
     // 6. Upload compiled PDF to Supabase storage bucket
     const bucketName = 'invoices';
@@ -311,7 +310,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      pdfBase64: modifiedBase64,
       filePath: filePath,
       ppfReceiptId
     });

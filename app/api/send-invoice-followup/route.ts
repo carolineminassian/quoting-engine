@@ -39,10 +39,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Server-side cooldown check
+    // Server-side cooldown and language snapshot lookup
     const { data: existing } = await supabaseAdmin
       .from('invoices')
-      .select('last_followup_sent_at')
+      .select('last_followup_sent_at, lang_snapshot')
       .eq('id', invoiceId)
       .single();
 
@@ -57,7 +57,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const isFr = country === 'FR';
+    // Use direct database language configuration, fall back to English 'EN'
+    const activeLang = existing?.lang_snapshot || 'EN';
+    const isFr = activeLang === 'FR';
     const currencySymbol = currency === 'EUR' ? '€' : '$';
 
     const logoHtml = logoUrl

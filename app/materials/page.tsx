@@ -57,9 +57,10 @@ export default function MaterialsPage() {
 
       if (profRes.data) {
         setProfile(profRes.data);
-        setLang(
-          profRes.data.country === 'FR' ? translations.FR : translations.US
-        );
+        const activeLang =
+          profRes.data.default_lang ||
+          (profRes.data.country === 'FR' ? 'FR' : 'EN');
+        setLang(activeLang === 'FR' ? translations.FR : translations.US);
       }
 
       setMaterials(matsRes.data || []);

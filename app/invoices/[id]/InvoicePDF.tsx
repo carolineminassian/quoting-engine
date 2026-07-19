@@ -637,9 +637,7 @@ export default function InvoicePDF({
     subtotal_cents: number;
   }[]
 }: InvoicePDFProps) {
-  const isFr =
-    invoice.lang_snapshot === 'FR' ||
-    (invoice.lang_snapshot !== 'EN' && profile.country === 'FR');
+  const isFr = invoice.lang_snapshot === 'FR';
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
   const locale = isFr ? 'fr-FR' : 'en-US';
 

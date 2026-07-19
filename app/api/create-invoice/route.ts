@@ -78,7 +78,9 @@ export async function POST(request: Request) {
     }
 
     const estCountry = estimate.country_snapshot || profile?.country || 'US';
-    const isFr = estCountry === 'FR';
+    const isFr = estimate.lang_snapshot
+      ? estimate.lang_snapshot === 'FR'
+      : estCountry === 'FR';
 
     const estimateTotalCents = estimate.total_amount_cents || 0;
     const estimateTaxCents = estimate.tax_amount_cents || 0;

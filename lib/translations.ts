@@ -258,6 +258,31 @@ export const translations = {
     requireDeposit: 'Require Deposit',
     generateEstimate: 'Generate Estimate',
 
+    // VAT & Registration Labels
+    vatLabel: 'VAT: {vat}',
+    companyRegLabel: 'Reg: {reg}',
+
+    // Installment Planning
+    remainingBalanceLabel: 'Remaining balance',
+    overByLabel: 'Over by {amount} — ',
+    remainingLabel: '{amount} remaining — ',
+    totalComparison: 'Total: {total} / {target}',
+    exceedsRemainingWarning: ' ⚠ Exceeds remaining balance',
+
+    // Deposit / Installment Types
+    depositRowLabel: 'Deposit',
+    installmentRowLabel: 'Installment {number}',
+
+    clearFilter: 'Clear filter',
+    toggleClientList: 'Toggle client list',
+    newActivity: 'New activity',
+    deleteDraft: 'Delete Draft',
+    deleteSection: 'Delete section',
+    toggleCategoryList: 'Toggle category list',
+    showDescSuggestions: 'Show description suggestions',
+    deleteItem: 'Delete item',
+    showPresetSuggestions: 'Show preset suggestions',
+
     // === NEW: ESTIMATE VIEW ===
     internalDetails: 'Internal Details',
     createRevision: 'Create Revision',
@@ -455,6 +480,28 @@ export const translations = {
     fullProjectTotal: 'Approved project total',
     invoiceSubtotal: 'Invoice subtotal',
     depositSubtotal: 'Deposit subtotal',
+
+    // CSV Status Values
+    csvStatusApproved: 'Approved',
+    csvStatusRejected: 'Rejected',
+    csvStatusPending: 'Pending',
+    csvStatusDraft: 'Draft',
+
+    // CSV Unit Values
+    csvUnitDays: 'Days',
+    csvUnitHours: 'Hours',
+    csvLaborDailyName: 'Daily Labor',
+    csvLaborHourlyName: 'Hourly Labor',
+    csvCostCategoryLabor: '"Labor"',
+    csvDefaultServiceTitle: 'Service',
+
+    // CSV Headers - Summary Mode
+    csvSummaryHeaders:
+      'Estimate ID,Date,Client Name,Client Email,Client Phone,Client Address,Status,Base Margin,Global Margin %,Currency,Total Amount\n',
+
+    // CSV Headers - Detailed Mode
+    csvDetailedHeaders:
+      'Estimate ID,Date,Client Name,Client Email,Client Phone,Client Address,Status,Service Category,Service Description,Cost Category,Item/Labor Name,Quantity,Unit,Base Cost,Base Amount,Margin %,Margin Amount,Client Price (Before Tax),Tax %,Tax Amount,Client Price (Including Tax),Currency\n',
 
     approvedEstimateExceededTitle: 'Approved estimate exceeded',
     approvedEstimateExceededMessage:
@@ -757,7 +804,7 @@ export const translations = {
     unspecified: 'UNSPECIFIED',
     finalizedEstimate: 'finalized estimate',
     finalizedEstimates: 'finalized estimates',
-
+    sessionExpiredError: 'Session expired. Please log in again.',
     // Pro lock modal
     proLockTitle: 'Pro Feature',
     proLockCsvMessage:
@@ -765,6 +812,18 @@ export const translations = {
     proLockZipMessage:
       'Bulk PDF downloads are available exclusively on the Pro plan. Upgrade to download all your estimates at once.',
     proLockUpgradeBtn: 'Upgrade to Pro',
+    invalidAmountEntered: 'Please enter a valid amount.',
+    pleaseProvideReason: 'Please provide a reason.',
+    amountExceedsLimit: 'Amount cannot exceed {limit}.',
+    alreadyCreditedWarning:
+      '{credited} already credited. Remaining creditable: {remaining}',
+    creditTypeSelectorLabel: 'Credit Type',
+    maxLabel: 'Max',
+
+    // Bank Account Profile Setup Placeholders
+    contactEmailFieldPlaceholder: 'contact@yourbusiness.com',
+    vatPlaceholder: 'GB123456789',
+    companyRegPlaceholder: '12345678',
 
     // Annual plan
     monthlyLabel: 'Monthly',
@@ -1292,6 +1351,32 @@ export const translations = {
     approvedEstimateExceededTitle: 'Dépassement du devis approuvé',
     approvedEstimateExceededMessage:
       'Cette facture dépasse le montant restant facturable du devis approuvé de {amount}. Voulez-vous quand même la finaliser ?',
+    // VAT & Registration Labels
+    vatLabel: 'N° TVA : {vat}',
+    companyRegLabel: 'SIRET : {reg}',
+
+    sessionExpiredError: 'Session expirée. Veuillez vous reconnecter.',
+    // Installment Planning
+    remainingBalanceLabel: 'Solde restant',
+    overByLabel: 'Dépassement de {amount} — ',
+    remainingLabel: '{amount} restant — ',
+    totalComparison: 'Total : {total} / {target}',
+    exceedsRemainingWarning: ' ⚠ Dépasse le solde restant',
+
+    // Deposit / Installment Types
+    depositRowLabel: 'Acompte',
+    installmentRowLabel: 'Versement {number}',
+
+    clearFilter: 'Effacer le filtre',
+    toggleClientList: 'Afficher/masquer la liste des clients',
+    newActivity: 'Nouvelle activité',
+    deleteDraft: 'Supprimer le brouillon',
+    deleteSection: 'Supprimer la section',
+    toggleCategoryList: 'Afficher/masquer la liste des catégories',
+    showDescSuggestions: 'Afficher les suggestions de description',
+    deleteItem: "Supprimer l'élément",
+    showPresetSuggestions: 'Afficher les suggestions prédéfinies',
+
     // Avoirs
     createCreditNote: 'Créer un Avoir',
     creditNote: 'Avoir',
@@ -1328,7 +1413,37 @@ export const translations = {
     bankWireInstructions: 'Coordonnées Bancaires / Virement',
     paymentLinkLabel: 'Paiement en Ligne',
     payInvoiceOnline: 'Payer en Ligne',
+    invalidAmountEntered: 'Veuillez saisir un montant valide.',
+    pleaseProvideReason: 'Veuillez indiquer un motif.',
+    amountExceedsLimit: 'Le montant ne peut pas dépasser {limit}.',
+    alreadyCreditedWarning:
+      '{credited} déjà crédité. Crédit restant : {remaining}',
+    creditTypeSelectorLabel: "Type d'avoir",
+    maxLabel: 'Max',
+    // CSV Status Values
+    csvStatusApproved: 'Approuvé',
+    csvStatusRejected: 'Refusé',
+    csvStatusPending: 'En Attente',
+    csvStatusDraft: 'Brouillon',
 
+    // CSV Unit Values
+    csvUnitDays: 'Jours',
+    csvUnitHours: 'Heures',
+    csvLaborDailyName: "Main-d'œuvre (Jour)",
+    csvLaborHourlyName: "Main-d'œuvre (Heure)",
+    csvCostCategoryLabor: '"Main-d\'œuvre"',
+    csvDefaultServiceTitle: 'Service',
+
+    // CSV Headers - Summary Mode
+    csvSummaryHeaders:
+      'ID Devis,Date,Nom du Client,Email du Client,Téléphone du Client,Adresse du Client,Statut,Marge de base,Marge globale %,Devise,Montant total\n',
+
+    // CSV Headers - Detailed Mode
+    csvDetailedHeaders:
+      "ID Devis,Date,Nom du Client,Email du Client,Téléphone du Client,Adresse du Client,Statut,Catégorie de Service,Description du Service,Catégorie de Coût,Nom de l'Article/Main d'œuvre,Quantité,Unité,Coût de Base,Montant de Base,% Marge,Montant Marge,Prix Client (HT),% TVA,Montant TVA,Prix Client (TTC),Devise\n",
+    contactEmailFieldPlaceholder: 'contact@votreentreprise.fr',
+    vatPlaceholder: 'FR00000000000',
+    companyRegPlaceholder: '000 000 000 00000',
     // Suivi de facturation
     billingProgress: 'Facturation',
     fullyBilled: 'Entièrement Facturé',

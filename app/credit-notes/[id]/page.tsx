@@ -87,10 +87,12 @@ export default function CreditNoteView() {
         if (user) {
           const { data: prof } = await supabase
             .from('profiles')
-            .select('country')
+            .select('country, default_lang')
             .eq('id', user.id)
             .single();
-          setLang(prof?.country === 'FR' ? translations.FR : translations.US);
+          const activeLang =
+            prof?.default_lang || (prof?.country === 'FR' ? 'FR' : 'EN');
+          setLang(activeLang === 'FR' ? translations.FR : translations.US);
         } else {
           setLang(translations.US);
         }
@@ -112,9 +114,12 @@ export default function CreditNoteView() {
 
       const prof = profRes.data;
       const inv = invRes.data;
-      const country = cn.country_snapshot || prof?.country || 'US';
+      const resolvedLang =
+        cn.lang_snapshot ||
+        prof?.default_lang ||
+        (cn.country_snapshot === 'FR' ? 'FR' : 'EN');
 
-      setLang(country === 'FR' ? translations.FR : translations.US);
+      setLang(resolvedLang === 'FR' ? translations.FR : translations.US);
       setIsOwner(!!user && user.id === cn.user_id);
       setCreditNote(cn);
       setInvoice(inv || null);
@@ -150,7 +155,7 @@ export default function CreditNoteView() {
       const InvoicePDF = (await import('../../invoices/[id]/InvoicePDF'))
         .default;
 
-      const isFr = profile?.country === 'FR';
+      const isFr = cn.lang_snapshot === 'FR';
       const currentLang = isFr ? translations.FR : translations.US;
       const taxRate =
         invoice?.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
@@ -311,7 +316,7 @@ export default function CreditNoteView() {
     );
   }
 
-  const isFR = profile?.country === 'FR';
+  const isFR = creditNote.lang_snapshot === 'FR';
   const isFullCredit = creditNote.is_full_credit;
 
   const invContext = {
