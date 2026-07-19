@@ -155,7 +155,7 @@ export default function CreditNoteView() {
       const InvoicePDF = (await import('../../invoices/[id]/InvoicePDF'))
         .default;
 
-      const isFr = cn.lang_snapshot === 'FR';
+      const isFr = creditNote?.lang_snapshot === 'FR';
       const currentLang = isFr ? translations.FR : translations.US;
       const taxRate =
         invoice?.tax_rate_snapshot ?? profile?.default_tax_rate ?? 0;
