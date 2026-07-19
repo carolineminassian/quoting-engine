@@ -500,9 +500,7 @@ export default function EstimatePDF({
   sections,
   additionalCharges = []
 }: EstimatePDFProps) {
-  const isFr =
-    estimate.lang_snapshot === 'FR' ||
-    (estimate.lang_snapshot !== 'EN' && profile.country === 'FR');
+  const isFr = estimate.lang_snapshot === 'FR';
   const currencySymbol = profile.currency === 'EUR' ? '€' : '$';
   const locale = isFr ? 'fr-FR' : 'en-US';
 

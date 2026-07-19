@@ -353,7 +353,7 @@ export default function AnalyticsPage() {
     const m = d.getMonth();
     const y = d.getFullYear();
     const label = d.toLocaleString(
-      prof?.default_lang === 'FR' ? 'fr-FR' : 'en-US',
+      lang === translations.FR ? 'fr-FR' : 'en-US',
       {
         month: 'short'
       }
@@ -475,7 +475,7 @@ export default function AnalyticsPage() {
     const m = d.getMonth();
     const y = d.getFullYear();
     const label = d.toLocaleString(
-      prof?.default_lang === 'FR' ? 'fr-FR' : 'en-US',
+      lang === translations.FR ? 'fr-FR' : 'en-US',
       {
         month: 'short'
       }
